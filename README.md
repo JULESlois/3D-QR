@@ -23,11 +23,12 @@ The external quiet zone remains conservative: it may be a low scanner-light plat
 
 ## Built-in generators
 
-- **Tree / Full Lawn** — broad grass-like QR landscape with the complete physical quiet zone.
-- **House / Courtyard Pad** — warm compact platform and house massing.
+- **Tree / Full Lawn** — one broad hero tree on the original lawn-like QR landscape.
+- **Forest / Woodland Floor** — a mixed-species woodland of broadleaf trees, conical pines and larger ancient trees. Overlapping canopy columns surround a winding low clearing while sparse shrubs fill the understory.
+- **House / Residential Lot** — a large gabled residence with projecting front gable, chimney, garage wing, porch and garden path.
 - **Castle / Ruined Fortress** — a central keep dominates three finder-area bastions with different damage levels. Broken timing walls contain real gaps and the courtyard uses sparse rubble rather than symmetrical corner towers.
 - **Glyph / Display Plaque** — alphanumeric relief on a thin QR-sized plaque.
-- **City / Urban Masterplan** — a central megablock intentionally spans both light and dark cells. One light roof column can become an antenna; other light cells remain streets or rise into civic plazas. Sparse secondary buildings keep the skyline readable.
+- **City / Dense Skyline** — a high-rise district made from deliberately different silhouettes: landmark spire, setback tower, twin towers, podium towers, slabs, terraces and crowned offices.
 - **Lighthouse / Tidal Harbor** — scanner-light cells become shallow blue water with one/two-voxel wave variation; finder regions become reef-like breakwaters while the dark island and beacon remain the visual anchor.
 - **Pagoda / Temple Courtyard** — a stepped mixed-polarity main pagoda spans light and dark data cells, finder regions become secondary pavilions, timing cells become corridors, and scanner-light data cells rise into gravel courts and steps.
 - **Temple / Shrine Axis** — a large foreground torii frames a stone approach and rear horizontal shrine hall. Finder regions are intentionally low gardens/water/lantern fragments rather than three tower nodes.
@@ -103,6 +104,12 @@ type ModuleZone = 'finder' | 'timing' | 'data'
 A style may use those zones semantically, but finder regions are not required to become three equivalent structures. Recent generators deliberately use different silhouette grammars:
 
 ```text
+Forest
+hero silhouette → layered woodland canopy
+light + dark cells → mixed-species crowns
+central field → winding low clearing / path
+outer data → understory shrubs
+
 Castle
 hero silhouette → central keep
 finder → three uneven ruined bastions
@@ -115,9 +122,9 @@ light data → waves
 finder → reefs / breakwaters
 
 City
-hero silhouette → sparse skyline / megablock
-light + dark data → coherent buildings
-light data → roads / plazas / antenna roof cells
+hero silhouette → dense differentiated skyline
+light + dark data → coherent tower footprints
+building grammar → landmark / setback / twin / podium / slab / terrace / crown
 
 Pagoda
 hero silhouette → vertical tiered tower
@@ -154,7 +161,7 @@ interface StyleAppearance {
 }
 ```
 
-This allows Lighthouse water to stay pale blue, Crystal bodies to use a dedicated cyan mineral range, and Temple to keep a warm shrine palette while scanner polarity is still controlled by the final cap colors.
+This allows Lighthouse water to stay pale blue, Crystal bodies to use a dedicated cyan mineral range, Forest to keep a mossy floor and green canopy, and Temple to keep a warm shrine palette while scanner polarity is still controlled by the final cap colors.
 
 ## Deterministic generation
 

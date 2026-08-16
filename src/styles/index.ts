@@ -2,6 +2,7 @@ import type { QRMatrixData } from '../qr'
 import type { SculptureBuild } from '../sculpture'
 import type { PaletteKey } from '../palettes'
 import { generateTree } from './tree'
+import { generateForest } from './forest'
 import { generateHouse } from './house'
 import { generateCastle } from './castle'
 import { generateGlyph } from './glyph'
@@ -11,7 +12,7 @@ import { generatePagoda } from './pagoda'
 import { generateTemple } from './temple'
 import { generateCrystal } from './crystal'
 
-export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple' | 'crystal'
+export type StyleId = 'tree' | 'forest' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple' | 'crystal'
 
 export interface StyleAppearance {
   baseLight: string
@@ -61,12 +62,31 @@ export const STYLES: readonly StyleDefinition[] = [
     generate: generateTree,
   },
   {
+    id: 'forest',
+    label: 'Forest',
+    eyebrow: 'VOXEL QR SCENE / FOREST',
+    headline: 'Walk into the code.',
+    description: 'A mixed-species woodland replaces the single hero tree. Broadleaf crowns, conical pines and a few larger ancient trees overlap into a layered canopy around a winding low clearing, while shrubs and mossy QR ground fill the understory.',
+    specimen: 'CANOPY + TRUNKS + CLEARING = QR',
+    projectionLabel: 'WOODLAND FLOOR',
+    defaultPalette: 'summer',
+    appearance: {
+      baseLight: '#d8ddbd',
+      baseDark: ['#274b35', '#31583b', '#3b6543', '#203e2e'],
+      foundation: ['#735e45', '#604d39', '#826b4e'],
+      qrTop: '#173927',
+      lightTop: '#dce2c2',
+      voxelFill: 0.93,
+    },
+    generate: generateForest,
+  },
+  {
     id: 'house',
     label: 'House',
     eyebrow: 'VOXEL QR SCULPTURE / HOUSE',
     headline: 'Live in the code.',
-    description: 'One coherent mixed-polarity residence now dominates the lot: a stepped gabled roof, chimney, front door and windows, porch canopy and garden path replace the old undifferentiated QR-height mass. Finder regions stay at ground level as part of the residential site.',
-    specimen: 'GABLE + CHIMNEY + PORCH = QR',
+    description: 'A large mixed-polarity residence dominates the lot: main gabled home, projecting front gable, two-cell chimney, garage wing, porch canopy and garden path. Finder regions stay at ground level as part of the residential site.',
+    specimen: 'HOME + GABLE + GARAGE = QR',
     projectionLabel: 'RESIDENTIAL LOT',
     defaultPalette: 'ginkgo',
     appearance: {
@@ -120,10 +140,10 @@ export const STYLES: readonly StyleDefinition[] = [
     id: 'city',
     label: 'City',
     eyebrow: 'VOXEL QR SCULPTURE / CITY',
-    headline: 'Plan the code.',
-    description: 'A planned skyline replaces the old random pillar field. A central podium-and-tower CBD anchors long slab blocks, a hollow courtyard block, a stepped terrace and one secondary office tower, with open QR ground reading as streets and civic space between coherent building footprints.',
-    specimen: 'CBD + BLOCKS + STREETS = QR',
-    projectionLabel: 'URBAN DISTRICTS',
+    headline: 'Raise the code.',
+    description: 'A dense high-rise skyline uses deliberately different building silhouettes: landmark spire, setback tower, twin towers, podium towers, slabs, terraces and crowned offices. Buildings may cross light and dark QR cells while their roofs restore scanner polarity.',
+    specimen: 'DIVERSE TOWERS + SKYLINE = QR',
+    projectionLabel: 'DENSE SKYLINE',
     defaultPalette: 'ginkgo',
     appearance: {
       baseLight: '#eff1ec',
