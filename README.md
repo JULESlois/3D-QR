@@ -1,30 +1,29 @@
 # 3D-QR
 
-A generative-art experiment built with Three.js: enter a URL or text, grow its real QR matrix into a colorful 3D tree, then fold the same modules back into a flat, scannable QR code.
+A generative Three.js experiment where a real QR matrix is built as one voxel sculpture. In the isometric view it reads as a small tree standing on a tiled ground plane; rotate the same object to the top view and the tree crown plus ground become the QR code.
 
 The interaction is inspired by [Chroma Tree](https://6cls.com/chroma-tree). This repository is an original implementation written from scratch rather than a source-code copy.
 
 ## Live demo
 
-GitHub Pages deployment is configured for `main` and publishes the production build from `dist/`.
-
-Expected project URL after Pages is enabled for the repository:
-
 `https://juleslois.github.io/3D-QR/`
+
+GitHub Pages deployment is configured for `main` and publishes the production build from `dist/`.
 
 ## What it does
 
-- Encodes the input with `qrcode` and reads the actual QR module matrix.
-- Creates one Three.js instanced leaf for every dark QR module.
-- Gives every module two deterministic transforms:
-  - a procedural tree-canopy position, rotation, and non-uniform leaf scale;
-  - its exact QR grid position.
-- Morphs between both layouts with eased transform interpolation and subtle procedural wind.
-- Uses a separate flat, unlit QR `InstancedMesh` in the final stage so scanability is not affected by the richer tree material and lighting.
-- Transitions the camera from an orbitable perspective view to a front-facing QR view.
-- Fades the curved low-poly trunk, dust field, ground shadow, and background treatment away for QR mode.
-- Supports Blossom, Summer, Ginkgo, and Spectrum palettes.
-- Seeds the procedural tree from the encoded text, so the same content grows the same tree.
+- Encodes the input with `qrcode` and reads the complete QR module matrix.
+- Builds a four-module quiet zone and the whole symbol as a tiled voxel ground plane.
+- Uses light ground voxels for QR light modules.
+- Uses green ground voxels for dark modules that remain on the ground.
+- Promotes a deterministic central subset of dark data modules into elevated tree-canopy columns.
+- Keeps the top voxel of every canopy column dark enough to remain a valid QR dark module from the top view.
+- Builds two trunk columns underneath central canopy modules, so the trunk never introduces a new top-view QR cell.
+- Uses one `InstancedMesh` for the whole sculpture rather than separate tree and QR meshes.
+- Switches views only by slerping the sculpture root between an isometric quaternion and a top-view quaternion.
+- Uses a fixed orthographic camera so the QR state is an aligned top projection instead of a perspective reconstruction.
+- Supports Blossom, Summer, Ginkgo, and Spectrum canopy palettes while preserving a green/cream ground matrix.
+- Seeds the voxel topology from the encoded text, so the same content produces the same tree.
 
 ## Stack
 
@@ -51,36 +50,41 @@ npm run preview
 
 ## Core model
 
-A leaf is not separate from the QR code; it is a QR module with two layouts:
+There is no longer a separate QR render layer and no per-module tree-to-grid morph. The QR is the top projection of the same voxel object:
 
 ```ts
-interface LeafLayout {
-  qrPosition: THREE.Vector3
-  treePosition: THREE.Vector3
-  treeRotation: THREE.Quaternion
-  treeScale: THREE.Vector3
+interface SculptureVoxel {
+  x: number
+  y: number
+  z: number
+  kind: 'floor-light' | 'floor-dark' | 'trunk' | 'canopy' | 'canopy-top'
   colorPhase: number
-  windPhase: number
-  windStrength: number
 }
 ```
 
-At runtime, each tree instance interpolates toward its QR position while its organic scale, rotation, and wind motion collapse. Near the end of the transition, a separate unlit plane-based QR mesh fades in at the exact module coordinates.
+The mode transition is intentionally small:
+
+```ts
+sculptureRoot.quaternion.slerpQuaternions(
+  treeQuaternion,
+  qrQuaternion,
+  easedProgress,
+)
+```
+
+The ground occupies the QR grid in the X/Z plane. Rotating the sculpture by 90 degrees around X turns that plane toward the orthographic camera. Elevated canopy columns remain inside dark QR cells, so their top voxels simply replace the green ground modules with canopy-colored dark modules in the QR projection.
 
 ## Interaction
 
-- Drag the canvas to orbit the tree.
-- Click the canvas or `REVEAL QR` to fold into QR mode.
-- Click again or use `GROW TREE` to return to the sculpture.
-- Edit the input to regenerate the QR matrix and deterministic tree.
-- Use the four square swatches to change palette.
+- Click the canvas or `VIEW QR` to rotate to the machine-readable view.
+- Click again or use `BACK TO TREE` to return to the isometric sculpture.
+- Edit the input to rebuild the QR matrix and deterministic voxel tree.
+- Use the four swatches to change the canopy palette.
 
 ## GitHub Pages
 
 The workflow in `.github/workflows/build.yml` type-checks and builds the project on pushes and pull requests. Pushes to `main` also upload `dist/` and deploy it with GitHub Pages Actions.
 
-If Pages has never been enabled for this repository, open **Settings → Pages → Build and deployment → Source** and select **GitHub Actions** once. Private repositories also require a GitHub plan that supports Pages for private repositories.
-
 ## Notes on scanability
 
-The final QR state uses the unmodified matrix produced by the encoder, a four-module quiet zone, a front-facing camera, and an unlit high-contrast QR layer. Actual scan performance still depends on screen glare, camera focus, display scaling, and encoded payload length.
+The QR state uses the unmodified encoder matrix and a four-module quiet zone. Every elevated tree column is constrained to an already-dark QR data cell, so the tree cannot create a new dark module in a light cell. Finder/timing and remaining dark modules stay on the green ground. The fixed orthographic top view keeps all module centers aligned. Actual scan performance still depends on display scaling, camera focus, screen glare, and palette contrast.

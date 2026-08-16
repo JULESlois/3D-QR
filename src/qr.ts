@@ -1,21 +1,29 @@
 import QRCode from 'qrcode'
 
-export type ModuleRole = 'finder' | 'timing' | 'data'
+export type ModuleRole = 'finder' | 'timing' | 'data' | 'light'
+export type DarkModuleRole = Exclude<ModuleRole, 'light'>
 
-export interface DarkModule {
+export interface QRCell {
   row: number
   col: number
   index: number
+  dark: boolean
   role: ModuleRole
+}
+
+export interface DarkModule extends QRCell {
+  dark: true
+  role: DarkModuleRole
 }
 
 export interface QRMatrixData {
   size: number
   version: number
+  cells: QRCell[]
   darkModules: DarkModule[]
 }
 
-function classifyModule(row: number, col: number, size: number): ModuleRole {
+function classifyDarkModule(row: number, col: number, size: number): DarkModuleRole {
   const inTopLeftFinder = row <= 6 && col <= 6
   const inTopRightFinder = row <= 6 && col >= size - 7
   const inBottomLeftFinder = row >= size - 7 && col <= 6
@@ -31,26 +39,41 @@ function classifyModule(row: number, col: number, size: number): ModuleRole {
 
 export function createQRMatrix(value: string): QRMatrixData {
   const symbol = QRCode.create(value, { errorCorrectionLevel: 'M' })
+  const cells: QRCell[] = []
   const darkModules: DarkModule[] = []
-  let index = 0
+  const size = symbol.modules.size
 
-  for (let row = 0; row < symbol.modules.size; row += 1) {
-    for (let col = 0; col < symbol.modules.size; col += 1) {
-      if (symbol.modules.get(row, col)) {
-        darkModules.push({
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      const index = row * size + col
+      const dark = Boolean(symbol.modules.get(row, col))
+
+      if (dark) {
+        const cell: DarkModule = {
           row,
           col,
           index,
-          role: classifyModule(row, col, symbol.modules.size),
+          dark: true,
+          role: classifyDarkModule(row, col, size),
+        }
+        cells.push(cell)
+        darkModules.push(cell)
+      } else {
+        cells.push({
+          row,
+          col,
+          index,
+          dark: false,
+          role: 'light',
         })
-        index += 1
       }
     }
   }
 
   return {
-    size: symbol.modules.size,
+    size,
     version: symbol.version,
+    cells,
     darkModules,
   }
 }

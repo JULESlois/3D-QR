@@ -6,13 +6,13 @@
     <meta name="theme-color" content="#f2f0e7" />
     <meta
       name="description"
-      content="A generative Three.js sculpture where every leaf is a real QR module. Fold the living tree into a scannable code."
+      content="A single voxel sculpture whose tree crown and ground become a real QR code when rotated."
     />
-    <title>3D QR — Generative Chroma Tree</title>
+    <title>3D QR — One Sculpture, Two Views</title>
   </head>
   <body data-mode="tree">
     <main class="app-shell">
-      <section class="stage" id="stage" aria-label="Interactive 3D QR sculpture">
+      <section class="stage" id="stage" aria-label="Interactive voxel QR sculpture">
         <div class="stage-grain" aria-hidden="true"></div>
       </section>
 
@@ -25,17 +25,17 @@
           <a class="source-link" href="https://github.com/JULESlois/3D-QR" target="_blank" rel="noreferrer">SOURCE ↗</a>
           <div class="mode-readout">
             <span class="mode-dot" aria-hidden="true"></span>
-            <span id="mode-readout">TREE / LIVING</span>
+            <span id="mode-readout">TREE / ISOMETRIC</span>
           </div>
         </div>
       </header>
 
       <section class="control-panel" aria-label="QR controls">
         <div class="control-copy">
-          <p class="eyebrow">QR MODULE SCULPTURE / 001</p>
-          <h1>Grow the code.</h1>
+          <p class="eyebrow">VOXEL QR SCULPTURE / 002</p>
+          <h1>Rotate the code.</h1>
           <p class="lede">
-            Every leaf is a live QR module. Orbit the sculpture, change its season, then fold it flat when you want the machine-readable state.
+            The tree and the ground already are the QR. Nothing flattens, swaps, or fades in — the same voxel field simply rotates into its machine-readable view.
           </p>
         </div>
 
@@ -63,19 +63,19 @@
         </div>
 
         <div class="panel-footer">
-          <p id="qr-meta">BUILDING QR MATRIX…</p>
+          <p id="qr-meta">BUILDING VOXEL FIELD…</p>
           <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
-            <span id="mode-toggle-label">REVEAL QR</span>
+            <span id="mode-toggle-label">VIEW QR</span>
             <span class="toggle-glyph" aria-hidden="true">↗</span>
           </button>
         </div>
       </section>
 
       <aside class="specimen-meta" aria-hidden="true">
-        <span>THREE.JS / INSTANCED</span>
-        <span>REAL QR MATRIX / LIVE</span>
+        <span>TREE + GROUND = QR</span>
+        <span>SINGLE INSTANCED VOXEL FIELD</span>
       </aside>
-      <p class="stage-hint" id="stage-hint">DRAG TO ORBIT · CLICK TO FOLD</p>
+      <p class="stage-hint" id="stage-hint">CLICK TO ROTATE · ONE SCULPTURE / TWO VIEWS</p>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

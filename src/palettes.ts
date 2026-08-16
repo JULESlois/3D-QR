@@ -9,23 +9,23 @@ export interface PaletteDefinition {
 export const PALETTES: Record<PaletteKey, PaletteDefinition> = {
   blossom: {
     label: 'Blossom',
-    colors: ['#f8dce2', '#efb2c0', '#dc7894', '#f5c8d2', '#be607e', '#f0e3dc', '#d996aa'],
-    qrDark: '#351923',
+    colors: ['#f8dce2', '#efb2c0', '#dc7894', '#f5c8d2', '#d996aa', '#f0e3dc', '#c86f92'],
+    qrDark: '#a1416c',
   },
   summer: {
     label: 'Summer',
-    colors: ['#c5d99b', '#91ba76', '#5f915a', '#acd083', '#477a4d', '#d8e2ac', '#76a665'],
-    qrDark: '#142d19',
+    colors: ['#d1e1aa', '#a8c98b', '#79a86a', '#b8d49a', '#5e915a', '#dfe8bf', '#8db77a'],
+    qrDark: '#315f3e',
   },
   ginkgo: {
     label: 'Ginkgo',
-    colors: ['#f6e2a0', '#efcc5c', '#ce9d30', '#f8d978', '#aa7b25', '#dfb844', '#eee0a3'],
-    qrDark: '#372807',
+    colors: ['#f7e5a6', '#efcf65', '#d2a23a', '#f4d77c', '#ba8730', '#e1b84b', '#efe0a0'],
+    qrDark: '#755719',
   },
   spectrum: {
     label: 'Spectrum',
-    colors: ['#d95f78', '#e99561', '#d7ba50', '#72aa6f', '#589ea9', '#6479b9', '#9b6ab0', '#cf7298'],
-    qrDark: '#171922',
+    colors: ['#d96f87', '#e69a67', '#d7bc59', '#78aa76', '#65a4ad', '#6d83bd', '#9d72ad', '#cf799c'],
+    qrDark: '#3d4965',
   },
 }
 
