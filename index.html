@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4f2ea" />
+    <meta name="theme-color" content="#f2f0e7" />
     <meta
       name="description"
-      content="A Three.js QR sculpture that grows into a colorful tree and folds back into a scannable code."
+      content="A generative Three.js sculpture where every leaf is a real QR module. Fold the living tree into a scannable code."
     />
-    <title>3D QR — Chroma Tree</title>
+    <title>3D QR — Generative Chroma Tree</title>
   </head>
-  <body>
+  <body data-mode="tree">
     <main class="app-shell">
       <section class="stage" id="stage" aria-label="Interactive 3D QR sculpture">
         <div class="stage-grain" aria-hidden="true"></div>
@@ -21,23 +21,26 @@
           <span class="brand-mark" aria-hidden="true"></span>
           <span>3D / QR</span>
         </a>
-        <div class="mode-readout">
-          <span class="mode-dot" aria-hidden="true"></span>
-          <span id="mode-readout">TREE MODE</span>
+        <div class="header-actions">
+          <a class="source-link" href="https://github.com/JULESlois/3D-QR" target="_blank" rel="noreferrer">SOURCE ↗</a>
+          <div class="mode-readout">
+            <span class="mode-dot" aria-hidden="true"></span>
+            <span id="mode-readout">TREE / LIVING</span>
+          </div>
         </div>
       </header>
 
       <section class="control-panel" aria-label="QR controls">
         <div class="control-copy">
-          <p class="eyebrow">GENERATIVE QR SCULPTURE</p>
-          <h1>Grow a link.</h1>
+          <p class="eyebrow">QR MODULE SCULPTURE / 001</p>
+          <h1>Grow the code.</h1>
           <p class="lede">
-            One QR matrix, two spatial layouts. Drag the tree, then fold it flat to scan.
+            Every leaf is a live QR module. Orbit the sculpture, change its season, then fold it flat when you want the machine-readable state.
           </p>
         </div>
 
         <label class="url-field" for="qr-input">
-          <span>URL / TEXT</span>
+          <span>SEED / URL OR TEXT</span>
           <input
             id="qr-input"
             type="text"
@@ -49,23 +52,30 @@
           />
         </label>
 
-        <div class="palette-row" aria-label="Tree palette">
-          <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
-          <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
-          <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
-          <button class="palette-swatch" type="button" data-palette="spectrum" aria-label="Spectrum palette"></button>
+        <div class="palette-control">
+          <span class="palette-label">CANOPY / PALETTE</span>
+          <div class="palette-row" aria-label="Tree palette">
+            <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
+            <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
+            <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
+            <button class="palette-swatch" type="button" data-palette="spectrum" aria-label="Spectrum palette"></button>
+          </div>
         </div>
 
         <div class="panel-footer">
-          <p id="qr-meta">Building QR matrix…</p>
+          <p id="qr-meta">BUILDING QR MATRIX…</p>
           <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
-            <span id="mode-toggle-label">SHOW QR</span>
+            <span id="mode-toggle-label">REVEAL QR</span>
             <span class="toggle-glyph" aria-hidden="true">↗</span>
           </button>
         </div>
       </section>
 
-      <p class="stage-hint" id="stage-hint">DRAG TO ORBIT · CLICK CANVAS TO MORPH</p>
+      <aside class="specimen-meta" aria-hidden="true">
+        <span>THREE.JS / INSTANCED</span>
+        <span>REAL QR MATRIX / LIVE</span>
+      </aside>
+      <p class="stage-hint" id="stage-hint">DRAG TO ORBIT · CLICK TO FOLD</p>
     </main>
 
     <script type="module" src="/src/main.ts"></script>
