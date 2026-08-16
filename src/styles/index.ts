@@ -7,8 +7,9 @@ import { generateCastle } from './castle'
 import { generateGlyph } from './glyph'
 import { generateCity } from './city'
 import { generateLighthouse } from './lighthouse'
+import { generatePagoda } from './pagoda'
 
-export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse'
+export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda'
 
 export interface StyleAppearance {
   baseLight: string
@@ -148,6 +149,25 @@ export const STYLES: readonly StyleDefinition[] = [
       voxelFill: 0.93,
     },
     generate: generateLighthouse,
+  },
+  {
+    id: 'pagoda',
+    label: 'Pagoda',
+    eyebrow: 'VOXEL QR SCULPTURE / PAGODA',
+    headline: 'Layer the code.',
+    description: 'A tiered main pagoda spans scanner-light and scanner-dark data cells as one continuous building. Finder regions become secondary pavilions, timing cells become ordered corridors, and pale cells rise into gravel courts and stone steps.',
+    specimen: 'PAGODA + PAVILIONS + COURTS = QR',
+    projectionLabel: 'TEMPLE COURTYARD',
+    defaultPalette: 'ginkgo',
+    appearance: {
+      baseLight: '#eee7d5',
+      baseDark: ['#5a4c3d', '#665846', '#4a4f43', '#735c46'],
+      foundation: ['#8c7f6d', '#756a5b', '#a1937d'],
+      qrTop: '#3d342c',
+      lightTop: '#f2ead8',
+      voxelFill: 0.94,
+    },
+    generate: generatePagoda,
   },
 ]
 

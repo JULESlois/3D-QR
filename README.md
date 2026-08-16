@@ -29,6 +29,7 @@ The external quiet zone remains conservative: it may be a low scanner-light plat
 - **Glyph / Display Plaque** — alphanumeric relief on a thin QR-sized plaque.
 - **City / Urban Masterplan** — a central megablock intentionally spans both light and dark cells. One light roof column can become an antenna; other light cells remain streets or rise into civic plazas. Sparse secondary blocks keep the skyline readable.
 - **Lighthouse / Tidal Harbor** — scanner-light cells become shallow blue water with one/two-voxel wave variation; finder regions become reef-like breakwaters while the dark island and beacon rise above them.
+- **Pagoda / Temple Courtyard** — a stepped mixed-polarity main pagoda spans light and dark data cells, finder regions become secondary pavilions, timing cells become corridors, and scanner-light data cells rise into gravel courts and steps.
 
 ## Architecture
 
@@ -116,6 +117,12 @@ City
 light + dark data → one coherent megabuilding
 light data → roads / plazas / antenna roof cells
 dark data → secondary buildings
+
+Pagoda
+light + dark data → one tiered main pagoda
+finder → secondary pavilions / gate complexes
+timing → covered corridors / approach path
+light data → gravel courts / stone steps
 ```
 
 ## Style appearance
@@ -170,7 +177,7 @@ npm run preview
 - render-and-decode QR tests in CI;
 - scanner contrast validation for custom themes;
 - richer finder-specific scene primitives;
-- pagoda / temple / station / crystal generators;
+- temple / station / crystal generators;
 - style parameter schemas;
 - multi-view / anamorphic constraints;
 - `.vox` or bitmap template ingestion with projection-safe clipping.
