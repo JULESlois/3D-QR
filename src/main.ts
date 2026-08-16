@@ -84,10 +84,25 @@ const trunkMaterial = new THREE.MeshStandardMaterial({
   transparent: true,
 })
 
-function curvedBranch(points: THREE.Vector3[], radius: number): THREE.Mesh {
+const veinMaterial = new THREE.MeshStandardMaterial({
+  color: 0xef7f9f,
+  roughness: 0.72,
+  metalness: 0.02,
+  emissive: 0x2a1118,
+  emissiveIntensity: 0.18,
+  transparent: true,
+  opacity: 0.72,
+})
+
+function curvedBranch(
+  points: THREE.Vector3[],
+  radius: number,
+  material: THREE.Material = trunkMaterial,
+  segments = 28,
+): THREE.Mesh {
   const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.56)
-  const geometry = new THREE.TubeGeometry(curve, 28, radius, 7, false)
-  const mesh = new THREE.Mesh(geometry, trunkMaterial)
+  const geometry = new THREE.TubeGeometry(curve, segments, radius, 7, false)
+  const mesh = new THREE.Mesh(geometry, material)
   mesh.castShadow = true
   mesh.receiveShadow = true
   return mesh
@@ -139,6 +154,23 @@ trunk.add(curvedBranch([
 ], 0.086))
 sculpture.add(trunk)
 
+const signalVeins = new THREE.Group()
+signalVeins.add(curvedBranch([
+  new THREE.Vector3(-1.48, 2.48, -0.48),
+  new THREE.Vector3(-0.72, 2.72, -0.31),
+  new THREE.Vector3(0.02, 2.93, -0.5),
+  new THREE.Vector3(0.76, 2.76, -0.36),
+  new THREE.Vector3(1.48, 2.5, -0.5),
+], 0.026, veinMaterial, 36))
+signalVeins.add(curvedBranch([
+  new THREE.Vector3(-0.48, 1.58, 0.68),
+  new THREE.Vector3(-0.34, 2.03, 0.49),
+  new THREE.Vector3(-0.3, 2.5, 0.25),
+  new THREE.Vector3(-0.42, 3.02, 0.05),
+  new THREE.Vector3(-0.5, 3.4, -0.02),
+], 0.024, veinMaterial, 32))
+sculpture.add(signalVeins)
+
 const groundMaterial = new THREE.ShadowMaterial({ color: 0x18201a, opacity: 0.12, transparent: true })
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), groundMaterial)
 ground.rotation.x = -Math.PI / 2
@@ -146,7 +178,7 @@ ground.position.y = -1.93
 ground.receiveShadow = true
 scene.add(ground)
 
-function createRadialTexture(): THREE.CanvasTexture {
+function createRadialTexture(centerAlpha = 0.34): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = 256
   canvas.height = 256
@@ -154,9 +186,9 @@ function createRadialTexture(): THREE.CanvasTexture {
   if (!context) throw new Error('Canvas 2D context is unavailable')
 
   const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128)
-  gradient.addColorStop(0, 'rgba(34, 43, 35, 0.34)')
-  gradient.addColorStop(0.38, 'rgba(34, 43, 35, 0.15)')
-  gradient.addColorStop(1, 'rgba(34, 43, 35, 0)')
+  gradient.addColorStop(0, `rgba(255, 255, 255, ${centerAlpha})`)
+  gradient.addColorStop(0.35, `rgba(255, 255, 255, ${centerAlpha * 0.42})`)
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
   context.fillStyle = gradient
   context.fillRect(0, 0, 256, 256)
 
@@ -166,20 +198,34 @@ function createRadialTexture(): THREE.CanvasTexture {
 }
 
 const groundGlowMaterial = new THREE.MeshBasicMaterial({
-  map: createRadialTexture(),
+  map: createRadialTexture(0.46),
+  color: 0x28372b,
   transparent: true,
-  opacity: 0.68,
+  opacity: 0.23,
   depthWrite: false,
   toneMapped: false,
 })
-const groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 4.15), groundGlowMaterial)
+const groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 4.3), groundGlowMaterial)
 groundGlow.rotation.x = -Math.PI / 2
 groundGlow.position.set(0, -1.91, 0.2)
 groundGlow.renderOrder = -2
 scene.add(groundGlow)
 
+const auraMaterial = new THREE.SpriteMaterial({
+  map: createRadialTexture(0.62),
+  color: 0xef7f9f,
+  transparent: true,
+  opacity: 0.085,
+  depthWrite: false,
+  toneMapped: false,
+})
+const canopyAura = new THREE.Sprite(auraMaterial)
+canopyAura.position.set(0, 2.35, -1.7)
+canopyAura.scale.set(7.1, 7.1, 1)
+scene.add(canopyAura)
+
 function createDustField(): THREE.Points {
-  const count = 110
+  const count = 128
   const positions = new Float32Array(count * 3)
 
   for (let i = 0; i < count; i += 1) {
@@ -201,7 +247,7 @@ function createDustField(): THREE.Points {
     size: 0.035,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.27,
+    opacity: 0.25,
     depthWrite: false,
   })
   return new THREE.Points(geometry, material)
@@ -225,9 +271,9 @@ scene.add(qrBacking)
 
 const leafMaterial = new THREE.MeshPhysicalMaterial({
   color: 0xffffff,
-  roughness: 0.58,
-  metalness: 0.015,
-  clearcoat: 0.2,
+  roughness: 0.56,
+  metalness: 0.012,
+  clearcoat: 0.22,
   clearcoatRoughness: 0.72,
   transparent: true,
   opacity: 1,
@@ -273,19 +319,27 @@ function saturate(value: number): number {
 }
 
 function smoothstep(value: number): number {
-  return value * value * (3 - 2 * value)
+  const t = saturate(value)
+  return t * t * (3 - 2 * t)
 }
 
 function getTreeColor(layout: LeafLayout, index: number): THREE.Color {
   const palette = PALETTES[paletteKey]
   const offset = Math.floor(layout.colorPhase * palette.colors.length)
-  return new THREE.Color(palette.colors[(index + offset) % palette.colors.length])
+  const roleShift = layout.role === 'finder' ? 1 : layout.role === 'timing' ? palette.colors.length - 1 : 0
+  return new THREE.Color(palette.colors[(index + offset + roleShift) % palette.colors.length])
 }
 
 function applyPalette(): void {
+  const palette = PALETTES[paletteKey]
   treeColors = layouts.map(getTreeColor)
-  qrMaterial.color.set(PALETTES[paletteKey].qrDark)
-  const accent = PALETTES[paletteKey].colors[Math.min(2, PALETTES[paletteKey].colors.length - 1)]
+  qrMaterial.color.set(palette.qrDark)
+
+  const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
+  const accentColor = new THREE.Color(accent)
+  veinMaterial.color.copy(accentColor)
+  veinMaterial.emissive.copy(accentColor).multiplyScalar(0.16)
+  auraMaterial.color.copy(accentColor)
   document.documentElement.style.setProperty('--accent', accent)
   dirtyInstances = true
 }
@@ -332,7 +386,7 @@ function buildQrMesh(): void {
 function rebuild(value: string): void {
   const content = value.trim()
   if (!content) {
-    meta.textContent = 'Enter a URL or text to grow a QR tree.'
+    meta.textContent = 'ENTER A URL OR TEXT TO GROW A QR TREE.'
     return
   }
 
@@ -357,7 +411,7 @@ function rebuild(value: string): void {
     qrMesh = new THREE.InstancedMesh(qrGeometry, qrMaterial, layouts.length)
     qrMesh.frustumCulled = false
     qrMesh.renderOrder = 3
-    qrMesh.visible = morph > 0.72
+    qrMesh.visible = morph > 0.78
     sculpture.add(qrMesh)
 
     applyPalette()
@@ -366,7 +420,10 @@ function rebuild(value: string): void {
 
     const backingSize = qrExtent()
     qrBacking.scale.set(backingSize, backingSize, 1)
-    meta.textContent = `QR V${qrVersion} · ${qrSize}×${qrSize} · ${layouts.length} MODULES`
+
+    const finderCount = matrix.darkModules.filter((module) => module.role === 'finder').length
+    const timingCount = matrix.darkModules.filter((module) => module.role === 'timing').length
+    meta.textContent = `QR V${qrVersion} · ${qrSize}×${qrSize} · F${finderCount} / T${timingCount} / D${layouts.length - finderCount - timingCount}`
     dirtyInstances = true
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown QR error'
@@ -377,15 +434,22 @@ function rebuild(value: string): void {
 function updateTreeInstances(elapsed: number): void {
   if (!leafMesh) return
 
-  const t = smoothstep(saturate(morph))
-  const organic = 1 - t
-
   for (let i = 0; i < layouts.length; i += 1) {
     const layout = layouts[i]
+    const localMorph = saturate((morph - layout.morphDelay) / Math.max(0.001, 1 - layout.morphDelay))
+    const t = smoothstep(localMorph)
+    const organic = 1 - t
+
     const sway = Math.sin(elapsed * 0.72 + layout.windPhase) * 0.045 * layout.windStrength * organic
     const lift = Math.sin(elapsed * 0.46 + layout.windPhase * 1.7) * 0.018 * organic
 
     tempPosition.lerpVectors(layout.treePosition, layout.qrPosition, t)
+
+    const flightArc = Math.sin(t * Math.PI)
+    const roleArc = layout.role === 'finder' ? 0.24 : layout.role === 'timing' ? 0.09 : 0.17
+    tempPosition.y += flightArc * roleArc * 0.42
+    tempPosition.z += flightArc * roleArc * Math.sin(layout.windPhase) * 1.35
+
     tempPosition.x += sway
     tempPosition.y += lift
     tempPosition.z += Math.cos(elapsed * 0.58 + layout.windPhase) * 0.028 * layout.windStrength * organic
@@ -489,35 +553,43 @@ function animate(): void {
   const delta = Math.min(clock.getDelta(), 0.05)
   const elapsed = clock.elapsedTime
   const previousMorph = morph
-  morph += (targetMorph - morph) * (1 - Math.exp(-5.35 * delta))
+  morph += (targetMorph - morph) * (1 - Math.exp(-5.1 * delta))
 
   if (Math.abs(targetMorph - morph) < 0.0002) morph = targetMorph
   if (Math.abs(previousMorph - morph) > 0.00001) dirtyInstances = true
 
-  const t = smoothstep(saturate(morph))
-  const qrReveal = smoothstep(saturate((t - 0.72) / 0.28))
-  const organicOpacity = 1 - smoothstep(saturate(t / 0.62))
+  const t = smoothstep(morph)
+  const qrReveal = smoothstep((t - 0.78) / 0.22)
+  const organicOpacity = 1 - smoothstep(t / 0.64)
+  const veinOpacity = 1 - smoothstep(t / 0.78)
 
   leafMaterial.opacity = 1 - qrReveal
-  qrMaterial.opacity = smoothstep(saturate((t - 0.77) / 0.23))
-  qrBackingMaterial.opacity = Math.pow(t, 2.25) * 0.995
+  qrMaterial.opacity = smoothstep((t - 0.82) / 0.18)
+  qrBackingMaterial.opacity = Math.pow(t, 2.35) * 0.995
   qrBacking.visible = morph > 0.01
 
   if (leafMesh) {
     leafMesh.visible = leafMaterial.opacity > 0.012
-    leafMesh.castShadow = t < 0.68
+    leafMesh.castShadow = t < 0.7
   }
   if (qrMesh) qrMesh.visible = qrMaterial.opacity > 0.01
 
   trunkMaterial.opacity = organicOpacity
   trunk.visible = organicOpacity > 0.01
+
+  veinMaterial.opacity = 0.72 * veinOpacity
+  signalVeins.visible = veinMaterial.opacity > 0.01
+
   groundMaterial.opacity = 0.12 * organicOpacity
   ground.visible = organicOpacity > 0.01
-  groundGlowMaterial.opacity = 0.68 * organicOpacity
+  groundGlowMaterial.opacity = 0.23 * organicOpacity
   groundGlow.visible = organicOpacity > 0.01
-  dustMaterial.opacity = 0.27 * organicOpacity
+  auraMaterial.opacity = 0.085 * organicOpacity
+  canopyAura.visible = organicOpacity > 0.01
+  dustMaterial.opacity = 0.25 * organicOpacity
   dust.visible = organicOpacity > 0.01
   dust.rotation.y += delta * 0.012
+  dust.position.y = Math.sin(elapsed * 0.18) * 0.035
 
   if (morph > 0.001 || targetMorph === 1) {
     controls.enabled = false
