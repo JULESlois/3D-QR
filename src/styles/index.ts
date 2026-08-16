@@ -5,8 +5,10 @@ import { generateTree } from './tree'
 import { generateHouse } from './house'
 import { generateCastle } from './castle'
 import { generateGlyph } from './glyph'
+import { generateCity } from './city'
+import { generateLighthouse } from './lighthouse'
 
-export type StyleId = 'tree' | 'house' | 'castle' | 'glyph'
+export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse'
 
 export interface StyleAppearance {
   baseLight: string
@@ -102,6 +104,42 @@ export const STYLES: readonly StyleDefinition[] = [
       voxelFill: 0.9,
     },
     generate: generateGlyph,
+  },
+  {
+    id: 'city',
+    label: 'City',
+    eyebrow: 'VOXEL QR SCULPTURE / CITY',
+    headline: 'Raise the skyline.',
+    description: 'A dense QR-sized urban slab becomes streets, low blocks and seeded skyscrapers. Finder and timing modules stay legible at street level while data modules build a deterministic skyline around a central tower.',
+    specimen: 'CITY + STREET GRID = QR',
+    projectionLabel: 'URBAN SLAB',
+    defaultPalette: 'spectrum',
+    appearance: {
+      baseLight: '#dfe2df',
+      baseDark: ['#29343a', '#34434a', '#1f2a30', '#45525a'],
+      foundation: ['#5f6668', '#4e575a', '#707577'],
+      qrTop: '#17242b',
+      voxelFill: 0.965,
+    },
+    generate: generateCity,
+  },
+  {
+    id: 'lighthouse',
+    label: 'Lighthouse',
+    eyebrow: 'VOXEL QR SCULPTURE / LIGHTHOUSE',
+    headline: 'Guide the code.',
+    description: 'A compact beacon rises from a rocky QR-safe island on a sea-toned harbor platform. The tower uses pale masonry and glass bands while deep teal QR tiles preserve the scanner projection.',
+    specimen: 'LIGHTHOUSE + HARBOR = QR',
+    projectionLabel: 'HARBOR PAD',
+    defaultPalette: 'ginkgo',
+    appearance: {
+      baseLight: '#e4eee8',
+      baseDark: ['#245663', '#2e6870', '#174a54', '#376f77'],
+      foundation: ['#55787a', '#466769', '#678486'],
+      qrTop: '#163d47',
+      voxelFill: 0.93,
+    },
+    generate: generateLighthouse,
   },
 ]
 

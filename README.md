@@ -12,6 +12,8 @@ Every built-in style has a physical platform, but the platform is part of the st
 - **House / Courtyard Pad** — compact warm two-layer courtyard with only a one-module physical border; the remaining quiet zone is supplied by the page background.
 - **Castle / Stone Plinth** — heavy three-layer masonry dais with a two-module physical border and denser voxel packing.
 - **Glyph / Display Plaque** — thin two-layer plaque exactly the size of the QR symbol; no physical quiet-zone rim is attached to the object.
+- **City / Urban Slab** — QR-sized two-layer metropolitan base. Finder/timing modules remain at street level while selected data modules rise into low blocks, glass towers and a seeded central skyscraper.
+- **Lighthouse / Harbor Pad** — sea-toned two-layer platform with a three-module physical border, a low rocky island and a compact lighthouse/lantern cluster.
 
 The QR topology is unchanged between styles. What changes is the physical footprint, platform thickness, tile gap, surface palette and semantic geometry above the dark modules.
 
@@ -73,13 +75,25 @@ interface BaseFieldProfile {
 The current built-ins intentionally use physical platforms:
 
 ```text
-Tree    → full-pad, quiet zone 4, one layer
-House   → full-pad, quiet zone 1, two layers
-Castle  → full-pad, quiet zone 2, three layers
-Glyph   → symbol-pad, quiet zone 0, two layers
+Tree       → full-pad, quiet zone 4, one layer
+House      → full-pad, quiet zone 1, two layers
+Castle     → full-pad, quiet zone 2, three layers
+Glyph      → symbol-pad, quiet zone 0, two layers
+City       → symbol-pad, quiet zone 0, two layers
+Lighthouse → full-pad, quiet zone 3, two layers
 ```
 
 This gives each object a different silhouette in art view while preserving the same machine-readable projection.
+
+## Scene generators
+
+### City
+
+`src/styles/city.ts` treats dark data modules as candidate building lots. A deterministic seeded height field combines radial centrality, random variation and a reserved avenue pattern. The nearest central data module becomes a landmark tower; taller blocks introduce glass bands while QR finder/timing structures remain at street level.
+
+### Lighthouse
+
+`src/styles/lighthouse.ts` scores central data modules by local adjacency to find a compact tower anchor. Nearby dark modules form a low rock island, while a small cluster rises into a tapered masonry beacon with a glass lantern band. The surrounding platform uses pale seafoam light cells and deep teal QR cells.
 
 ## Projection safety
 
@@ -121,9 +135,9 @@ Therefore the same payload and style reproduce the same sculpture, while another
 A new generator can choose its own platform vocabulary. Examples:
 
 ```text
-City       → asphalt block / street-grid pedestal
 Pagoda     → raised stone courtyard
-Lighthouse → circular-looking island assembled from QR-safe voxel columns
+Temple     → timber terrace + stone approach
+Station    → industrial transit slab
 Robot      → industrial display base
 Crystal    → faceted mineral slab
 Logo       → thin gallery plaque
@@ -158,7 +172,7 @@ npm run preview
 
 ## Next directions
 
-- procedural city / pagoda / lighthouse / icon generators;
+- pagoda / temple / station / icon generators;
 - platform presets and per-style parameter schemas;
 - automatic rendered-image QR decoding tests in CI;
 - scanner-contrast validation for custom material themes;
