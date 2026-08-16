@@ -1,29 +1,90 @@
 # 3D-QR
 
-A generative Three.js experiment where a real QR matrix is built as one voxel sculpture. In the isometric view it reads as a small tree standing on a tiled ground plane; rotate the same object to the top view and the tree crown plus ground become the QR code.
+A generative Three.js experiment that turns a real QR matrix into a single voxel sculpture. The same physical voxel field can be viewed as a semantic 3D form or rotated into an orthographic, machine-readable QR projection.
 
-The interaction is inspired by [Chroma Tree](https://6cls.com/chroma-tree). This repository is an original implementation written from scratch rather than a source-code copy.
+Live demo: `https://juleslois.github.io/3D-QR/`
 
-## Live demo
+## Built-in generators
 
-`https://juleslois.github.io/3D-QR/`
+- **Tree** — QR-constrained canopy, trunk and ground.
+- **House** — gabled house with wall, roof, door and chimney language.
+- **Castle** — keep, perimeter walls, towers and crenellations.
+- **Glyph** — extrudes the first alphanumeric character in the payload using a deterministic 5×7 bitmap font.
 
-GitHub Pages deployment is configured for `main` and publishes the production build from `dist/`.
+All styles preserve the same core invariant: elevated geometry may only occupy dark QR-module columns, and every elevated column must terminate in a scanner-dark `qr-top` voxel. Light modules and the four-module quiet zone are never occluded.
 
-## What it does
+## Architecture
 
-- Encodes the input with `qrcode` and reads the complete QR module matrix.
-- Builds a four-module quiet zone and the whole symbol as a tiled voxel ground plane.
-- Uses light ground voxels for QR light modules.
-- Uses green ground voxels for dark modules that remain on the ground.
-- Promotes a deterministic central subset of dark data modules into elevated tree-canopy columns.
-- Keeps the top voxel of every canopy column dark enough to remain a valid QR dark module from the top view.
-- Builds two trunk columns underneath central canopy modules, so the trunk never introduces a new top-view QR cell.
-- Uses one `InstancedMesh` for the whole sculpture rather than separate tree and QR meshes.
-- Switches views only by slerping the sculpture root between an isometric quaternion and a top-view quaternion.
-- Uses a fixed orthographic camera so the QR state is an aligned top projection instead of a perspective reconstruction.
-- Supports Blossom, Summer, Ginkgo, and Spectrum canopy palettes while preserving a green/cream ground matrix.
-- Seeds the voxel topology from the encoded text, so the same content produces the same tree.
+```text
+URL / text
+   ↓
+QRMatrixData
+   ↓
+StyleDefinition.generate()
+   ↓
+QR-safe SculptureBuild
+   ↓
+THREE.InstancedMesh
+   ↓
+ART VIEW ⇄ QR VIEW
+    same voxel field
+```
+
+The application is split into three layers:
+
+```text
+src/qr.ts          QR truth layer
+src/sculpture.ts   QR-safe voxel field + projection invariants
+src/styles/*       semantic generators
+src/main.ts        rendering, UI, palettes and view rotation
+```
+
+### Style registry
+
+`src/styles/index.ts` owns the public generator registry:
+
+```ts
+export interface StyleDefinition {
+  id: StyleId
+  label: string
+  eyebrow: string
+  headline: string
+  description: string
+  specimen: string
+  defaultPalette: PaletteKey
+  generate: (matrix: QRMatrixData, seedText: string) => SculptureBuild
+}
+```
+
+Adding another form such as a city, tower, icon, crystal, robot or symbol should normally require a new `src/styles/<style>.ts` generator plus one registry entry. The renderer does not need style-specific geometry code.
+
+## Projection safety
+
+`src/sculpture.ts` provides shared helpers and validates every generated field before rendering.
+
+The validator currently enforces:
+
+1. No elevated voxel may exist in the quiet zone.
+2. No elevated voxel may occupy a light QR cell.
+3. The highest voxel in every elevated QR column must use the scanner-dark `qr-top` material role.
+4. The base plane always contains the complete original QR matrix plus its four-module quiet zone.
+
+This makes style generation a constrained depth/height problem instead of allowing styles to rewrite the QR topology.
+
+## Deterministic generation
+
+Each style receives a seeded PRNG derived from:
+
+```text
+payload + style ID
+```
+
+Therefore:
+
+```text
+same payload + same style → same sculpture
+same payload + another style → different form, same QR projection
+```
 
 ## Stack
 
@@ -31,8 +92,6 @@ GitHub Pages deployment is configured for `main` and publishes the production bu
 - TypeScript
 - Vite
 - `qrcode`
-
-## Development
 
 Vite 8 requires Node.js 20.19+ or 22.12+.
 
@@ -48,43 +107,18 @@ npm run build
 npm run preview
 ```
 
-## Core model
-
-There is no longer a separate QR render layer and no per-module tree-to-grid morph. The QR is the top projection of the same voxel object:
-
-```ts
-interface SculptureVoxel {
-  x: number
-  y: number
-  z: number
-  kind: 'floor-light' | 'floor-dark' | 'trunk' | 'canopy' | 'canopy-top'
-  colorPhase: number
-}
-```
-
-The mode transition is intentionally small:
-
-```ts
-sculptureRoot.quaternion.slerpQuaternions(
-  treeQuaternion,
-  qrQuaternion,
-  easedProgress,
-)
-```
-
-The ground occupies the QR grid in the X/Z plane. Rotating the sculpture by 90 degrees around X turns that plane toward the orthographic camera. Elevated canopy columns remain inside dark QR cells, so their top voxels simply replace the green ground modules with canopy-colored dark modules in the QR projection.
-
-## Interaction
-
-- Click the canvas or `VIEW QR` to rotate to the machine-readable view.
-- Click again or use `BACK TO TREE` to return to the isometric sculpture.
-- Edit the input to rebuild the QR matrix and deterministic voxel tree.
-- Use the four swatches to change the canopy palette.
-
 ## GitHub Pages
 
-The workflow in `.github/workflows/build.yml` type-checks and builds the project on pushes and pull requests. Pushes to `main` also upload `dist/` and deploy it with GitHub Pages Actions.
+`.github/workflows/build.yml` type-checks and builds pushes and pull requests. Pushes to `main` also deploy `dist/` to GitHub Pages.
 
-## Notes on scanability
+## Next directions
 
-The QR state uses the unmodified encoder matrix and a four-module quiet zone. Every elevated tree column is constrained to an already-dark QR data cell, so the tree cannot create a new dark module in a light cell. Finder/timing and remaining dark modules stay on the green ground. The fixed orthographic top view keeps all module centers aligned. Actual scan performance still depends on display scaling, camera focus, screen glare, and palette contrast.
+The style system is intentionally small but extensible. Good next additions are:
+
+- tower / pagoda / lighthouse generators;
+- procedural city blocks and skylines;
+- icon and logo bitmap generators;
+- style-specific parameter schemas and presets;
+- `.vox` template ingestion;
+- automated binary projection tests and rendered-image QR decoder tests;
+- multi-view constrained sculptures where QR is one projection and a glyph/icon is another.

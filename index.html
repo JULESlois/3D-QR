@@ -6,11 +6,11 @@
     <meta name="theme-color" content="#f2f0e7" />
     <meta
       name="description"
-      content="A single voxel sculpture whose tree crown and ground become a real QR code when rotated."
+      content="A multi-style generative voxel sculpture system whose tree, house, castle or glyph becomes a real QR code when rotated."
     />
-    <title>3D QR — One Sculpture, Two Views</title>
+    <title>3D QR — Generative QR Sculptures</title>
   </head>
-  <body data-mode="tree">
+  <body data-mode="art" data-style="tree">
     <main class="app-shell">
       <section class="stage" id="stage" aria-label="Interactive voxel QR sculpture">
         <div class="stage-grain" aria-hidden="true"></div>
@@ -32,10 +32,10 @@
 
       <section class="control-panel" aria-label="QR controls">
         <div class="control-copy">
-          <p class="eyebrow">VOXEL QR SCULPTURE / 002</p>
-          <h1>Rotate the code.</h1>
-          <p class="lede">
-            The tree and the ground already are the QR. Nothing flattens, swaps, or fades in — the same voxel field simply rotates into its machine-readable view.
+          <p class="eyebrow" id="style-eyebrow">VOXEL QR SCULPTURE / TREE</p>
+          <h1 id="style-headline">Grow the code.</h1>
+          <p class="lede" id="style-lede">
+            A QR-constrained canopy rises from dark modules while the ground keeps the rest of the symbol intact. Rotate the same voxel field into its scanner view.
           </p>
         </div>
 
@@ -52,9 +52,19 @@
           />
         </label>
 
+        <div class="style-control">
+          <span class="palette-label">FORM / GENERATOR</span>
+          <div class="style-row" aria-label="Sculpture style">
+            <button class="style-chip is-active" type="button" data-style="tree">TREE</button>
+            <button class="style-chip" type="button" data-style="house">HOUSE</button>
+            <button class="style-chip" type="button" data-style="castle">CASTLE</button>
+            <button class="style-chip" type="button" data-style="glyph">GLYPH</button>
+          </div>
+        </div>
+
         <div class="palette-control">
-          <span class="palette-label">CANOPY / PALETTE</span>
-          <div class="palette-row" aria-label="Tree palette">
+          <span class="palette-label">SURFACE / PALETTE</span>
+          <div class="palette-row" aria-label="Sculpture palette">
             <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
             <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
             <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
@@ -72,8 +82,8 @@
       </section>
 
       <aside class="specimen-meta" aria-hidden="true">
-        <span>TREE + GROUND = QR</span>
-        <span>SINGLE INSTANCED VOXEL FIELD</span>
+        <span id="style-specimen">TREE + GROUND = QR</span>
+        <span>STYLE MODULE / SINGLE VOXEL FIELD</span>
       </aside>
       <p class="stage-hint" id="stage-hint">CLICK TO ROTATE · ONE SCULPTURE / TWO VIEWS</p>
     </main>
