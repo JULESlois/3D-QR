@@ -8,8 +8,9 @@ import { generateGlyph } from './glyph'
 import { generateCity } from './city'
 import { generateLighthouse } from './lighthouse'
 import { generatePagoda } from './pagoda'
+import { generateTemple } from './temple'
 
-export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda'
+export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple'
 
 export interface StyleAppearance {
   baseLight: string
@@ -168,6 +169,26 @@ export const STYLES: readonly StyleDefinition[] = [
       voxelFill: 0.94,
     },
     generate: generatePagoda,
+  },
+  {
+    id: 'temple',
+    label: 'Temple',
+    eyebrow: 'VOXEL QR SCULPTURE / TEMPLE',
+    headline: 'Compose the code.',
+    description: 'A broad mixed-polarity main hall anchors a horizontal temple complex. The three finder regions become a gatehouse, water-garden node and bell pavilion; timing cells form corridors and a stone approach while light data cells become water courts and terraces.',
+    specimen: 'MAIN HALL + GARDENS + AXES = QR',
+    projectionLabel: 'TEMPLE PRECINCT',
+    defaultPalette: 'ginkgo',
+    appearance: {
+      baseLight: '#ebe5d8',
+      baseDark: ['#4b4438', '#5b5141', '#3f4841', '#6b5b47'],
+      foundation: ['#8b8171', '#746b5e', '#9f9582'],
+      qrTop: '#352f28',
+      lightTop: '#f0ebdf',
+      water: ['#9fbdbb', '#adc8c3', '#8eaeae', '#bfd2cb'],
+      voxelFill: 0.95,
+    },
+    generate: generateTemple,
   },
 ]
 
