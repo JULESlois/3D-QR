@@ -119,6 +119,10 @@ function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color 
       return appearance.water
         ? indexedHexColor(appearance.water, voxel.colorPhase, target)
         : target.set(appearance.baseLight)
+    case 'crystal':
+      return appearance.crystal
+        ? indexedHexColor(appearance.crystal, voxel.colorPhase, target)
+        : indexedColor(glassColors, voxel.colorPhase, target)
     case 'foundation':
       return indexedHexColor(appearance.foundation, voxel.colorPhase, target)
     case 'wood':

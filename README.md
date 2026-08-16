@@ -13,7 +13,7 @@ scanner polarity  → light / dark
 structural zone   → finder / timing / data
 ```
 
-A light cell may be empty background, a flat floor, a wave, a courtyard terrace, a pale roof or part of a large building. A dark cell may be pavement, tree canopy, masonry, rock or a tower. The invariant is only that the highest visible surface from the QR axis keeps the correct scanner polarity.
+A light cell may be empty background, a flat floor, a wave, a courtyard terrace, a pale roof, a crystal tip or part of a large building. A dark cell may be pavement, tree canopy, masonry, rock, mineral or a tower. The invariant is only that the highest visible surface from the QR axis keeps the correct scanner polarity.
 
 ```text
 orthographic_projection(scene) === original_qr_matrix
@@ -31,6 +31,7 @@ The external quiet zone remains conservative: it may be a low scanner-light plat
 - **Lighthouse / Tidal Harbor** — scanner-light cells become shallow blue water with one/two-voxel wave variation; finder regions become reef-like breakwaters while the dark island and beacon rise above them.
 - **Pagoda / Temple Courtyard** — a stepped mixed-polarity main pagoda spans light and dark data cells, finder regions become secondary pavilions, timing cells become corridors, and scanner-light data cells rise into gravel courts and steps.
 - **Temple / Temple Precinct** — a broad horizontal main hall spans both polarities. The three finder regions are interpreted differently as a gatehouse, water-garden node and bell pavilion; timing cells become covered corridors and a stone approach; surrounding light cells form water courts and terraces.
+- **Crystal / Mineral Field** — a central mixed-polarity crystal bloom rises from the QR-sized mineral slab. Finder structures become satellite geodes, timing cells become mineral veins, and sparse light/dark data cells rise into secondary shards.
 
 ## Architecture
 
@@ -81,7 +82,7 @@ dark cell  → qr-top
 light cell → light-top
 ```
 
-The body below that cap can use any semantic material (`stone`, `glass`, `water`, etc.) because it disappears into depth in QR view.
+The body below that cap can use any semantic material (`stone`, `glass`, `water`, `crystal`, etc.) because it disappears into depth in QR view.
 
 The validator checks the final visible cap per `(row, col)`:
 
@@ -133,6 +134,12 @@ finder BL → bell pavilion
 horizontal timing → covered timber corridor
 vertical timing → stone approach
 light data → water court / terraces
+
+Crystal
+light + dark data → central crystal bloom
+finder → three satellite geodes
+timing → low mineral veins
+light + dark data → sparse secondary shards
 ```
 
 ## Style appearance
@@ -147,11 +154,12 @@ interface StyleAppearance {
   qrTop: 'palette' | string
   lightTop?: string
   water?: readonly string[]
+  crystal?: readonly string[]
   voxelFill: number
 }
 ```
 
-This allows, for example, Lighthouse light modules to be pale blue rather than white while still remaining scanner-light relative to the deep teal dark modules.
+This allows, for example, Lighthouse light modules to be pale blue rather than white, or Crystal bodies to use a dedicated violet/blue mineral range, while scanner polarity is still controlled by the final cap colors.
 
 ## Deterministic generation
 
@@ -187,7 +195,7 @@ npm run preview
 - render-and-decode QR tests in CI;
 - scanner contrast validation for custom themes;
 - richer finder-specific scene primitives;
-- station / crystal / mountain generators;
+- station / mountain generators;
 - style parameter schemas;
 - multi-view / anamorphic constraints;
 - `.vox` or bitmap template ingestion with projection-safe clipping.

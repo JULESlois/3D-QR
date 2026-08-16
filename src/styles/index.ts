@@ -9,8 +9,9 @@ import { generateCity } from './city'
 import { generateLighthouse } from './lighthouse'
 import { generatePagoda } from './pagoda'
 import { generateTemple } from './temple'
+import { generateCrystal } from './crystal'
 
-export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple'
+export type StyleId = 'tree' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple' | 'crystal'
 
 export interface StyleAppearance {
   baseLight: string
@@ -21,6 +22,8 @@ export interface StyleAppearance {
   lightTop?: string
   /** Optional semantic water palette for styles that turn light cells into water. */
   water?: readonly string[]
+  /** Optional semantic crystal palette for mineral/crystal scene bodies. */
+  crystal?: readonly string[]
   /** Fraction of a QR cell occupied by each voxel. Smaller values expose more grid gap. */
   voxelFill: number
 }
@@ -189,6 +192,26 @@ export const STYLES: readonly StyleDefinition[] = [
       voxelFill: 0.95,
     },
     generate: generateTemple,
+  },
+  {
+    id: 'crystal',
+    label: 'Crystal',
+    eyebrow: 'VOXEL QR SCULPTURE / CRYSTAL',
+    headline: 'Crystallize the code.',
+    description: 'A central mixed-polarity crystal bloom rises from a compact mineral slab. Finder regions become three satellite geodes, timing cells form low mineral veins, and sparse light/dark data cells grow into secondary shards while their tips preserve the original QR polarity.',
+    specimen: 'CRYSTAL BLOOM + GEODES + VEINS = QR',
+    projectionLabel: 'MINERAL FIELD',
+    defaultPalette: 'spectrum',
+    appearance: {
+      baseLight: '#ece9f3',
+      baseDark: ['#4c4764', '#5a5271', '#403b59', '#70627f'],
+      foundation: ['#6d6679', '#595366', '#837a90'],
+      qrTop: '#2c283e',
+      lightTop: '#f2eff8',
+      crystal: ['#b5a6d8', '#8e78c3', '#c8b9e6', '#79a4c4', '#d9cdf0'],
+      voxelFill: 0.9,
+    },
+    generate: generateCrystal,
   },
 ]
 
