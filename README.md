@@ -25,6 +25,7 @@ The external quiet zone remains conservative: it may be a low scanner-light plat
 
 - **Tree / Full Lawn** — one broad hero tree on the original lawn-like QR landscape.
 - **Forest / Woodland Floor** — a mixed-species woodland of broadleaf trees, conical pines and larger ancient trees. Overlapping canopy columns surround a winding low clearing while sparse shrubs fill the understory.
+- **Mountain / Alpine Relief** — the entire QR symbol becomes continuous terrain. Forested lower slopes rise into rock and snow around a sweeping ridge and carved valley, while finder regions stay low as foothills instead of becoming corner towers.
 - **House / Residential Lot** — a large gabled residence with projecting front gable, chimney, garage wing, porch and garden path.
 - **Castle / Ruined Fortress** — a central keep dominates three finder-area bastions with different damage levels. Broken timing walls contain real gaps and the courtyard uses sparse rubble rather than symmetrical corner towers.
 - **Glyph / Display Plaque** — alphanumeric relief on a thin QR-sized plaque.
@@ -110,6 +111,12 @@ light + dark cells → mixed-species crowns
 central field → winding low clearing / path
 outer data → understory shrubs
 
+Mountain
+hero silhouette → continuous sweeping ridge
+finder → low foothills / lake edges
+light + dark data → one shared heightfield
+material bands → forest / exposed rock / snow
+
 Castle
 hero silhouette → central keep
 finder → three uneven ruined bastions
@@ -161,7 +168,7 @@ interface StyleAppearance {
 }
 ```
 
-This allows Lighthouse water to stay pale blue, Crystal bodies to use a dedicated cyan mineral range, Forest to keep a mossy floor and green canopy, and Temple to keep a warm shrine palette while scanner polarity is still controlled by the final cap colors.
+This allows Lighthouse water to stay pale blue, Crystal bodies to use a dedicated cyan mineral range, Forest to keep a mossy floor and green canopy, Mountain to separate forested slopes, rock, snow and alpine water, and Temple to keep a warm shrine palette while scanner polarity is still controlled by the final cap colors.
 
 ## Deterministic generation
 
@@ -197,7 +204,7 @@ npm run preview
 - render-and-decode QR tests in CI;
 - scanner contrast validation for custom themes;
 - explicit silhouette-grammar and scene-role metadata per style;
-- station / mountain generators;
+- station generator;
 - style parameter schemas;
 - multi-view / anamorphic constraints;
 - `.vox` or bitmap template ingestion with projection-safe clipping.

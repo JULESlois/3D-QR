@@ -3,6 +3,7 @@ import type { SculptureBuild } from '../sculpture'
 import type { PaletteKey } from '../palettes'
 import { generateTree } from './tree'
 import { generateForest } from './forest'
+import { generateMountain } from './mountain'
 import { generateHouse } from './house'
 import { generateCastle } from './castle'
 import { generateGlyph } from './glyph'
@@ -12,7 +13,7 @@ import { generatePagoda } from './pagoda'
 import { generateTemple } from './temple'
 import { generateCrystal } from './crystal'
 
-export type StyleId = 'tree' | 'forest' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple' | 'crystal'
+export type StyleId = 'tree' | 'forest' | 'mountain' | 'house' | 'castle' | 'glyph' | 'city' | 'lighthouse' | 'pagoda' | 'temple' | 'crystal'
 
 export interface StyleAppearance {
   baseLight: string
@@ -79,6 +80,26 @@ export const STYLES: readonly StyleDefinition[] = [
       voxelFill: 0.93,
     },
     generate: generateForest,
+  },
+  {
+    id: 'mountain',
+    label: 'Mountain',
+    eyebrow: 'VOXEL QR TERRAIN / MOUNTAIN',
+    headline: 'Carve the code.',
+    description: 'The whole QR symbol becomes one continuous alpine relief: forested lower slopes rise into rock and snow, a curved valley cuts across the terrain, and finder regions remain deliberately low foothills instead of becoming three corner monuments.',
+    specimen: 'RIDGE + VALLEY + SNOWLINE = QR',
+    projectionLabel: 'ALPINE RELIEF',
+    defaultPalette: 'summer',
+    appearance: {
+      baseLight: '#dbe6df',
+      baseDark: ['#315348', '#3d6252', '#29483f', '#496b58'],
+      foundation: ['#676f6b', '#59625e', '#78807a'],
+      qrTop: '#263f36',
+      lightTop: '#eff3ed',
+      water: ['#9fc4c7', '#afd0d1', '#8db6bc', '#bed8d6'],
+      voxelFill: 0.95,
+    },
+    generate: generateMountain,
   },
   {
     id: 'house',
