@@ -68,8 +68,6 @@ const voxelMaterial = new THREE.MeshStandardMaterial({
 })
 const voxelSize = CELL_SIZE * 0.91
 
-const groundLight = new THREE.Color('#ece7d8')
-const groundDark = ['#315d43', '#466f49', '#5d7e50', '#738e58'].map((value) => new THREE.Color(value))
 const woodColors = ['#563b2d', '#6d4b34', '#815b3a'].map((value) => new THREE.Color(value))
 const stoneColors = ['#6f746d', '#85897e', '#a09d8d', '#5d655f'].map((value) => new THREE.Color(value))
 const plasterColors = ['#d8cbb4', '#e7dbc5', '#c9b99e', '#eee6d8'].map((value) => new THREE.Color(value))
@@ -102,14 +100,20 @@ function indexedColor(colors: readonly THREE.Color[], phase: number, target: THR
   return target.copy(colors[index])
 }
 
+function indexedHexColor(colors: readonly string[], phase: number, target: THREE.Color): THREE.Color {
+  const index = Math.min(colors.length - 1, Math.floor(clamp01(phase) * colors.length))
+  return target.set(colors[index])
+}
+
 function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color {
   const palette = PALETTES[paletteKey]
+  const appearance = getStyle(styleId).appearance
 
   switch (voxel.kind) {
     case 'floor-light':
-      return target.copy(groundLight)
+      return target.set(appearance.baseLight)
     case 'floor-dark':
-      return indexedColor(groundDark, voxel.colorPhase, target)
+      return indexedHexColor(appearance.baseDark, voxel.colorPhase, target)
     case 'wood':
       return indexedColor(woodColors, voxel.colorPhase, target)
     case 'stone':
@@ -119,7 +123,7 @@ function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color 
     case 'glass':
       return indexedColor(glassColors, voxel.colorPhase, target)
     case 'qr-top':
-      return target.set(palette.qrDark)
+      return target.set(appearance.qrTop === 'palette' ? palette.qrDark : appearance.qrTop)
     case 'primary':
     default: {
       const index = Math.min(palette.colors.length - 1, Math.floor(clamp01(voxel.colorPhase) * palette.colors.length))
@@ -227,7 +231,7 @@ function rebuild(value: string): void {
     updateComposition()
 
     const detail = build.detail ? ` · ${build.detail}` : ''
-    meta.textContent = `QR V${matrix.version} · ${matrix.size}×${matrix.size} · ${style.label.toUpperCase()} ${build.liftedModuleCount} / GROUND ${build.groundDarkCount}${detail}`
+    meta.textContent = `QR V${matrix.version} · ${matrix.size}×${matrix.size} · ${style.label.toUpperCase()} ${build.liftedModuleCount} · BASE D${build.baseDarkCount}/L${build.baseLightCount} · ${style.projectionLabel}${detail}`
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown QR error'
     meta.textContent = `QR ERROR · ${message}`
@@ -242,10 +246,10 @@ function setMode(next: 'art' | 'qr'): void {
 
   modeToggle.setAttribute('aria-pressed', String(showQr))
   modeToggleLabel.textContent = showQr ? `BACK TO ${style.label.toUpperCase()}` : 'VIEW QR'
-  modeReadout.textContent = showQr ? 'QR / SAME VOXELS' : `${style.label.toUpperCase()} / ISOMETRIC`
+  modeReadout.textContent = showQr ? `QR / ${style.projectionLabel}` : `${style.label.toUpperCase()} / ISOMETRIC`
   stageHint.textContent = showQr
     ? `CLICK TO RETURN · ${style.specimen}`
-    : 'CLICK TO ROTATE · ONE SCULPTURE / TWO VIEWS'
+    : 'CLICK TO ROTATE · ONE SCULPTURE / MULTIPLE PROJECTION STRATEGIES'
   document.body.dataset.mode = showQr ? 'qr' : 'art'
 }
 

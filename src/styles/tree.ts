@@ -36,7 +36,7 @@ function pickTrunkModules(modules: DarkModule[], center: number): Set<string> {
 export function generateTree(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'tree')
   const { random, center } = context
-  const voxels = createBaseVoxels(context)
+  const voxels = createBaseVoxels(context, { mode: 'full-pad' })
 
   const canopyCandidates = matrix.darkModules.filter((module) => {
     if (module.role !== 'data') return false
@@ -90,5 +90,5 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
     }
   }
 
-  return finalizeSculpture(matrix, voxels, 'tree', 'Tree', lifted)
+  return finalizeSculpture(matrix, voxels, 'tree', 'Tree', lifted, 'FULL GRASS PAD', 'full-pad')
 }

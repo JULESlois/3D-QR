@@ -11,7 +11,7 @@ import {
 export function generateCastle(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'castle')
   const { random, center } = context
-  const voxels = createBaseVoxels(context)
+  const voxels = createBaseVoxels(context, { mode: 'dark-only' })
 
   const modules = matrix.darkModules.filter((module) => {
     if (module.role !== 'data') return false
@@ -59,5 +59,5 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     }
   }
 
-  return finalizeSculpture(matrix, voxels, 'castle', 'Castle', lifted, 'KEEP / 4 TOWERS')
+  return finalizeSculpture(matrix, voxels, 'castle', 'Castle', lifted, 'STONE QR FIELD / NO LIGHT PAD', 'dark-field')
 }

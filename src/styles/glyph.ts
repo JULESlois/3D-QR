@@ -1,4 +1,4 @@
-import type { DarkModule, QRMatrixData } from '../qr'
+import type { QRMatrixData } from '../qr'
 import {
   cellKey,
   createBaseVoxels,
@@ -51,60 +51,39 @@ function glyphFromSeed(seedText: string): string {
   return seedText.toUpperCase().match(/[A-Z0-9]/)?.[0] ?? 'Q'
 }
 
-function chooseGlyphModules(matrix: QRMatrixData, center: number): DarkModule[] {
-  const preferred = matrix.darkModules.filter((module) => {
-    if (module.role !== 'data') return false
-    const nx = Math.abs((module.col - center) / Math.max(1, matrix.size * 0.34))
-    const nz = Math.abs((module.row - center) / Math.max(1, matrix.size * 0.18))
-    return nx <= 1.05 && nz <= 1.1
-  })
-
-  if (preferred.length >= 18) return preferred
-
-  return matrix.darkModules
-    .filter((module) => module.role === 'data')
-    .sort((a, b) => {
-      const da = Math.abs(a.row - center) * 1.8 + Math.abs(a.col - center)
-      const db = Math.abs(b.row - center) * 1.8 + Math.abs(b.col - center)
-      return da - db
-    })
-    .slice(0, 64)
-}
-
 export function generateGlyph(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'glyph')
   const { random, center } = context
-  const voxels = createBaseVoxels(context)
+  const voxels = createBaseVoxels(context, { mode: 'none' })
   const glyph = glyphFromSeed(seedText)
   const bitmap = FONT_5X7[glyph] ?? FONT_5X7.Q
-  const modules = chooseGlyphModules(matrix, center)
   const lifted = new Set<string>()
 
-  for (const module of modules) {
-    const normalized = (module.col - center) / Math.max(1, matrix.size * 0.34)
-    const glyphCol = Math.max(0, Math.min(4, Math.round(((normalized + 1) * 0.5) * 4)))
-    const activeRows: number[] = []
-
-    for (let row = 0; row < 7; row += 1) {
-      if (bitmap[row][glyphCol] === '1') activeRows.push(row)
-    }
-
-    if (activeRows.length === 0) continue
+  for (const module of matrix.darkModules) {
     lifted.add(cellKey(module.row, module.col))
-    const topLevel = 3 + (6 - Math.min(...activeRows))
 
-    for (const row of activeRows) {
-      const level = 3 + (6 - row)
+    const nx = (module.col - center) / Math.max(1, matrix.size - 1) + 0.5
+    const nz = (module.row - center) / Math.max(1, matrix.size - 1) + 0.5
+    const glyphCol = Math.max(0, Math.min(4, Math.round(nx * 4)))
+    const glyphRow = Math.max(0, Math.min(6, Math.round(nz * 6)))
+    const active = bitmap[glyphRow][glyphCol] === '1'
+
+    const baseHeight = module.role === 'finder' ? 2 : 1
+    const topLevel = active
+      ? 7 + Math.floor(random() * 3)
+      : baseHeight + (random() > 0.82 ? 1 : 0)
+
+    for (let level = 1; level <= topLevel; level += 1) {
       pushVoxel(
         voxels,
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : 'primary',
-        (random() * 0.55 + row * 0.09 + glyphCol * 0.07) % 1,
+        level === topLevel ? 'qr-top' : active ? 'primary' : 'stone',
+        (random() * 0.55 + glyphRow * 0.08 + glyphCol * 0.11 + level * 0.025) % 1,
       )
     }
   }
 
-  return finalizeSculpture(matrix, voxels, 'glyph', 'Glyph', lifted, `GLYPH ${glyph} / 5×7`)
+  return finalizeSculpture(matrix, voxels, 'glyph', 'Glyph', lifted, `GLYPH ${glyph} / WHOLE PROJECTION`, 'object-only')
 }

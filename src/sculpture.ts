@@ -13,6 +13,20 @@ export type VoxelKind =
   | 'plaster'
   | 'glass'
 
+export type ProjectionStrategy = 'full-pad' | 'site-window' | 'dark-field' | 'object-only'
+export type BaseFieldMode = 'full-pad' | 'symbol-pad' | 'dark-only' | 'window' | 'none'
+
+export interface BaseFieldProfile {
+  mode: BaseFieldMode
+  quietZone?: number
+  window?: {
+    centerRow?: number
+    centerCol?: number
+    halfRows: number
+    halfCols: number
+  }
+}
+
 export interface SculptureVoxel {
   x: number
   y: number
@@ -27,11 +41,15 @@ export interface SculptureBuild {
   styleId: string
   styleLabel: string
   detail?: string
+  projection: ProjectionStrategy
   voxels: SculptureVoxel[]
   footprint: number
   maxHeight: number
   pivotY: number
   liftedModuleCount: number
+  baseDarkCount: number
+  baseLightCount: number
+  /** @deprecated Use baseDarkCount. Kept for compatibility with older UI code. */
   groundDarkCount: number
 }
 
@@ -86,24 +104,72 @@ export function positionForCell(row: number, col: number, matrixSize: number): {
   }
 }
 
-export function createBaseVoxels(context: GenerationContext): SculptureVoxel[] {
-  const { matrix, random, center } = context
+function baseVoxel(
+  context: GenerationContext,
+  row: number,
+  col: number,
+  kind: 'floor-light' | 'floor-dark',
+): SculptureVoxel {
+  const { center, random } = context
+  return {
+    x: (col - center) * CELL_SIZE,
+    y: 0,
+    z: (row - center) * CELL_SIZE,
+    row,
+    col,
+    kind,
+    colorPhase: kind === 'floor-dark' ? random() : 0,
+  }
+}
+
+export function createBaseVoxels(
+  context: GenerationContext,
+  profile: BaseFieldProfile = { mode: 'full-pad' },
+): SculptureVoxel[] {
+  const { matrix } = context
   const voxels: SculptureVoxel[] = []
 
-  for (let row = -QUIET_ZONE; row < matrix.size + QUIET_ZONE; row += 1) {
-    for (let col = -QUIET_ZONE; col < matrix.size + QUIET_ZONE; col += 1) {
+  if (profile.mode === 'none') return voxels
+
+  if (profile.mode === 'dark-only') {
+    for (const module of matrix.darkModules) {
+      voxels.push(baseVoxel(context, module.row, module.col, 'floor-dark'))
+    }
+    return voxels
+  }
+
+  if (profile.mode === 'window') {
+    const window = profile.window
+    if (!window) throw new Error('Window base mode requires window bounds.')
+
+    const centerRow = window.centerRow ?? (matrix.size - 1) / 2
+    const centerCol = window.centerCol ?? (matrix.size - 1) / 2
+
+    for (let row = 0; row < matrix.size; row += 1) {
+      for (let col = 0; col < matrix.size; col += 1) {
+        const cell = matrix.cells[row * matrix.size + col]
+        const insideWindow = Math.abs(row - centerRow) <= window.halfRows
+          && Math.abs(col - centerCol) <= window.halfCols
+
+        // The local site keeps both light and dark cells. Outside it, only real dark
+        // QR modules remain as sparse pavers so empty page background supplies light cells.
+        if (insideWindow || cell.dark) {
+          voxels.push(baseVoxel(context, row, col, cell.dark ? 'floor-dark' : 'floor-light'))
+        }
+      }
+    }
+    return voxels
+  }
+
+  const quietZone = profile.mode === 'full-pad' ? (profile.quietZone ?? QUIET_ZONE) : 0
+  const start = profile.mode === 'full-pad' ? -quietZone : 0
+  const end = profile.mode === 'full-pad' ? matrix.size + quietZone : matrix.size
+
+  for (let row = start; row < end; row += 1) {
+    for (let col = start; col < end; col += 1) {
       const inside = row >= 0 && row < matrix.size && col >= 0 && col < matrix.size
       const cell = inside ? matrix.cells[row * matrix.size + col] : null
-
-      voxels.push({
-        x: (col - center) * CELL_SIZE,
-        y: 0,
-        z: (row - center) * CELL_SIZE,
-        row,
-        col,
-        kind: cell?.dark ? 'floor-dark' : 'floor-light',
-        colorPhase: cell?.dark ? random() : 0,
-      })
+      voxels.push(baseVoxel(context, row, col, cell?.dark ? 'floor-dark' : 'floor-light'))
     }
   }
 
@@ -159,14 +225,20 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
   const topByColumn = new Map<string, SculptureVoxel>()
 
   for (const voxel of voxels) {
-    if (voxel.y <= 0) continue
+    const inside = voxel.row >= 0
+      && voxel.row < matrix.size
+      && voxel.col >= 0
+      && voxel.col < matrix.size
 
-    if (voxel.row < 0 || voxel.row >= matrix.size || voxel.col < 0 || voxel.col >= matrix.size) {
-      throw new Error('Style generator placed elevated geometry inside the quiet zone.')
+    if (!inside) {
+      if (voxel.y !== 0 || voxel.kind !== 'floor-light') {
+        throw new Error('Only scanner-light base voxels may occupy the quiet zone.')
+      }
+      continue
     }
 
     const cell = matrix.cells[voxel.row * matrix.size + voxel.col]
-    if (!cell.dark) {
+    if (!cell.dark && (voxel.y > 0 || voxel.kind !== 'floor-light')) {
       throw new Error(`Style generator occluded light QR module ${voxel.row}:${voxel.col}.`)
     }
 
@@ -175,9 +247,18 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
     if (!existing || voxel.y > existing.y) topByColumn.set(key, voxel)
   }
 
-  for (const top of topByColumn.values()) {
-    if (top.kind !== 'qr-top') {
-      throw new Error(`Elevated QR column ${top.row}:${top.col} is missing a scanner-dark cap.`)
+  for (const cell of matrix.cells) {
+    const top = topByColumn.get(cellKey(cell.row, cell.col))
+
+    if (cell.dark) {
+      if (!top) {
+        throw new Error(`Style generator omitted dark QR module ${cell.row}:${cell.col}.`)
+      }
+      if (top.kind !== 'floor-dark' && top.kind !== 'qr-top') {
+        throw new Error(`QR column ${cell.row}:${cell.col} is missing a scanner-dark top surface.`)
+      }
+    } else if (top && top.kind !== 'floor-light') {
+      throw new Error(`Light QR module ${cell.row}:${cell.col} projects as a dark surface.`)
     }
   }
 }
@@ -189,21 +270,36 @@ export function finalizeSculpture(
   styleLabel: string,
   liftedModules: ReadonlySet<string>,
   detail?: string,
+  projection: ProjectionStrategy = 'full-pad',
 ): SculptureBuild {
   validateProjectionInvariant(voxels, matrix)
 
   let maxHeight = CELL_SIZE
-  for (const voxel of voxels) maxHeight = Math.max(maxHeight, voxel.y + CELL_SIZE)
+  let baseDarkCount = 0
+  let baseLightCount = 0
+
+  for (const voxel of voxels) {
+    maxHeight = Math.max(maxHeight, voxel.y + CELL_SIZE)
+    if (voxel.y === 0 && voxel.kind === 'floor-dark') baseDarkCount += 1
+    if (voxel.y === 0 && voxel.kind === 'floor-light') baseLightCount += 1
+  }
+
+  // Even styles with no physical quiet-zone plate need composition space around the
+  // machine-readable projection so the page background can act as the quiet zone.
+  const projectionFootprint = (matrix.size + QUIET_ZONE * 2) * CELL_SIZE
 
   return {
     styleId,
     styleLabel,
     detail,
+    projection,
     voxels,
-    footprint: (matrix.size + QUIET_ZONE * 2) * CELL_SIZE,
+    footprint: projectionFootprint,
     maxHeight,
     pivotY: maxHeight * 0.44,
     liftedModuleCount: liftedModules.size,
-    groundDarkCount: matrix.darkModules.length - liftedModules.size,
+    baseDarkCount,
+    baseLightCount,
+    groundDarkCount: baseDarkCount,
   }
 }

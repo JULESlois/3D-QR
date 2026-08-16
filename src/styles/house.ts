@@ -12,7 +12,12 @@ import {
 export function generateHouse(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'house')
   const { random, center } = context
-  const voxels = createBaseVoxels(context)
+  const siteHalfRows = Math.max(4, Math.round(matrix.size * 0.28))
+  const siteHalfCols = Math.max(5, Math.round(matrix.size * 0.36))
+  const voxels = createBaseVoxels(context, {
+    mode: 'window',
+    window: { halfRows: siteHalfRows, halfCols: siteHalfCols },
+  })
 
   const candidates = matrix.darkModules.filter((module) => {
     if (module.role !== 'data') return false
@@ -80,5 +85,5 @@ export function generateHouse(matrix: QRMatrixData, seedText: string): Sculpture
     }
   }
 
-  return finalizeSculpture(matrix, voxels, 'house', 'House', lifted, 'GABLE / CHIMNEY')
+  return finalizeSculpture(matrix, voxels, 'house', 'House', lifted, 'LOCAL SITE / SPARSE PAVERS', 'site-window')
 }
