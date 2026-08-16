@@ -1,4 +1,4 @@
-import type { DarkModule, QRMatrixData } from './qr'
+import type { DarkModule, QRCell, QRMatrixData } from './qr'
 
 export const CELL_SIZE = 0.245
 export const QUIET_ZONE = 4
@@ -6,6 +6,7 @@ export const QUIET_ZONE = 4
 export type VoxelKind =
   | 'floor-light'
   | 'floor-dark'
+  | 'light-top'
   | 'foundation'
   | 'primary'
   | 'qr-top'
@@ -13,6 +14,7 @@ export type VoxelKind =
   | 'stone'
   | 'plaster'
   | 'glass'
+  | 'water'
 
 export type ProjectionStrategy = 'full-pad' | 'courtyard-pad' | 'stone-plinth' | 'display-plaque'
 export type BaseFieldMode = 'full-pad' | 'symbol-pad' | 'dark-only' | 'window' | 'none'
@@ -192,6 +194,26 @@ export function createBaseVoxels(
   return voxels
 }
 
+export function pushCellVoxel(
+  voxels: SculptureVoxel[],
+  cell: Pick<QRCell, 'row' | 'col'>,
+  matrixSize: number,
+  level: number,
+  kind: VoxelKind,
+  colorPhase: number,
+): void {
+  const { x, z } = positionForCell(cell.row, cell.col, matrixSize)
+  voxels.push({
+    x,
+    y: level * CELL_SIZE,
+    z,
+    row: cell.row,
+    col: cell.col,
+    kind,
+    colorPhase,
+  })
+}
+
 export function pushVoxel(
   voxels: SculptureVoxel[],
   module: DarkModule,
@@ -200,16 +222,35 @@ export function pushVoxel(
   kind: VoxelKind,
   colorPhase: number,
 ): void {
-  const { x, z } = positionForCell(module.row, module.col, matrixSize)
-  voxels.push({
-    x,
-    y: level * CELL_SIZE,
-    z,
-    row: module.row,
-    col: module.col,
-    kind,
-    colorPhase,
-  })
+  pushCellVoxel(voxels, module, matrixSize, level, kind, colorPhase)
+}
+
+export function projectedCapKind(cell: Pick<QRCell, 'dark'>): 'qr-top' | 'light-top' {
+  return cell.dark ? 'qr-top' : 'light-top'
+}
+
+export function pushProjectedColumn(
+  voxels: SculptureVoxel[],
+  cell: QRCell,
+  matrixSize: number,
+  fromLevel: number,
+  toLevel: number,
+  bodyKind: VoxelKind,
+  random: () => number,
+): void {
+  const start = Math.max(1, Math.floor(fromLevel))
+  const end = Math.max(start, Math.floor(toLevel))
+
+  for (let level = start; level <= end; level += 1) {
+    pushCellVoxel(
+      voxels,
+      cell,
+      matrixSize,
+      level,
+      level === end ? projectedCapKind(cell) : bodyKind,
+      (random() * 0.72 + level * 0.041) % 1,
+    )
+  }
 }
 
 export function pushSolidColumn(
@@ -246,15 +287,10 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
       && voxel.col >= 0
       && voxel.col < matrix.size
 
+    // Keep the external quiet zone conservative. Inside the QR symbol both light
+    // and dark cells may rise into semantic geometry; only their visible cap matters.
     if (!inside && voxel.y > 0) {
       throw new Error('Elevated geometry may not occupy the QR quiet zone.')
-    }
-
-    if (inside) {
-      const cell = matrix.cells[voxel.row * matrix.size + voxel.col]
-      if (!cell.dark && voxel.y > 0) {
-        throw new Error(`Style generator occluded light QR module ${voxel.row}:${voxel.col}.`)
-      }
     }
 
     const key = cellKey(voxel.row, voxel.col)
@@ -272,8 +308,8 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
       if (top.kind !== 'floor-dark' && top.kind !== 'qr-top') {
         throw new Error(`QR column ${cell.row}:${cell.col} is missing a scanner-dark top surface.`)
       }
-    } else if (top && top.kind !== 'floor-light') {
-      throw new Error(`Light QR module ${cell.row}:${cell.col} projects as a dark surface.`)
+    } else if (top && top.kind !== 'floor-light' && top.kind !== 'light-top') {
+      throw new Error(`Light QR module ${cell.row}:${cell.col} is missing a scanner-light top surface.`)
     }
   }
 

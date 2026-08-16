@@ -1,16 +1,17 @@
-import type { DarkModule, QRMatrixData } from '../qr'
+import type { DarkModule, QRCell, QRMatrixData } from '../qr'
 import {
   cellKey,
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
   hashString,
+  pushProjectedColumn,
   pushVoxel,
   type SculptureBuild,
   type VoxelKind,
 } from '../sculpture'
 
-type BuildingArchetype = 'landmark' | 'tower' | 'midrise' | 'slab' | 'terrace'
+type BuildingArchetype = 'tower' | 'midrise' | 'slab' | 'terrace'
 
 const CARDINAL_OFFSETS = [
   [-1, 0],
@@ -23,7 +24,7 @@ function localNoise(seedText: string, row: number, col: number, salt: string): n
   return (hashString(`${seedText}::city::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
-function distance(a: DarkModule, b: DarkModule): number {
+function distance(a: Pick<QRCell, 'row' | 'col'>, b: Pick<QRCell, 'row' | 'col'>): number {
   return Math.hypot(a.row - b.row, a.col - b.col)
 }
 
@@ -44,25 +45,20 @@ function dataDensity(module: DarkModule, dataByKey: ReadonlyMap<string, DarkModu
   return count
 }
 
-function roadFrontage(matrix: QRMatrixData, module: DarkModule): number {
+function lightFrontage(matrix: QRMatrixData, module: DarkModule): number {
   let count = 0
 
   for (const [dr, dc] of CARDINAL_OFFSETS) {
     const row = module.row + dr
     const col = module.col + dc
-
-    if (row < 0 || row >= matrix.size || col < 0 || col >= matrix.size) {
-      count += 1
-      continue
-    }
-
+    if (row < 0 || row >= matrix.size || col < 0 || col >= matrix.size) continue
     if (!matrix.cells[row * matrix.size + col].dark) count += 1
   }
 
   return count
 }
 
-function chooseLandmark(
+function chooseMegablockAnchor(
   matrix: QRMatrixData,
   modules: readonly DarkModule[],
   dataByKey: ReadonlyMap<string, DarkModule>,
@@ -71,13 +67,21 @@ function chooseLandmark(
 ): DarkModule | undefined {
   return [...modules].sort((a, b) => {
     const score = (module: DarkModule): number => (
-      centrality(module, center, matrix.size) * 2.25
-      + dataDensity(module, dataByKey) * 0.55
-      + roadFrontage(matrix, module) * 0.28
-      + localNoise(seedText, module.row, module.col, 'landmark') * 0.22
+      centrality(module, center, matrix.size) * 2.4
+      + dataDensity(module, dataByKey) * 0.58
+      + lightFrontage(matrix, module) * 0.18
+      + localNoise(seedText, module.row, module.col, 'mega') * 0.2
     )
     return score(b) - score(a)
   })[0]
+}
+
+function megablockCells(matrix: QRMatrixData, anchor: DarkModule): QRCell[] {
+  return matrix.cells.filter((cell) => (
+    cell.zone === 'data'
+    && Math.abs(cell.row - anchor.row) <= 1
+    && Math.abs(cell.col - anchor.col) <= 1
+  ))
 }
 
 function chooseAnchors(
@@ -86,25 +90,24 @@ function chooseAnchors(
   dataByKey: ReadonlyMap<string, DarkModule>,
   center: number,
   seedText: string,
-  landmark: DarkModule,
+  megablockAnchor: DarkModule,
 ): DarkModule[] {
-  const targetCount = Math.max(9, Math.min(18, Math.round(modules.length * 0.07)))
-  const minSpacing = matrix.size >= 41 ? 2.6 : 2.25
-  const landmarkKey = cellKey(landmark.row, landmark.col)
+  const targetCount = Math.max(7, Math.min(13, Math.round(modules.length * 0.05)))
+  const minSpacing = matrix.size >= 41 ? 3.0 : 2.6
 
   const ranked = modules
-    .filter((module) => cellKey(module.row, module.col) !== landmarkKey)
+    .filter((module) => distance(module, megablockAnchor) >= 3.2)
     .sort((a, b) => {
       const score = (module: DarkModule): number => (
-        centrality(module, center, matrix.size) * 1.35
-        + dataDensity(module, dataByKey) * 0.5
-        + roadFrontage(matrix, module) * 0.42
-        + localNoise(seedText, module.row, module.col, 'anchor') * 1.1
+        centrality(module, center, matrix.size) * 1.15
+        + dataDensity(module, dataByKey) * 0.42
+        + lightFrontage(matrix, module) * 0.34
+        + localNoise(seedText, module.row, module.col, 'anchor') * 1.18
       )
       return score(b) - score(a)
     })
 
-  const anchors: DarkModule[] = [landmark]
+  const anchors: DarkModule[] = []
 
   for (const candidate of ranked) {
     if (anchors.every((anchor) => distance(anchor, candidate) >= minSpacing)) {
@@ -122,24 +125,20 @@ function chooseArchetype(
   dataByKey: ReadonlyMap<string, DarkModule>,
   center: number,
   seedText: string,
-  landmarkKey: string,
 ): BuildingArchetype {
-  if (cellKey(module.row, module.col) === landmarkKey) return 'landmark'
-
   const density = dataDensity(module, dataByKey)
-  const frontage = roadFrontage(matrix, module)
+  const frontage = lightFrontage(matrix, module)
   const core = centrality(module, center, matrix.size)
   const noise = localNoise(seedText, module.row, module.col, 'type')
 
-  if (core > 0.46 && density >= 4 && noise > 0.5) return 'tower'
-  if (frontage >= 2 && density >= 3 && noise > 0.34) return 'slab'
-  if (frontage >= 2 && noise > 0.62) return 'terrace'
+  if (core > 0.42 && density >= 4 && noise > 0.56) return 'tower'
+  if (frontage >= 2 && density >= 3 && noise > 0.38) return 'slab'
+  if (frontage >= 2 && noise > 0.65) return 'terrace'
   return 'midrise'
 }
 
 function footprintLimit(archetype: BuildingArchetype): number {
   switch (archetype) {
-    case 'landmark': return 4
     case 'slab': return 3
     case 'terrace': return 3
     case 'tower': return 2
@@ -203,8 +202,6 @@ function buildingHeight(
   const d = distance(anchor, module)
 
   switch (archetype) {
-    case 'landmark':
-      return Math.max(9, Math.round(14 - d * 3 + noise * 1.5))
     case 'tower':
       return Math.max(7, Math.round(10 - d * 1.6 + noise * 1.5))
     case 'midrise':
@@ -228,9 +225,6 @@ function facadeKind(
   const noise = localNoise(seedText, module.row, module.col, 'facade')
 
   switch (archetype) {
-    case 'landmark':
-      if (level === topLevel - 3) return 'primary'
-      return level % 3 === 0 ? 'glass' : 'stone'
     case 'tower':
       return level % 2 === 0 ? 'glass' : 'stone'
     case 'slab':
@@ -246,7 +240,7 @@ function facadeKind(
 
 export function generateCity(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'city')
-  const { center } = context
+  const { random, center } = context
   const voxels = createBaseVoxels(context, {
     mode: 'symbol-pad',
     thickness: 2,
@@ -257,19 +251,63 @@ export function generateCity(matrix: QRMatrixData, seedText: string): SculptureB
   const lifted = new Set<string>()
 
   if (modules.length === 0) {
-    return finalizeSculpture(matrix, voxels, 'city', 'City', lifted, 'WHITE ROAD NETWORK / OPEN BLOCKS', 'display-plaque')
+    return finalizeSculpture(matrix, voxels, 'city', 'City', lifted, 'URBAN PLAZA / OPEN STREET PLAN', 'display-plaque')
   }
 
   const dataByKey = new Map(modules.map((module) => [cellKey(module.row, module.col), module]))
-  const landmark = chooseLandmark(matrix, modules, dataByKey, center, seedText) ?? modules[0]
-  const anchors = chooseAnchors(matrix, modules, dataByKey, center, seedText, landmark)
+  const megaAnchor = chooseMegablockAnchor(matrix, modules, dataByKey, center, seedText) ?? modules[0]
+  const megaCells = megablockCells(matrix, megaAnchor)
+  const antennaCell = megaCells
+    .filter((cell) => !cell.dark)
+    .sort((a, b) => (
+      localNoise(seedText, b.row, b.col, 'antenna')
+      - localNoise(seedText, a.row, a.col, 'antenna')
+    ))[0]
+
+  // A single coherent megabuilding is allowed to cross both dark and light QR cells.
+  // Its roof cells keep their original polarity, so scanner view still sees the exact QR.
+  for (const cell of megaCells) {
+    const d = Math.max(Math.abs(cell.row - megaAnchor.row), Math.abs(cell.col - megaAnchor.col))
+    const noise = localNoise(seedText, cell.row, cell.col, 'mega-height')
+    let topLevel = Math.max(8, Math.round(13 - d * 2.4 + noise * 1.4))
+    if (cell === antennaCell) topLevel = 16
+
+    pushProjectedColumn(
+      voxels,
+      cell,
+      matrix.size,
+      1,
+      topLevel,
+      topLevel >= 12 ? 'glass' : 'stone',
+      random,
+    )
+    lifted.add(cellKey(cell.row, cell.col))
+  }
+
+  // Nearby scanner-light cells become raised civic plazas rather than every light cell
+  // being interpreted as a road. They remain pale from the QR axis.
+  for (const cell of matrix.cells) {
+    if (cell.dark || cell.zone !== 'data') continue
+    if (megaCells.some((mega) => mega.row === cell.row && mega.col === cell.col)) continue
+    const d = distance(cell, megaAnchor)
+    const plaza = d >= 2.2 && d <= 5.2 && localNoise(seedText, cell.row, cell.col, 'plaza') > 0.83
+    if (!plaza) continue
+
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'plaster', random)
+    lifted.add(cellKey(cell.row, cell.col))
+  }
+
+  const anchors = chooseAnchors(matrix, modules, dataByKey, center, seedText, megaAnchor)
   const reservedAnchors = new Set(anchors.map((module) => cellKey(module.row, module.col)))
-  const claimed = new Set<string>()
-  const landmarkKey = cellKey(landmark.row, landmark.col)
-  let buildingCount = 0
+  const claimed = new Set(
+    megaCells
+      .filter((cell): cell is DarkModule => cell.dark)
+      .map((cell) => cellKey(cell.row, cell.col)),
+  )
+  let buildingCount = megaCells.length > 0 ? 1 : 0
 
   for (const anchor of anchors) {
-    const archetype = chooseArchetype(matrix, anchor, dataByKey, center, seedText, landmarkKey)
+    const archetype = chooseArchetype(matrix, anchor, dataByKey, center, seedText)
     const footprint = collectFootprint(anchor, archetype, dataByKey, claimed, reservedAnchors, seedText)
     if (footprint.length === 0) continue
 
@@ -299,7 +337,7 @@ export function generateCity(matrix: QRMatrixData, seedText: string): SculptureB
     'city',
     'City',
     lifted,
-    `${buildingCount} BUILDINGS / ${lifted.size} LOT CELLS / WHITE ROAD NETWORK`,
+    `${buildingCount} BUILDINGS / MIXED-POLARITY MEGABLOCK / LIGHT PLAZAS`,
     'display-plaque',
   )
 }

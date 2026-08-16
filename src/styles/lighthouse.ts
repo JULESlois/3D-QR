@@ -1,15 +1,17 @@
-import type { DarkModule, QRMatrixData } from '../qr'
+import type { DarkModule, QRCell, QRMatrixData } from '../qr'
 import {
   cellKey,
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
+  hashString,
+  pushProjectedColumn,
   pushVoxel,
   type SculptureBuild,
   type VoxelKind,
 } from '../sculpture'
 
-function distance(a: DarkModule, b: DarkModule): number {
+function distance(a: Pick<QRCell, 'row' | 'col'>, b: Pick<QRCell, 'row' | 'col'>): number {
   return Math.hypot(a.row - b.row, a.col - b.col)
 }
 
@@ -24,6 +26,18 @@ function adjacencyScore(module: DarkModule, modules: readonly DarkModule[]): num
   return score
 }
 
+function waveHeight(cell: QRCell, seedText: string): number {
+  if (cell.zone === 'finder') return 1
+  if (cell.zone === 'timing') return 1
+
+  const seed = (hashString(`${seedText}::wave::${cell.row}:${cell.col}`) % 1000) / 1000
+  const wave = Math.sin(cell.row * 0.83 + cell.col * 0.31)
+    + Math.cos(cell.col * 0.71 - cell.row * 0.27)
+    + (seed - 0.5) * 0.9
+
+  return wave > 0.55 ? 2 : 1
+}
+
 export function generateLighthouse(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'lighthouse')
   const { random, center } = context
@@ -33,6 +47,24 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     thickness: 2,
     foundationKind: 'foundation',
   })
+  const lifted = new Set<string>()
+
+  // Scanner-light cells are real scene geometry now: a shallow blue sea with a
+  // deterministic one/two-voxel wave field. In QR view their caps remain light.
+  for (const cell of matrix.cells) {
+    if (cell.dark) continue
+    const topLevel = waveHeight(cell, seedText)
+    pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'water', random)
+    lifted.add(cellKey(cell.row, cell.col))
+  }
+
+  // Dark finder modules become three low reef/breakwater structures instead of
+  // remaining a printed-looking corner pattern on the harbor floor.
+  for (const module of matrix.darkModules.filter((cell) => cell.zone === 'finder')) {
+    const topLevel = ((module.row + module.col) % 4 === 0) ? 2 : 1
+    pushProjectedColumn(voxels, module, matrix.size, 1, topLevel, 'stone', random)
+    lifted.add(cellKey(module.row, module.col))
+  }
 
   const dataModules = matrix.darkModules.filter((module) => module.role === 'data')
   const anchor = [...dataModules].sort((a, b) => {
@@ -44,7 +76,15 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
   })[0]
 
   if (!anchor) {
-    return finalizeSculpture(matrix, voxels, 'lighthouse', 'Lighthouse', new Set(), 'HARBOR PAD', 'courtyard-pad')
+    return finalizeSculpture(
+      matrix,
+      voxels,
+      'lighthouse',
+      'Lighthouse',
+      lifted,
+      'WAVE FIELD / FINDER REEFS / HARBOR PAD',
+      'courtyard-pad',
+    )
   }
 
   const nearby = [...dataModules]
@@ -57,12 +97,11 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     .sort((a, b) => distance(a, anchor) - distance(b, anchor))
     .slice(0, Math.min(18, dataModules.length))
 
-  const lifted = new Set<string>()
   const towerKeys = new Set(towerModules.map((module) => cellKey(module.row, module.col)))
 
   for (const module of islandModules) {
     if (towerKeys.has(cellKey(module.row, module.col))) continue
-    const topLevel = random() > 0.72 ? 2 : 1
+    const topLevel = random() > 0.72 ? 3 : 2
     lifted.add(cellKey(module.row, module.col))
 
     for (let level = 1; level <= topLevel; level += 1) {
@@ -110,7 +149,7 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     'lighthouse',
     'Lighthouse',
     lifted,
-    'BEACON / ROCK ISLAND / HARBOR PAD',
+    'SCANNER-LIGHT WAVES / FINDER REEFS / BEACON',
     'courtyard-pad',
   )
 }

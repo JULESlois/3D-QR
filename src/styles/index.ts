@@ -15,6 +15,10 @@ export interface StyleAppearance {
   baseDark: readonly string[]
   foundation: readonly string[]
   qrTop: 'palette' | string
+  /** Scanner-light cap color for elevated light QR cells. Defaults to baseLight. */
+  lightTop?: string
+  /** Optional semantic water palette for styles that turn light cells into water. */
+  water?: readonly string[]
   /** Fraction of a QR cell occupied by each voxel. Smaller values expose more grid gap. */
   voxelFill: number
 }
@@ -74,15 +78,16 @@ export const STYLES: readonly StyleDefinition[] = [
     label: 'Castle',
     eyebrow: 'VOXEL QR SCULPTURE / CASTLE',
     headline: 'Fortify the code.',
-    description: 'The castle uses a thick three-layer stone dais with a smaller two-module physical border. Its floor is pale masonry and graphite QR stone rather than grass, giving the fortification its own weight and silhouette.',
-    specimen: 'CASTLE + STONE DAIS = QR',
-    projectionLabel: 'STONE PLINTH',
+    description: 'The three finder regions become full tiered watchtower complexes, timing cells become connector walls, and pale light cells can rise into courtyard terraces. The QR pattern is preserved by the cap colors rather than by keeping light cells flat.',
+    specimen: 'FINDER TOWERS + WALLS = QR',
+    projectionLabel: 'FORTRESS PLAN',
     defaultPalette: 'summer',
     appearance: {
       baseLight: '#d9d7cc',
       baseDark: ['#424a47', '#505854', '#616862', '#343c39'],
       foundation: ['#777a73', '#666b66', '#898a80'],
       qrTop: '#2f3834',
+      lightTop: '#ddd9ca',
       voxelFill: 0.97,
     },
     generate: generateCastle,
@@ -109,16 +114,17 @@ export const STYLES: readonly StyleDefinition[] = [
     id: 'city',
     label: 'City',
     eyebrow: 'VOXEL QR SCULPTURE / CITY',
-    headline: 'Map the streets.',
-    description: 'White QR modules read as a continuous street network while only a sparse selection of connected dark lots rise into buildings. Low slabs, terraces, mid-rises, glass towers and one landmark create a calmer deterministic skyline.',
-    specimen: 'CITY BLOCKS + WHITE ROADS = QR',
-    projectionLabel: 'URBAN STREET PLAN',
+    headline: 'Build across the code.',
+    description: 'A central megablock deliberately spans both dark and light QR cells, with one scanner-light roof column extending as an antenna. Other light cells become streets or raised civic plazas while sparse secondary buildings keep the skyline readable.',
+    specimen: 'MEGABLOCK + STREETS + PLAZAS = QR',
+    projectionLabel: 'URBAN MASTERPLAN',
     defaultPalette: 'ginkgo',
     appearance: {
       baseLight: '#eff1ec',
       baseDark: ['#596164', '#4b5558', '#687174', '#414a4e'],
       foundation: ['#5b6264', '#4d5659', '#707679'],
       qrTop: '#202a2e',
+      lightTop: '#eef0e8',
       voxelFill: 0.94,
     },
     generate: generateCity,
@@ -127,16 +133,18 @@ export const STYLES: readonly StyleDefinition[] = [
     id: 'lighthouse',
     label: 'Lighthouse',
     eyebrow: 'VOXEL QR SCULPTURE / LIGHTHOUSE',
-    headline: 'Guide the code.',
-    description: 'A compact beacon rises from a rocky QR-safe island on a sea-toned harbor platform. The tower uses pale masonry and glass bands while deep teal QR tiles preserve the scanner projection.',
-    specimen: 'LIGHTHOUSE + HARBOR = QR',
-    projectionLabel: 'HARBOR PAD',
+    headline: 'Shape the tide.',
+    description: 'Scanner-light QR cells become a shallow blue wave field with deterministic height variation. Finder regions rise into reef-like breakwaters while the dark island and beacon remain the visual anchor.',
+    specimen: 'SEA + REEFS + BEACON = QR',
+    projectionLabel: 'TIDAL HARBOR',
     defaultPalette: 'ginkgo',
     appearance: {
-      baseLight: '#e4eee8',
+      baseLight: '#b9dce4',
       baseDark: ['#245663', '#2e6870', '#174a54', '#376f77'],
       foundation: ['#55787a', '#466769', '#678486'],
       qrTop: '#163d47',
+      lightTop: '#b8dfe8',
+      water: ['#9bcbd8', '#acd7e1', '#b9e0e7', '#8fc3d1'],
       voxelFill: 0.93,
     },
     generate: generateLighthouse,

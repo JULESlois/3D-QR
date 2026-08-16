@@ -1,19 +1,24 @@
 import QRCode from 'qrcode'
 
-export type ModuleRole = 'finder' | 'timing' | 'data' | 'light'
-export type DarkModuleRole = Exclude<ModuleRole, 'light'>
+export type ModuleZone = 'finder' | 'timing' | 'data'
+export type ModuleRole = ModuleZone | 'light'
+export type DarkModuleRole = ModuleZone
 
 export interface QRCell {
   row: number
   col: number
   index: number
   dark: boolean
+  /** Backwards-compatible color role. Light cells keep `light`; dark cells use their QR structure role. */
   role: ModuleRole
+  /** Structural location independent of scanner polarity. Light finder/separator cells are still `finder`. */
+  zone: ModuleZone
 }
 
 export interface DarkModule extends QRCell {
   dark: true
   role: DarkModuleRole
+  zone: ModuleZone
 }
 
 export interface QRMatrixData {
@@ -23,10 +28,12 @@ export interface QRMatrixData {
   darkModules: DarkModule[]
 }
 
-function classifyDarkModule(row: number, col: number, size: number): DarkModuleRole {
-  const inTopLeftFinder = row <= 6 && col <= 6
-  const inTopRightFinder = row <= 6 && col >= size - 7
-  const inBottomLeftFinder = row >= size - 7 && col <= 6
+function classifyModuleZone(row: number, col: number, size: number): ModuleZone {
+  // Include the one-cell separator around each 7x7 finder so light cells in the
+  // recognition structures can participate in scene generation as well.
+  const inTopLeftFinder = row <= 7 && col <= 7
+  const inTopRightFinder = row <= 7 && col >= size - 8
+  const inBottomLeftFinder = row >= size - 8 && col <= 7
 
   if (inTopLeftFinder || inTopRightFinder || inBottomLeftFinder) return 'finder'
 
@@ -47,6 +54,7 @@ export function createQRMatrix(value: string): QRMatrixData {
     for (let col = 0; col < size; col += 1) {
       const index = row * size + col
       const dark = Boolean(symbol.modules.get(row, col))
+      const zone = classifyModuleZone(row, col, size)
 
       if (dark) {
         const cell: DarkModule = {
@@ -54,7 +62,8 @@ export function createQRMatrix(value: string): QRMatrixData {
           col,
           index,
           dark: true,
-          role: classifyDarkModule(row, col, size),
+          role: zone,
+          zone,
         }
         cells.push(cell)
         darkModules.push(cell)
@@ -65,6 +74,7 @@ export function createQRMatrix(value: string): QRMatrixData {
           index,
           dark: false,
           role: 'light',
+          zone,
         })
       }
     }

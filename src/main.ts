@@ -113,6 +113,12 @@ function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color 
       return target.set(appearance.baseLight)
     case 'floor-dark':
       return indexedHexColor(appearance.baseDark, voxel.colorPhase, target)
+    case 'light-top':
+      return target.set(appearance.lightTop ?? appearance.baseLight)
+    case 'water':
+      return appearance.water
+        ? indexedHexColor(appearance.water, voxel.colorPhase, target)
+        : target.set(appearance.baseLight)
     case 'foundation':
       return indexedHexColor(appearance.foundation, voxel.colorPhase, target)
     case 'wood':
@@ -251,7 +257,7 @@ function setMode(next: 'art' | 'qr'): void {
   modeReadout.textContent = showQr ? `QR / ${style.projectionLabel}` : `${style.label.toUpperCase()} / ISOMETRIC`
   stageHint.textContent = showQr
     ? `CLICK TO RETURN · ${style.specimen}`
-    : 'CLICK TO ROTATE · STYLE-SPECIFIC PLATFORM / SAME QR PROJECTION'
+    : 'CLICK TO ROTATE · FULL-SCENE QR POLARITY / SAME PROJECTION'
   document.body.dataset.mode = showQr ? 'qr' : 'art'
 }
 
