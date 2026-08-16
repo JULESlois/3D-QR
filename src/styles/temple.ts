@@ -13,7 +13,7 @@ import {
 } from '../sculpture'
 
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
-  return (hashString(`${seedText}::temple-v2::${salt}::${row}:${col}`) % 10000) / 10000
+  return (hashString(`${seedText}::temple-v3::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
@@ -61,26 +61,27 @@ function buildFinderGardens(
     const bottomLeft = cell.row >= matrix.size - 8 && cell.col <= 7
     const noise = localNoise(seedText, cell.row, cell.col, 'finder-landscape')
 
-    // Finder regions are landscape/support zones now, not three competing towers.
+    // Finder regions remain low landscape/support zones so the enlarged torii and
+    // rear shrine hall dominate the silhouette instead of three corner structures.
     if (topRight) {
-      if (!cell.dark && noise > 0.38) {
+      if (!cell.dark && noise > 0.44) {
         pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'water', random)
         lifted.add(cellKey(cell.row, cell.col))
-      } else if (cell.dark && noise > 0.86) {
+      } else if (cell.dark && noise > 0.9) {
         pushProjectedColumn(voxels, cell, matrix.size, 1, 2, 'stone', random)
         lifted.add(cellKey(cell.row, cell.col))
       }
       continue
     }
 
-    if (topLeft && cell.dark && noise > 0.84) {
-      pushProjectedColumn(voxels, cell, matrix.size, 1, noise > 0.94 ? 3 : 2, 'stone', random)
+    if (topLeft && cell.dark && noise > 0.9) {
+      pushProjectedColumn(voxels, cell, matrix.size, 1, 2, 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
       continue
     }
 
-    if (bottomLeft && noise > 0.9) {
-      pushProjectedColumn(voxels, cell, matrix.size, 1, cell.dark ? 3 : 1, cell.dark ? 'wood' : 'stone', random)
+    if (bottomLeft && noise > 0.94) {
+      pushProjectedColumn(voxels, cell, matrix.size, 1, cell.dark ? 2 : 1, cell.dark ? 'wood' : 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
@@ -94,19 +95,35 @@ function buildMainHall(
   hallRow: number,
   center: number,
 ): void {
-  const halfWidth = Math.max(3, Math.min(5, Math.floor(matrix.size * 0.16)))
+  const halfWidth = Math.max(5, Math.min(10, Math.floor(matrix.size * 0.28)))
+  const halfDepth = Math.max(2, Math.min(3, Math.floor(matrix.size * 0.09)))
 
-  for (let row = hallRow - 1; row <= hallRow + 1; row += 1) {
+  // A much broader/deeper hall replaces the previous thin 3-row strip. The roof
+  // mass stretches laterally so Temple reads as a shrine complex, not a small prop.
+  for (let row = hallRow - halfDepth; row <= hallRow + halfDepth; row += 1) {
     for (let col = center - halfWidth; col <= center + halfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
       if (!cell) continue
 
-      const edge = Math.abs(col - center) === halfWidth
-      const ridge = row === hallRow && Math.abs(col - center) <= Math.max(1, halfWidth - 2)
-      const topLevel = ridge ? 8 : edge ? 5 : row === hallRow ? 7 : 6
+      const rowDistance = Math.abs(row - hallRow)
+      const colDistance = Math.abs(col - center)
+      const ridge = rowDistance === 0 && colDistance <= Math.max(2, halfWidth - 3)
+      const outerEave = colDistance >= halfWidth - 1 || rowDistance === halfDepth
+      const topLevel = ridge ? 10 : outerEave ? 6 : rowDistance <= 1 ? 8 : 7
+
       pushStyledColumn(voxels, cell, matrix.size, topLevel, seedText, 'hall')
       lifted.add(cellKey(cell.row, cell.col))
     }
+  }
+
+  // Front veranda / dais extends the hall toward the approach and increases its
+  // ground footprint without competing with the roof height.
+  const verandaRow = hallRow + halfDepth + 1
+  for (let col = center - halfWidth + 2; col <= center + halfWidth - 2; col += 1) {
+    const cell = getCell(matrix, verandaRow, col)
+    if (!cell) continue
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 3, col % 3 === 0 ? 'wood' : 'stone', () => localNoise(seedText, verandaRow, col, 'veranda'))
+    lifted.add(cellKey(cell.row, cell.col))
   }
 }
 
@@ -119,11 +136,15 @@ function buildApproach(
   toriiRow: number,
   center: number,
 ): void {
-  for (let row = hallRow + 2; row < toriiRow; row += 1) {
-    for (let col = center - 1; col <= center + 1; col += 1) {
+  const halfWidth = matrix.size >= 33 ? 3 : 2
+
+  for (let row = hallRow + 4; row < toriiRow; row += 1) {
+    for (let col = center - halfWidth; col <= center + halfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
       if (!cell) continue
-      const step = row > toriiRow - 3 ? 1 : row < hallRow + 4 ? 2 : 1
+      const nearHall = row <= hallRow + 6
+      const nearTorii = row >= toriiRow - 2
+      const step = nearHall ? 3 : nearTorii ? 2 : 1
       pushProjectedColumn(voxels, cell, matrix.size, 1, step, 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
     }
@@ -137,37 +158,51 @@ function buildTorii(
   toriiRow: number,
   center: number,
 ): void {
-  const beamHalfWidth = Math.max(4, Math.min(7, Math.floor(matrix.size * 0.22)))
-  const postOffset = Math.max(2, beamHalfWidth - 2)
-  const leftPost = center - postOffset
-  const rightPost = center + postOffset
+  const safeHalfWidth = Math.max(6, Math.min(Math.floor(matrix.size * 0.36), Math.floor((matrix.size - 3) / 2)))
+  const postOffset = Math.max(3, safeHalfWidth - 3)
+  const postColumns = [
+    center - postOffset - 1,
+    center - postOffset,
+    center + postOffset,
+    center + postOffset + 1,
+  ]
+  const toriiRows = [toriiRow, Math.min(matrix.size - 1, toriiRow + 1)]
 
-  for (const col of [leftPost, rightPost]) {
+  // Two-cell-wide, two-cell-deep posts make the torii read as architecture rather
+  // than two thin voxel sticks. The top beam spans roughly two thirds of the QR.
+  for (const row of toriiRows) {
+    for (const col of postColumns) {
+      const cell = getCell(matrix, row, col)
+      if (!cell) continue
+      for (let level = 1; level <= 11; level += 1) {
+        pushCellVoxel(voxels, cell, matrix.size, level, level === 11 ? projectedCapKind(cell) : 'primary', 0.08)
+      }
+      lifted.add(cellKey(cell.row, cell.col))
+    }
+  }
+
+  // Lower nuki beam: one row deep, wide and visually separate from the upper lintel.
+  for (let col = center - safeHalfWidth + 1; col <= center + safeHalfWidth - 1; col += 1) {
     const cell = getCell(matrix, toriiRow, col)
     if (!cell) continue
-    for (let level = 1; level <= 10; level += 1) {
-      pushCellVoxel(
-        voxels,
-        cell,
-        matrix.size,
-        level,
-        level === 10 ? projectedCapKind(cell) : 'primary',
-        0.08,
-      )
+    pushCellVoxel(voxels, cell, matrix.size, 9, 'primary', 0.08)
+    // If this column has no higher upper-beam voxel, cap it here for scanner safety.
+    if (Math.abs(col - center) > safeHalfWidth) {
+      pushCellVoxel(voxels, cell, matrix.size, 10, projectedCapKind(cell), 0.08)
     }
     lifted.add(cellKey(cell.row, cell.col))
   }
 
-  // Floating crossbeams are legal because QR safety depends only on the highest
-  // scanner-facing voxel in each projection column, not on columns being solid.
-  for (let col = center - beamHalfWidth; col <= center + beamHalfWidth; col += 1) {
-    const cell = getCell(matrix, toriiRow, col)
-    if (!cell) continue
-
-    pushCellVoxel(voxels, cell, matrix.size, 7, 'primary', 0.08)
-    pushCellVoxel(voxels, cell, matrix.size, 9, 'primary', 0.08)
-    pushCellVoxel(voxels, cell, matrix.size, 10, projectedCapKind(cell), 0.08)
-    lifted.add(cellKey(cell.row, cell.col))
+  // Massive two-layer upper lintel, two rows deep. The outer ends extend past the
+  // posts to create the familiar torii silhouette seen in the reference image.
+  for (const row of toriiRows) {
+    for (let col = center - safeHalfWidth; col <= center + safeHalfWidth; col += 1) {
+      const cell = getCell(matrix, row, col)
+      if (!cell) continue
+      pushCellVoxel(voxels, cell, matrix.size, 12, 'primary', 0.08)
+      pushCellVoxel(voxels, cell, matrix.size, 13, projectedCapKind(cell), 0.08)
+      lifted.add(cellKey(cell.row, cell.col))
+    }
   }
 }
 
@@ -182,23 +217,23 @@ export function generateTemple(matrix: QRMatrixData, seedText: string): Sculptur
   })
   const lifted = new Set<string>()
   const center = Math.round((matrix.size - 1) / 2)
-  const hallRow = Math.max(9, center - Math.max(2, Math.floor(matrix.size * 0.1)))
-  const toriiRow = Math.min(matrix.size - 4, center + Math.max(4, Math.floor(matrix.size * 0.18)))
+  const hallRow = Math.max(9, center - Math.max(3, Math.floor(matrix.size * 0.14)))
+  const toriiRow = Math.min(matrix.size - 4, center + Math.max(5, Math.floor(matrix.size * 0.24)))
 
   buildFinderGardens(voxels, matrix, seedText, random, lifted)
   buildMainHall(voxels, matrix, seedText, lifted, hallRow, center)
   buildApproach(voxels, matrix, random, lifted, hallRow, toriiRow, center)
   buildTorii(voxels, matrix, lifted, toriiRow, center)
 
-  // Sparse side lanterns keep the courtyard inhabited without becoming another
-  // ring of towers around the three QR finders.
+  // Only a few low side lanterns survive; the enlarged torii and main hall now
+  // control both the horizontal footprint and the vertical hierarchy.
   for (const cell of matrix.cells) {
     if (cell.zone !== 'data' || !cell.dark) continue
-    if (Math.abs(cell.row - center) > matrix.size * 0.3) continue
-    if (Math.abs(cell.col - center) < 4) continue
+    if (Math.abs(cell.row - center) > matrix.size * 0.32) continue
+    if (Math.abs(cell.col - center) < Math.max(5, matrix.size * 0.15)) continue
     const noise = localNoise(seedText, cell.row, cell.col, 'lantern')
-    if (noise < 0.975) continue
-    pushProjectedColumn(voxels, cell, matrix.size, 1, 3 + Math.floor(noise * 2), 'wood', random)
+    if (noise < 0.988) continue
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 3, 'wood', random)
     lifted.add(cellKey(cell.row, cell.col))
   }
 
@@ -208,7 +243,7 @@ export function generateTemple(matrix: QRMatrixData, seedText: string): Sculptur
     'temple',
     'Temple',
     lifted,
-    'FOREGROUND TORII / AXIAL APPROACH / REAR MAIN HALL / LOW FINDER GARDENS',
+    'OVERSIZED TORII / WIDE SHRINE HALL / BROAD STONE APPROACH / LOW FINDER GARDENS',
     'courtyard-pad',
   )
 }
