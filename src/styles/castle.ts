@@ -4,33 +4,78 @@ import {
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
+  hashString,
   pushProjectedColumn,
   pushVoxel,
   type SculptureBuild,
 } from '../sculpture'
 
-function finderCenter(cell: QRCell, size: number): { row: number; col: number } | null {
-  if (cell.row <= 7 && cell.col <= 7) return { row: 3, col: 3 }
-  if (cell.row <= 7 && cell.col >= size - 8) return { row: 3, col: size - 4 }
-  if (cell.row >= size - 8 && cell.col <= 7) return { row: size - 4, col: 3 }
+function localNoise(seedText: string, row: number, col: number, salt: string): number {
+  return (hashString(`${seedText}::castle-v2::${salt}::${row}:${col}`) % 10000) / 10000
+}
+
+function finderProfile(cell: QRCell, size: number): { row: number; col: number; severity: number; bias: number } | null {
+  if (cell.row <= 7 && cell.col <= 7) return { row: 3, col: 3, severity: 0.18, bias: 1 }
+  if (cell.row <= 7 && cell.col >= size - 8) return { row: 3, col: size - 4, severity: 0.42, bias: 0 }
+  if (cell.row >= size - 8 && cell.col <= 7) return { row: size - 4, col: 3, severity: 0.58, bias: -1 }
   return null
 }
 
-function finderTowerHeight(cell: QRCell, size: number): number {
-  const center = finderCenter(cell, size)
-  if (!center) return cell.dark ? 5 : 3
+function buildBrokenFinderBastions(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  seedText: string,
+  random: () => number,
+  lifted: Set<string>,
+): void {
+  for (const cell of matrix.cells.filter((candidate) => candidate.zone === 'finder')) {
+    const profile = finderProfile(cell, matrix.size)
+    if (!profile) continue
 
-  const ring = Math.max(Math.abs(cell.row - center.row), Math.abs(cell.col - center.col))
+    const ring = Math.max(Math.abs(cell.row - profile.row), Math.abs(cell.col - profile.col))
+    const survival = localNoise(seedText, cell.row, cell.col, 'bastion-survival')
+    const chip = localNoise(seedText, cell.row, cell.col, 'bastion-chip')
 
-  if (cell.dark) {
-    if (ring <= 1) return 11
-    if (ring <= 3) return 8
-    return 5
+    if (cell.dark) {
+      const threshold = profile.severity + (ring === 2 ? 0.08 : 0)
+      if (survival < threshold) continue
+
+      const baseHeight = ring <= 1 ? 8 : ring <= 3 ? 6 : 3
+      const topLevel = Math.max(2, baseHeight + profile.bias - Math.floor(chip * (3 + profile.severity * 3)))
+      pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+      continue
+    }
+
+    // Pale finder cells only survive as occasional broken wall-walks and exposed
+    // floors, leaving visible gaps instead of creating three complete tower masses.
+    if (survival > 0.82 + profile.severity * 0.08) {
+      const topLevel = ring <= 2 ? 2 : 1
+      pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+    }
   }
+}
 
-  if (ring <= 1) return 7
-  if (ring <= 3) return 6
-  return 4
+function buildBrokenTimingWalls(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  seedText: string,
+  random: () => number,
+  lifted: Set<string>,
+): void {
+  for (const cell of matrix.cells.filter((candidate) => candidate.zone === 'timing')) {
+    const survival = localNoise(seedText, cell.row, cell.col, 'wall-survival')
+    if (cell.dark) {
+      if (survival < 0.36) continue
+      const topLevel = 3 + Math.floor(localNoise(seedText, cell.row, cell.col, 'wall-height') * 3)
+      pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+    } else if (survival > 0.83) {
+      pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+    }
+  }
 }
 
 export function generateCastle(matrix: QRMatrixData, seedText: string): SculptureBuild {
@@ -44,31 +89,18 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
   })
   const lifted = new Set<string>()
 
-  // Each finder becomes a complete watchtower complex. Both light and dark cells
-  // rise as masonry; only the cap polarity differs, so the finder pattern survives
-  // exactly in QR view while reading as a tiered tower in art view.
-  for (const cell of matrix.cells.filter((candidate) => candidate.zone === 'finder')) {
-    const topLevel = finderTowerHeight(cell, matrix.size)
-    pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
-    lifted.add(cellKey(cell.row, cell.col))
-  }
+  buildBrokenFinderBastions(voxels, matrix, seedText, random, lifted)
+  buildBrokenTimingWalls(voxels, matrix, seedText, random, lifted)
 
-  // Timing modules become crenellated connector walls. Light timing cells are lower
-  // pale wall-walks, dark timing cells are higher battlements.
-  for (const cell of matrix.cells.filter((candidate) => candidate.zone === 'timing')) {
-    const topLevel = cell.dark ? 5 : 3
-    pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
-    lifted.add(cellKey(cell.row, cell.col))
-  }
-
-  // Some central light data cells rise into pale courtyard terraces instead of
-  // remaining a perfectly flat QR plate.
+  // Light cells become sparse rubble, collapsed wall walks and pale exposed court
+  // surfaces rather than a uniformly raised courtyard.
   for (const cell of matrix.cells) {
     if (cell.dark || cell.zone !== 'data') continue
     const nx = Math.abs((cell.col - center) / Math.max(1, matrix.size * 0.36))
     const nz = Math.abs((cell.row - center) / Math.max(1, matrix.size * 0.36))
-    if (nx <= 0.72 && nz <= 0.72 && random() > 0.54) {
-      pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'stone', random)
+    const rubble = localNoise(seedText, cell.row, cell.col, 'rubble')
+    if (nx <= 0.9 && nz <= 0.9 && rubble > 0.9) {
+      pushProjectedColumn(voxels, cell, matrix.size, 1, rubble > 0.97 ? 2 : 1, 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
@@ -80,30 +112,29 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     return nx <= 1.04 && nz <= 1.04
   })
 
-  const wallLevel = Math.round(Math.max(5, Math.min(8, matrix.size * 0.16)))
-  const towerLevel = wallLevel + Math.round(Math.max(4, Math.min(7, matrix.size * 0.13)))
-  const keepLevel = wallLevel + Math.round(Math.max(2, Math.min(5, matrix.size * 0.09)))
+  const wallLevel = Math.round(Math.max(4, Math.min(7, matrix.size * 0.14)))
+  const keepLevel = wallLevel + Math.round(Math.max(4, Math.min(7, matrix.size * 0.13)))
 
   for (const module of modules) {
     const nx = (module.col - center) / Math.max(1, matrix.size * 0.34)
     const nz = (module.row - center) / Math.max(1, matrix.size * 0.34)
     const ax = Math.abs(nx)
     const az = Math.abs(nz)
-
-    const isCornerTower = ax > 0.58 && az > 0.58
-    const isWall = ax > 0.72 || az > 0.72
     const isKeep = ax < 0.34 && az < 0.34
-    const crenellation = ((module.row + module.col) & 1) === 0 ? 1 : 0
+    const isWall = ax > 0.68 || az > 0.68
+    const damage = localNoise(seedText, module.row, module.col, 'fortress-damage')
 
-    let topLevel = isCornerTower
-      ? towerLevel + crenellation
-      : isKeep
-        ? keepLevel + crenellation
-        : isWall
-          ? wallLevel + crenellation
-          : Math.max(3, wallLevel - 2)
+    // Broken perimeter walls may collapse all the way back to the QR floor. The
+    // central keep stays comparatively intact and becomes the sole dominant mass.
+    if (isWall && !isKeep && damage < 0.28) continue
 
-    if (random() > 0.86 && (isCornerTower || isKeep)) topLevel += 1
+    let topLevel = isKeep
+      ? keepLevel - Math.floor(damage * 2)
+      : isWall
+        ? Math.max(3, wallLevel - Math.floor(damage * 3))
+        : 2 + Math.floor(localNoise(seedText, module.row, module.col, 'court-block') * 3)
+
+    if (isKeep && ((module.row + module.col) & 1) === 0) topLevel += 1
     lifted.add(cellKey(module.row, module.col))
 
     for (let level = 1; level <= topLevel; level += 1) {
@@ -113,8 +144,8 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : upperBand && isCornerTower ? 'primary' : 'stone',
-        (random() * 0.7 + level * 0.043 + ax * 0.08 + az * 0.08) % 1,
+        level === topLevel ? 'qr-top' : upperBand && isKeep ? 'primary' : 'stone',
+        (random() * 0.68 + level * 0.041 + damage * 0.15) % 1,
       )
     }
   }
@@ -125,7 +156,7 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     'castle',
     'Castle',
     lifted,
-    '3 FINDER WATCHTOWERS / TIMING WALLS / COURTYARD TERRACES',
+    'CENTRAL KEEP / 3 UNEVEN RUINED BASTIONS / BROKEN TIMING WALLS / RUBBLE COURT',
     'stone-plinth',
   )
 }

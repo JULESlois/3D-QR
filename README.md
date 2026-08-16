@@ -25,13 +25,13 @@ The external quiet zone remains conservative: it may be a low scanner-light plat
 
 - **Tree / Full Lawn** — broad grass-like QR landscape with the complete physical quiet zone.
 - **House / Courtyard Pad** — warm compact platform and house massing.
-- **Castle / Fortress Plan** — the three finder regions become tiered watchtower complexes; timing cells become connector walls; selected light cells rise into pale courtyard terraces.
+- **Castle / Ruined Fortress** — a central keep dominates three finder-area bastions with different damage levels. Broken timing walls contain real gaps and the courtyard uses sparse rubble rather than symmetrical corner towers.
 - **Glyph / Display Plaque** — alphanumeric relief on a thin QR-sized plaque.
-- **City / Urban Masterplan** — a central megablock intentionally spans both light and dark cells. One light roof column can become an antenna; other light cells remain streets or rise into civic plazas. Sparse secondary blocks keep the skyline readable.
-- **Lighthouse / Tidal Harbor** — scanner-light cells become shallow blue water with one/two-voxel wave variation; finder regions become reef-like breakwaters while the dark island and beacon rise above them.
+- **City / Urban Masterplan** — a central megablock intentionally spans both light and dark cells. One light roof column can become an antenna; other light cells remain streets or rise into civic plazas. Sparse secondary buildings keep the skyline readable.
+- **Lighthouse / Tidal Harbor** — scanner-light cells become shallow blue water with one/two-voxel wave variation; finder regions become reef-like breakwaters while the dark island and beacon remain the visual anchor.
 - **Pagoda / Temple Courtyard** — a stepped mixed-polarity main pagoda spans light and dark data cells, finder regions become secondary pavilions, timing cells become corridors, and scanner-light data cells rise into gravel courts and steps.
-- **Temple / Temple Precinct** — a broad horizontal main hall spans both polarities. The three finder regions are interpreted differently as a gatehouse, water-garden node and bell pavilion; timing cells become covered corridors and a stone approach; surrounding light cells form water courts and terraces.
-- **Crystal / Mineral Field** — a central mixed-polarity crystal bloom rises from the QR-sized mineral slab. Finder structures become satellite geodes, timing cells become mineral veins, and sparse light/dark data cells rise into secondary shards.
+- **Temple / Shrine Axis** — a large foreground torii frames a stone approach and rear horizontal shrine hall. Finder regions are intentionally low gardens/water/lantern fragments rather than three tower nodes.
+- **Crystal / Crystal Sanctum** — a single suspended cyan crystal hangs above an energy basin inside a low stone frame with four pylons. Finder regions remain part of the slab instead of becoming satellite crystal towers.
 
 ## Architecture
 
@@ -82,7 +82,7 @@ dark cell  → qr-top
 light cell → light-top
 ```
 
-The body below that cap can use any semantic material (`stone`, `glass`, `water`, `crystal`, etc.) because it disappears into depth in QR view.
+The body below that cap can use any semantic material (`stone`, `glass`, `water`, `crystal`, etc.) because it disappears into depth in QR view. Geometry also does not need to form solid columns: isolated high voxels can create suspended beams or crystals as long as the highest voxel in every represented QR column has the correct scanner polarity.
 
 The validator checks the final visible cap per `(row, col)`:
 
@@ -92,7 +92,7 @@ The validator checks the final visible cap per `(row, col)`:
 4. Elevated geometry is forbidden in the external quiet zone.
 5. Foundation layers below the scanner-facing plane do not affect the projection.
 
-## Structural QR zones
+## Structural QR zones are hints, not mandatory towers
 
 `QRCell.zone` is independent of color:
 
@@ -100,46 +100,41 @@ The validator checks the final visible cap per `(row, col)`:
 type ModuleZone = 'finder' | 'timing' | 'data'
 ```
 
-The one-cell light separator around each finder is also classified as `finder`, which lets generators turn the complete recognition structure into semantic 3D forms while preserving its light/dark pattern in QR view.
-
-Examples:
+A style may use those zones semantically, but finder regions are not required to become three equivalent structures. Recent generators deliberately use different silhouette grammars:
 
 ```text
 Castle
-finder → watchtower complexes
-timing → connector walls
-light data → courtyard terraces
+hero silhouette → central keep
+finder → three uneven ruined bastions
+timing → broken wall fragments
+light data → rubble / exposed court
 
 Lighthouse
+hero silhouette → beacon + island
 light data → waves
 finder → reefs / breakwaters
-dark data → island + beacon
 
 City
-light + dark data → one coherent megabuilding
+hero silhouette → sparse skyline / megablock
+light + dark data → coherent buildings
 light data → roads / plazas / antenna roof cells
-dark data → secondary buildings
 
 Pagoda
-light + dark data → one tiered main pagoda
+hero silhouette → vertical tiered tower
 finder → secondary pavilions / gate complexes
 timing → covered corridors / approach path
-light data → gravel courts / stone steps
 
 Temple
-light + dark data → broad horizontal main hall
-finder TL → gatehouse
-finder TR → water-garden node
-finder BL → bell pavilion
-horizontal timing → covered timber corridor
-vertical timing → stone approach
-light data → water court / terraces
+hero silhouette → foreground torii framing rear shrine hall
+finder → low garden / water / lantern fragments
+central axis → stone approach
+light + dark data → rear horizontal main hall
 
 Crystal
-light + dark data → central crystal bloom
-finder → three satellite geodes
-timing → low mineral veins
-light + dark data → sparse secondary shards
+hero silhouette → one suspended central crystal
+finder → low scanner slab only
+central field → energy basin + sanctum frame
+four selected cells → low pylons
 ```
 
 ## Style appearance
@@ -159,7 +154,7 @@ interface StyleAppearance {
 }
 ```
 
-This allows, for example, Lighthouse light modules to be pale blue rather than white, or Crystal bodies to use a dedicated violet/blue mineral range, while scanner polarity is still controlled by the final cap colors.
+This allows Lighthouse water to stay pale blue, Crystal bodies to use a dedicated cyan mineral range, and Temple to keep a warm shrine palette while scanner polarity is still controlled by the final cap colors.
 
 ## Deterministic generation
 
@@ -194,7 +189,7 @@ npm run preview
 
 - render-and-decode QR tests in CI;
 - scanner contrast validation for custom themes;
-- richer finder-specific scene primitives;
+- explicit silhouette-grammar and scene-role metadata per style;
 - station / mountain generators;
 - style parameter schemas;
 - multi-view / anamorphic constraints;

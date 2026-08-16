@@ -12,147 +12,161 @@ import {
   type VoxelKind,
 } from '../sculpture'
 
-type FinderScene = 'gate' | 'garden' | 'bell'
-
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
-  return (hashString(`${seedText}::temple::${salt}::${row}:${col}`) % 10000) / 10000
+  return (hashString(`${seedText}::temple-v2::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
-function distance(a: Pick<QRCell, 'row' | 'col'>, b: Pick<QRCell, 'row' | 'col'>): number {
-  return Math.hypot(a.row - b.row, a.col - b.col)
+function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
+  if (row < 0 || row >= matrix.size || col < 0 || col >= matrix.size) return undefined
+  return matrix.cells[row * matrix.size + col]
 }
 
-function finderScene(cell: QRCell, size: number): FinderScene | null {
-  if (cell.row <= 7 && cell.col <= 7) return 'gate'
-  if (cell.row <= 7 && cell.col >= size - 8) return 'garden'
-  if (cell.row >= size - 8 && cell.col <= 7) return 'bell'
-  return null
-}
-
-function finderCenter(cell: QRCell, size: number): { row: number; col: number } | null {
-  if (cell.row <= 7 && cell.col <= 7) return { row: 3, col: 3 }
-  if (cell.row <= 7 && cell.col >= size - 8) return { row: 3, col: size - 4 }
-  if (cell.row >= size - 8 && cell.col <= 7) return { row: size - 4, col: 3 }
-  return null
-}
-
-function finderRing(cell: QRCell, size: number): number {
-  const center = finderCenter(cell, size)
-  if (!center) return 4
-  return Math.max(Math.abs(cell.row - center.row), Math.abs(cell.col - center.col))
-}
-
-function chooseMainAnchor(matrix: QRMatrixData, seedText: string): QRCell | undefined {
-  const center = (matrix.size - 1) / 2
-  return [...matrix.cells]
-    .filter((cell) => cell.zone === 'data')
-    .sort((a, b) => {
-      const score = (cell: QRCell): number => (
-        Math.hypot(cell.row - center, cell.col - center)
-        - (cell.dark ? 0.24 : 0)
-        - localNoise(seedText, cell.row, cell.col, 'anchor') * 0.12
-      )
-      return score(a) - score(b)
-    })[0]
-}
-
-function mainHallCells(matrix: QRMatrixData, anchor: QRCell): QRCell[] {
-  return matrix.cells.filter((cell) => (
-    cell.zone === 'data'
-    && Math.abs(cell.row - anchor.row) <= 1
-    && Math.abs(cell.col - anchor.col) <= 3
-  ))
-}
-
-function hallHeight(cell: QRCell, anchor: QRCell, seedText: string): number {
-  const rowOffset = Math.abs(cell.row - anchor.row)
-  const colOffset = Math.abs(cell.col - anchor.col)
-  const noise = localNoise(seedText, cell.row, cell.col, 'hall-height')
-  const ridge = colOffset <= 1 ? 1 : 0
-  const edge = colOffset >= 3 ? 1 : 0
-  return Math.max(5, 8 + ridge - rowOffset * 2 - edge + Math.round(noise * 0.8))
-}
-
-function hallBodyKind(level: number, topLevel: number): VoxelKind {
-  if (level >= topLevel - 2) return 'primary'
-  if (level <= 2) return 'stone'
-  if (level % 3 === 0) return 'plaster'
-  return 'wood'
-}
-
-function pushHallColumn(
+function pushStyledColumn(
   voxels: ReturnType<typeof createBaseVoxels>,
   cell: QRCell,
   matrixSize: number,
-  anchor: QRCell,
+  topLevel: number,
   seedText: string,
+  salt: string,
 ): void {
-  const topLevel = hallHeight(cell, anchor, seedText)
-
   for (let level = 1; level <= topLevel; level += 1) {
+    let kind: VoxelKind = 'wood'
+    if (level <= 2) kind = 'stone'
+    else if (level >= topLevel - 1) kind = 'primary'
+    else if (level % 3 === 0) kind = 'plaster'
+
     pushCellVoxel(
       voxels,
       cell,
       matrixSize,
       level,
-      level === topLevel ? projectedCapKind(cell) : hallBodyKind(level, topLevel),
-      (localNoise(seedText, cell.row, cell.col, `hall-${level}`) * 0.58 + level * 0.051) % 1,
+      level === topLevel ? projectedCapKind(cell) : kind,
+      kind === 'primary'
+        ? 0.08
+        : (localNoise(seedText, cell.row, cell.col, `${salt}-${level}`) * 0.54 + level * 0.043) % 1,
     )
   }
 }
 
-function buildFinderScenes(
+function buildFinderGardens(
   voxels: ReturnType<typeof createBaseVoxels>,
   matrix: QRMatrixData,
+  seedText: string,
   random: () => number,
   lifted: Set<string>,
 ): void {
   for (const cell of matrix.cells.filter((candidate) => candidate.zone === 'finder')) {
-    const scene = finderScene(cell, matrix.size)
-    const ring = finderRing(cell, matrix.size)
-    if (!scene) continue
+    const topLeft = cell.row <= 7 && cell.col <= 7
+    const topRight = cell.row <= 7 && cell.col >= matrix.size - 8
+    const bottomLeft = cell.row >= matrix.size - 8 && cell.col <= 7
+    const noise = localNoise(seedText, cell.row, cell.col, 'finder-landscape')
 
-    let topLevel = 1
-    let bodyKind: VoxelKind = 'stone'
-
-    if (scene === 'gate') {
-      topLevel = cell.dark
-        ? ring <= 1 ? 8 : ring <= 3 ? 6 : 3
-        : ring <= 1 ? 5 : ring <= 3 ? 4 : 2
-      bodyKind = cell.dark ? 'wood' : 'plaster'
-    } else if (scene === 'garden') {
-      topLevel = cell.dark
-        ? ring <= 1 ? 5 : ring <= 3 ? 3 : 2
-        : ring <= 1 ? 2 : 1
-      bodyKind = cell.dark ? 'stone' : 'water'
-    } else {
-      topLevel = cell.dark
-        ? ring <= 1 ? 10 : ring <= 3 ? 6 : 3
-        : ring <= 1 ? 5 : ring <= 3 ? 3 : 2
-      bodyKind = cell.dark ? 'wood' : 'stone'
+    // Finder regions are landscape/support zones now, not three competing towers.
+    if (topRight) {
+      if (!cell.dark && noise > 0.38) {
+        pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'water', random)
+        lifted.add(cellKey(cell.row, cell.col))
+      } else if (cell.dark && noise > 0.86) {
+        pushProjectedColumn(voxels, cell, matrix.size, 1, 2, 'stone', random)
+        lifted.add(cellKey(cell.row, cell.col))
+      }
+      continue
     }
 
-    pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, bodyKind, random)
-    lifted.add(cellKey(cell.row, cell.col))
+    if (topLeft && cell.dark && noise > 0.84) {
+      pushProjectedColumn(voxels, cell, matrix.size, 1, noise > 0.94 ? 3 : 2, 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+      continue
+    }
+
+    if (bottomLeft && noise > 0.9) {
+      pushProjectedColumn(voxels, cell, matrix.size, 1, cell.dark ? 3 : 1, cell.dark ? 'wood' : 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+    }
   }
 }
 
-function buildTempleAxes(
+function buildMainHall(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  seedText: string,
+  lifted: Set<string>,
+  hallRow: number,
+  center: number,
+): void {
+  const halfWidth = Math.max(3, Math.min(5, Math.floor(matrix.size * 0.16)))
+
+  for (let row = hallRow - 1; row <= hallRow + 1; row += 1) {
+    for (let col = center - halfWidth; col <= center + halfWidth; col += 1) {
+      const cell = getCell(matrix, row, col)
+      if (!cell) continue
+
+      const edge = Math.abs(col - center) === halfWidth
+      const ridge = row === hallRow && Math.abs(col - center) <= Math.max(1, halfWidth - 2)
+      const topLevel = ridge ? 8 : edge ? 5 : row === hallRow ? 7 : 6
+      pushStyledColumn(voxels, cell, matrix.size, topLevel, seedText, 'hall')
+      lifted.add(cellKey(cell.row, cell.col))
+    }
+  }
+}
+
+function buildApproach(
   voxels: ReturnType<typeof createBaseVoxels>,
   matrix: QRMatrixData,
   random: () => number,
   lifted: Set<string>,
+  hallRow: number,
+  toriiRow: number,
+  center: number,
 ): void {
-  for (const cell of matrix.cells.filter((candidate) => candidate.zone === 'timing')) {
-    const horizontal = cell.row === 6
-    const topLevel = horizontal
-      ? cell.dark ? 4 : 3
-      : cell.dark ? 2 : 1
-    const bodyKind: VoxelKind = horizontal
-      ? cell.dark ? 'wood' : 'plaster'
-      : 'stone'
+  for (let row = hallRow + 2; row < toriiRow; row += 1) {
+    for (let col = center - 1; col <= center + 1; col += 1) {
+      const cell = getCell(matrix, row, col)
+      if (!cell) continue
+      const step = row > toriiRow - 3 ? 1 : row < hallRow + 4 ? 2 : 1
+      pushProjectedColumn(voxels, cell, matrix.size, 1, step, 'stone', random)
+      lifted.add(cellKey(cell.row, cell.col))
+    }
+  }
+}
 
-    pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, bodyKind, random)
+function buildTorii(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  lifted: Set<string>,
+  toriiRow: number,
+  center: number,
+): void {
+  const beamHalfWidth = Math.max(4, Math.min(7, Math.floor(matrix.size * 0.22)))
+  const postOffset = Math.max(2, beamHalfWidth - 2)
+  const leftPost = center - postOffset
+  const rightPost = center + postOffset
+
+  for (const col of [leftPost, rightPost]) {
+    const cell = getCell(matrix, toriiRow, col)
+    if (!cell) continue
+    for (let level = 1; level <= 10; level += 1) {
+      pushCellVoxel(
+        voxels,
+        cell,
+        matrix.size,
+        level,
+        level === 10 ? projectedCapKind(cell) : 'primary',
+        0.08,
+      )
+    }
+    lifted.add(cellKey(cell.row, cell.col))
+  }
+
+  // Floating crossbeams are legal because QR safety depends only on the highest
+  // scanner-facing voxel in each projection column, not on columns being solid.
+  for (let col = center - beamHalfWidth; col <= center + beamHalfWidth; col += 1) {
+    const cell = getCell(matrix, toriiRow, col)
+    if (!cell) continue
+
+    pushCellVoxel(voxels, cell, matrix.size, 7, 'primary', 0.08)
+    pushCellVoxel(voxels, cell, matrix.size, 9, 'primary', 0.08)
+    pushCellVoxel(voxels, cell, matrix.size, 10, projectedCapKind(cell), 0.08)
     lifted.add(cellKey(cell.row, cell.col))
   }
 }
@@ -167,82 +181,25 @@ export function generateTemple(matrix: QRMatrixData, seedText: string): Sculptur
     foundationKind: 'foundation',
   })
   const lifted = new Set<string>()
+  const center = Math.round((matrix.size - 1) / 2)
+  const hallRow = Math.max(9, center - Math.max(2, Math.floor(matrix.size * 0.1)))
+  const toriiRow = Math.min(matrix.size - 4, center + Math.max(4, Math.floor(matrix.size * 0.18)))
 
-  buildFinderScenes(voxels, matrix, random, lifted)
-  buildTempleAxes(voxels, matrix, random, lifted)
+  buildFinderGardens(voxels, matrix, seedText, random, lifted)
+  buildMainHall(voxels, matrix, seedText, lifted, hallRow, center)
+  buildApproach(voxels, matrix, random, lifted, hallRow, toriiRow, center)
+  buildTorii(voxels, matrix, lifted, toriiRow, center)
 
-  const anchor = chooseMainAnchor(matrix, seedText)
-  if (!anchor) {
-    return finalizeSculpture(
-      matrix,
-      voxels,
-      'temple',
-      'Temple',
-      lifted,
-      'GATE / WATER GARDEN / BELL PAVILION / TEMPLE AXES',
-      'courtyard-pad',
-    )
-  }
-
-  const hallCells = mainHallCells(matrix, anchor)
-  const hallKeys = new Set(hallCells.map((cell) => cellKey(cell.row, cell.col)))
-
-  // The main hall is deliberately broad and horizontal. Light and dark cells share
-  // the same architectural mass, while their scanner-facing roof caps preserve QR polarity.
-  for (const cell of hallCells) {
-    pushHallColumn(voxels, cell, matrix.size, anchor, seedText)
-    lifted.add(cellKey(cell.row, cell.col))
-  }
-
-  const gardenSide = localNoise(seedText, anchor.row, anchor.col, 'garden-side') > 0.5 ? 1 : -1
-
-  // A side water court uses scanner-light data cells as shallow water. Dark cells
-  // inside the same court become stepping stones or lantern bases instead of being excluded.
+  // Sparse side lanterns keep the courtyard inhabited without becoming another
+  // ring of towers around the three QR finders.
   for (const cell of matrix.cells) {
-    if (cell.zone !== 'data') continue
-    const key = cellKey(cell.row, cell.col)
-    if (hallKeys.has(key)) continue
-
-    const dr = Math.abs(cell.row - anchor.row)
-    const signedDc = (cell.col - anchor.col) * gardenSide
-    const inWaterCourt = dr <= 3 && signedDc >= 3 && signedDc <= 7
-
-    if (inWaterCourt) {
-      if (!cell.dark && localNoise(seedText, cell.row, cell.col, 'water') > 0.32) {
-        const topLevel = localNoise(seedText, cell.row, cell.col, 'water-height') > 0.84 ? 2 : 1
-        pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'water', random)
-        lifted.add(key)
-        continue
-      }
-
-      if (cell.dark && localNoise(seedText, cell.row, cell.col, 'stepping-stone') > 0.72) {
-        pushProjectedColumn(voxels, cell, matrix.size, 1, 2, 'stone', random)
-        lifted.add(key)
-        continue
-      }
-    }
-
-    const d = distance(cell, anchor)
-
-    if (!cell.dark) {
-      const courtyard = d >= 3.2
-        && d <= Math.max(7, matrix.size * 0.25)
-        && localNoise(seedText, cell.row, cell.col, 'courtyard') > 0.86
-      if (courtyard) {
-        pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'stone', random)
-        lifted.add(key)
-      }
-      continue
-    }
-
-    const lantern = d >= 4
-      && d <= Math.max(8, matrix.size * 0.3)
-      && localNoise(seedText, cell.row, cell.col, 'lantern') > 0.965
-    if (lantern) {
-      const topLevel = 3 + Math.floor(localNoise(seedText, cell.row, cell.col, 'lantern-height') * 3)
-      pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'wood', random)
-      lifted.add(key)
-    }
+    if (cell.zone !== 'data' || !cell.dark) continue
+    if (Math.abs(cell.row - center) > matrix.size * 0.3) continue
+    if (Math.abs(cell.col - center) < 4) continue
+    const noise = localNoise(seedText, cell.row, cell.col, 'lantern')
+    if (noise < 0.975) continue
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 3 + Math.floor(noise * 2), 'wood', random)
+    lifted.add(cellKey(cell.row, cell.col))
   }
 
   return finalizeSculpture(
@@ -251,7 +208,7 @@ export function generateTemple(matrix: QRMatrixData, seedText: string): Sculptur
     'temple',
     'Temple',
     lifted,
-    'HORIZONTAL MAIN HALL / GATE / WATER GARDEN / BELL PAVILION / CORRIDORS',
+    'FOREGROUND TORII / AXIAL APPROACH / REAR MAIN HALL / LOW FINDER GARDENS',
     'courtyard-pad',
   )
 }
