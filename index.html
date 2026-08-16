@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f2ea" />
+    <meta
+      name="description"
+      content="A Three.js QR sculpture that grows into a colorful tree and folds back into a scannable code."
+    />
+    <title>3D QR — Chroma Tree</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage" id="stage" aria-label="Interactive 3D QR sculpture">
+        <div class="stage-grain" aria-hidden="true"></div>
+      </section>
+
+      <header class="masthead">
+        <a class="brand" href="#" aria-label="3D QR home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>3D / QR</span>
+        </a>
+        <div class="mode-readout">
+          <span class="mode-dot" aria-hidden="true"></span>
+          <span id="mode-readout">TREE MODE</span>
+        </div>
+      </header>
+
+      <section class="control-panel" aria-label="QR controls">
+        <div class="control-copy">
+          <p class="eyebrow">GENERATIVE QR SCULPTURE</p>
+          <h1>Grow a link.</h1>
+          <p class="lede">
+            One QR matrix, two spatial layouts. Drag the tree, then fold it flat to scan.
+          </p>
+        </div>
+
+        <label class="url-field" for="qr-input">
+          <span>URL / TEXT</span>
+          <input
+            id="qr-input"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            spellcheck="false"
+            value="https://github.com/JULESlois/3D-QR"
+            aria-describedby="qr-meta"
+          />
+        </label>
+
+        <div class="palette-row" aria-label="Tree palette">
+          <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
+          <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
+          <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
+          <button class="palette-swatch" type="button" data-palette="spectrum" aria-label="Spectrum palette"></button>
+        </div>
+
+        <div class="panel-footer">
+          <p id="qr-meta">Building QR matrix…</p>
+          <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
+            <span id="mode-toggle-label">SHOW QR</span>
+            <span class="toggle-glyph" aria-hidden="true">↗</span>
+          </button>
+        </div>
+      </section>
+
+      <p class="stage-hint" id="stage-hint">DRAG TO ORBIT · CLICK CANVAS TO MORPH</p>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
