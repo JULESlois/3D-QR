@@ -54,7 +54,11 @@ function glyphFromSeed(seedText: string): string {
 export function generateGlyph(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'glyph')
   const { random, center } = context
-  const voxels = createBaseVoxels(context, { mode: 'none' })
+  const voxels = createBaseVoxels(context, {
+    mode: 'symbol-pad',
+    thickness: 2,
+    foundationKind: 'foundation',
+  })
   const glyph = glyphFromSeed(seedText)
   const bitmap = FONT_5X7[glyph] ?? FONT_5X7.Q
   const lifted = new Set<string>()
@@ -85,5 +89,13 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     }
   }
 
-  return finalizeSculpture(matrix, voxels, 'glyph', 'Glyph', lifted, `GLYPH ${glyph} / WHOLE PROJECTION`, 'object-only')
+  return finalizeSculpture(
+    matrix,
+    voxels,
+    'glyph',
+    'Glyph',
+    lifted,
+    `GLYPH ${glyph} / SYMBOL PLAQUE / 2-LAYER`,
+    'display-plaque',
+  )
 }

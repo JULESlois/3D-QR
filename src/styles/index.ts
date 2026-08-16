@@ -11,7 +11,10 @@ export type StyleId = 'tree' | 'house' | 'castle' | 'glyph'
 export interface StyleAppearance {
   baseLight: string
   baseDark: readonly string[]
+  foundation: readonly string[]
   qrTop: 'palette' | string
+  /** Fraction of a QR cell occupied by each voxel. Smaller values expose more grid gap. */
+  voxelFill: number
 }
 
 export interface StyleDefinition {
@@ -33,14 +36,16 @@ export const STYLES: readonly StyleDefinition[] = [
     label: 'Tree',
     eyebrow: 'VOXEL QR SCULPTURE / TREE',
     headline: 'Grow the code.',
-    description: 'The tree keeps a complete lawn-like QR plate. Dark modules rise into the canopy while the full physical quiet zone remains part of the sculpture.',
+    description: 'The original landscape treatment: a broad lawn-like QR plate with the full physical quiet zone. Dark modules rise into the canopy while the ground remains part of the composition.',
     specimen: 'TREE + FULL LAWN = QR',
-    projectionLabel: 'FULL PAD',
+    projectionLabel: 'FULL LAWN',
     defaultPalette: 'blossom',
     appearance: {
       baseLight: '#ece7d8',
       baseDark: ['#315d43', '#466f49', '#5d7e50', '#738e58'],
+      foundation: ['#d8d0bb', '#c8bea7'],
       qrTop: 'palette',
+      voxelFill: 0.91,
     },
     generate: generateTree,
   },
@@ -49,14 +54,16 @@ export const STYLES: readonly StyleDefinition[] = [
     label: 'House',
     eyebrow: 'VOXEL QR SCULPTURE / HOUSE',
     headline: 'Build the code.',
-    description: 'The house sits on a compact warm courtyard instead of a full lawn. Outside the site, only sparse dark QR pavers remain; empty page space supplies the light modules.',
-    specimen: 'HOUSE + SITE TILES = QR',
-    projectionLabel: 'SITE WINDOW',
+    description: 'The house sits on a compact two-layer courtyard pad with only a one-module physical border. Warm ceramic tiles replace the tree lawn while the page supplies the remaining scanner quiet zone.',
+    specimen: 'HOUSE + COURTYARD = QR',
+    projectionLabel: 'COURTYARD PAD',
     defaultPalette: 'ginkgo',
     appearance: {
-      baseLight: '#eadfc9',
-      baseDark: ['#8f664a', '#a97852', '#bc895d', '#755643'],
-      qrTop: '#5a342d',
+      baseLight: '#efe3cb',
+      baseDark: ['#7a5140', '#8f6047', '#a46d4c', '#6a473c'],
+      foundation: ['#b58b68', '#9e765c', '#c29b77'],
+      qrTop: '#57362f',
+      voxelFill: 0.94,
     },
     generate: generateHouse,
   },
@@ -65,14 +72,16 @@ export const STYLES: readonly StyleDefinition[] = [
     label: 'Castle',
     eyebrow: 'VOXEL QR SCULPTURE / CASTLE',
     headline: 'Fortify the code.',
-    description: 'The castle removes the light-colored board completely. Only scanner-dark stone pixels form the court and the keep rises from them, making the QR footprint itself part of the masonry.',
-    specimen: 'CASTLE + STONE FIELD = QR',
-    projectionLabel: 'DARK FIELD',
+    description: 'The castle uses a thick three-layer stone dais with a smaller two-module physical border. Its floor is pale masonry and graphite QR stone rather than grass, giving the fortification its own weight and silhouette.',
+    specimen: 'CASTLE + STONE DAIS = QR',
+    projectionLabel: 'STONE PLINTH',
     defaultPalette: 'summer',
     appearance: {
-      baseLight: '#f2f0e7',
-      baseDark: ['#46504d', '#58615c', '#687069', '#363f3d'],
-      qrTop: '#303936',
+      baseLight: '#d9d7cc',
+      baseDark: ['#424a47', '#505854', '#616862', '#343c39'],
+      foundation: ['#777a73', '#666b66', '#898a80'],
+      qrTop: '#2f3834',
+      voxelFill: 0.97,
     },
     generate: generateCastle,
   },
@@ -81,14 +90,16 @@ export const STYLES: readonly StyleDefinition[] = [
     label: 'Glyph',
     eyebrow: 'VOXEL QR SCULPTURE / GLYPH',
     headline: 'Sign the code.',
-    description: 'There is no QR floor at all. Every dark module is one part of the sculpture: low columns preserve the symbol while selected columns rise to reveal a 5×7 alphanumeric relief.',
-    specimen: 'WHOLE GLYPH FIELD = QR',
-    projectionLabel: 'OBJECT ONLY',
+    description: 'The glyph is a relief mounted on a thin display plaque exactly the size of the QR symbol. There is no physical quiet-zone rim, so the plaque reads more like a designed object than a landscape base.',
+    specimen: 'GLYPH + DISPLAY PLAQUE = QR',
+    projectionLabel: 'DISPLAY PLAQUE',
     defaultPalette: 'spectrum',
     appearance: {
-      baseLight: '#f2f0e7',
-      baseDark: ['#3d3745', '#51485d', '#60546a'],
+      baseLight: '#ebe6ef',
+      baseDark: ['#40394b', '#51475c', '#62556b'],
+      foundation: ['#81768b', '#70647b', '#94879e'],
       qrTop: '#292432',
+      voxelFill: 0.9,
     },
     generate: generateGlyph,
   },

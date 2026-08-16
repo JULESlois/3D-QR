@@ -6,14 +6,14 @@ Live demo: `https://juleslois.github.io/3D-QR/`
 
 ## Built-in generators
 
-The generators now use different projection strategies rather than sharing one mandatory QR lawn:
+Every built-in style has a physical platform, but the platform is part of the style rather than a copy of the Tree lawn.
 
-- **Tree / Full Pad** — a complete grass-like QR plate with a physical four-module quiet zone; selected dark modules rise into the canopy.
-- **House / Site Window** — a smaller warm courtyard contains both light and dark modules around the building, while dark modules outside the site remain as sparse QR pavers over the page background.
-- **Castle / Dark Field** — no light-colored board. Only dark QR-module stones remain at ground level and the keep/walls rise from them.
-- **Glyph / Object Only** — no QR floor at all. Every dark QR module is an elevated column; height differences reveal a 5×7 alphanumeric relief while the whole object projects back into the QR.
+- **Tree / Full Lawn** — broad grass-like QR plate with the complete physical four-module quiet zone.
+- **House / Courtyard Pad** — compact warm two-layer courtyard with only a one-module physical border; the remaining quiet zone is supplied by the page background.
+- **Castle / Stone Plinth** — heavy three-layer masonry dais with a two-module physical border and denser voxel packing.
+- **Glyph / Display Plaque** — thin two-layer plaque exactly the size of the QR symbol; no physical quiet-zone rim is attached to the object.
 
-This lets each style decide how much of the QR is represented by a physical base, by empty background, or by the object itself.
+The QR topology is unchanged between styles. What changes is the physical footprint, platform thickness, tile gap, surface palette and semantic geometry above the dark modules.
 
 ## Architecture
 
@@ -32,96 +32,79 @@ ART VIEW ⇄ QR VIEW
     same voxel field
 ```
 
-The application is split into three layers:
-
 ```text
 src/qr.ts          QR truth layer
-src/sculpture.ts   QR-safe voxel field + projection invariants
-src/styles/*       semantic generators + projection strategies
+src/sculpture.ts   QR-safe voxel/platform system + projection invariants
+src/styles/*       semantic generators
 src/main.ts        rendering, style appearance, palettes and view rotation
 ```
 
-### Style registry
+## Style registry
 
-`src/styles/index.ts` owns both generator metadata and style-specific projection appearance:
+`src/styles/index.ts` defines both semantic generation and platform appearance:
 
 ```ts
 export interface StyleAppearance {
   baseLight: string
   baseDark: readonly string[]
+  foundation: readonly string[]
   qrTop: 'palette' | string
-}
-
-export interface StyleDefinition {
-  id: StyleId
-  label: string
-  eyebrow: string
-  headline: string
-  description: string
-  specimen: string
-  projectionLabel: string
-  defaultPalette: PaletteKey
-  appearance: StyleAppearance
-  generate: (matrix: QRMatrixData, seedText: string) => SculptureBuild
+  voxelFill: number
 }
 ```
 
-The renderer therefore does not assume that every style has grass, a full board, or even any base at all.
+`voxelFill` controls how much of each QR cell the voxel occupies, so styles can have tighter masonry or more visible grid gaps without changing QR cell coordinates.
 
-## Projection strategies
+## Platform system
 
-`src/sculpture.ts` supports several base-field modes:
+`src/sculpture.ts` separates the scanner-facing surface from the physical foundation beneath it.
 
-```text
-full-pad     complete QR + physical quiet zone
-symbol-pad   complete QR symbol, no physical quiet-zone plate
-dark-only    only dark modules become base voxels
-window       a local patch contains light + dark cells; dark cells outside remain sparse
-none         no base voxels; the object must provide every dark QR module itself
+A `BaseFieldProfile` can vary:
+
+```ts
+interface BaseFieldProfile {
+  mode: 'full-pad' | 'symbol-pad' | 'dark-only' | 'window' | 'none'
+  quietZone?: number
+  thickness?: number
+  foundationKind?: VoxelKind
+}
 ```
 
-Built-in styles currently map them as:
+The current built-ins intentionally use physical platforms:
 
 ```text
-Tree    → full-pad
-House   → window
-Castle  → dark-only
-Glyph   → none
+Tree    → full-pad, quiet zone 4, one layer
+House   → full-pad, quiet zone 1, two layers
+Castle  → full-pad, quiet zone 2, three layers
+Glyph   → symbol-pad, quiet zone 0, two layers
 ```
 
-Empty light modules are allowed because the page background itself can be the scanner-light field. This is what makes partial pads and object-only QR sculptures possible.
+This gives each object a different silhouette in art view while preserving the same machine-readable projection.
 
 ## Projection safety
 
-The validator now checks the final projected column topology, not merely whether elevated geometry is legal.
+The validator checks the final projected column topology rather than assuming one specific floor design.
 
 It enforces:
 
-1. Every original **dark** QR module must have a projected voxel column.
-2. The highest visible voxel in every dark column must be `floor-dark` or scanner-dark `qr-top`.
-3. A **light** QR module may either be empty/background or contain only scanner-light `floor-light` at base level.
-4. Elevated geometry may never occupy a light module.
-5. Physical quiet-zone voxels, when present, must be scanner-light base voxels only.
-6. Styles with no physical quiet-zone plate still reserve composition space around the QR so the page background supplies the required quiet zone.
+1. Every original dark QR module has a projected dark column.
+2. The highest visible surface in every dark column is `floor-dark` or scanner-dark `qr-top`.
+3. A light QR module may only project as `floor-light` or empty background.
+4. Elevated semantic geometry may never occupy a light module.
+5. Physical quiet-zone columns, when present, must expose a scanner-light top surface.
+6. Foundation voxels may extend below the scanner-facing plane without changing the QR projection.
 
-This changes style generation from “all models sit on the same QR floor” into a constrained projection problem:
+The important invariant is therefore:
 
 ```text
-3D form may vary freely along depth/height
-           ↓
-orthographic projection must equal QR topology
+orthographic_projection(sculpture) === original_qr_matrix
 ```
 
-## Style-specific QR appearance
+not:
 
-Each style may define its own scanner-safe surface treatment:
-
-- Tree uses green dark ground modules and a warm light lawn.
-- House uses sand/plaster light tiles and terracotta/earth dark pavers.
-- Castle uses dark stone only; there is no light board.
-- Glyph uses an ink-like object-only dark projection.
-
-`qr-top` can either follow the selected palette's dark color or use a style-specific fixed scanner-dark color.
+```text
+all styles share the same QR lawn
+```
 
 ## Deterministic generation
 
@@ -131,27 +114,22 @@ Each style receives a seeded PRNG derived from:
 payload + style ID
 ```
 
-Therefore:
-
-```text
-same payload + same style → same sculpture
-same payload + another style → different form, same QR projection
-```
+Therefore the same payload and style reproduce the same sculpture, while another style produces a different object with the same QR projection.
 
 ## Adding another style
 
-A new style can choose any projection strategy. Examples:
+A new generator can choose its own platform vocabulary. Examples:
 
 ```text
-City      → dark-only streets + buildings on selected modules
-Tower     → object-only vertical QR columns
-Pagoda    → compact window courtyard
-Logo      → object-only relief
-Robot     → sparse site pad + full-body projection ownership
-Crystal   → no floor, every dark module contributes to a crystal cluster
+City       → asphalt block / street-grid pedestal
+Pagoda     → raised stone courtyard
+Lighthouse → circular-looking island assembled from QR-safe voxel columns
+Robot      → industrial display base
+Crystal    → faceted mineral slab
+Logo       → thin gallery plaque
 ```
 
-The important requirement is not a shared base shape; it is that the final orthographic column projection reconstructs the QR matrix.
+The renderer should not need generator-specific geometry logic; style code provides the QR-safe voxel field and appearance metadata.
 
 ## Stack
 
@@ -180,9 +158,9 @@ npm run preview
 
 ## Next directions
 
-- style-specific parameter schemas (`siteSize`, `towerCount`, `reliefDepth`, etc.);
 - procedural city / pagoda / lighthouse / icon generators;
-- multiple projection axes and anamorphic sculptures;
+- platform presets and per-style parameter schemas;
 - automatic rendered-image QR decoding tests in CI;
 - scanner-contrast validation for custom material themes;
+- multi-view / anamorphic constraints;
 - `.vox` or bitmap template ingestion with projection-safe clipping.

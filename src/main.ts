@@ -66,7 +66,6 @@ const voxelMaterial = new THREE.MeshStandardMaterial({
   roughness: 0.86,
   metalness: 0.015,
 })
-const voxelSize = CELL_SIZE * 0.91
 
 const woodColors = ['#563b2d', '#6d4b34', '#815b3a'].map((value) => new THREE.Color(value))
 const stoneColors = ['#6f746d', '#85897e', '#a09d8d', '#5d655f'].map((value) => new THREE.Color(value))
@@ -114,6 +113,8 @@ function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color 
       return target.set(appearance.baseLight)
     case 'floor-dark':
       return indexedHexColor(appearance.baseDark, voxel.colorPhase, target)
+    case 'foundation':
+      return indexedHexColor(appearance.foundation, voxel.colorPhase, target)
     case 'wood':
       return indexedColor(woodColors, voxel.colorPhase, target)
     case 'stone':
@@ -213,6 +214,7 @@ function rebuild(value: string): void {
     const mesh = new THREE.InstancedMesh(voxelGeometry, voxelMaterial, build.voxels.length)
     mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
     mesh.frustumCulled = false
+    const voxelSize = CELL_SIZE * style.appearance.voxelFill
 
     for (let i = 0; i < build.voxels.length; i += 1) {
       const voxel = build.voxels[i]
@@ -231,7 +233,7 @@ function rebuild(value: string): void {
     updateComposition()
 
     const detail = build.detail ? ` · ${build.detail}` : ''
-    meta.textContent = `QR V${matrix.version} · ${matrix.size}×${matrix.size} · ${style.label.toUpperCase()} ${build.liftedModuleCount} · BASE D${build.baseDarkCount}/L${build.baseLightCount} · ${style.projectionLabel}${detail}`
+    meta.textContent = `QR V${matrix.version} · ${matrix.size}×${matrix.size} · ${style.label.toUpperCase()} ${build.liftedModuleCount} · PAD D${build.baseDarkCount}/L${build.baseLightCount} · F${build.foundationVoxelCount} · ${style.projectionLabel}${detail}`
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown QR error'
     meta.textContent = `QR ERROR · ${message}`
@@ -249,7 +251,7 @@ function setMode(next: 'art' | 'qr'): void {
   modeReadout.textContent = showQr ? `QR / ${style.projectionLabel}` : `${style.label.toUpperCase()} / ISOMETRIC`
   stageHint.textContent = showQr
     ? `CLICK TO RETURN · ${style.specimen}`
-    : 'CLICK TO ROTATE · ONE SCULPTURE / MULTIPLE PROJECTION STRATEGIES'
+    : 'CLICK TO ROTATE · STYLE-SPECIFIC PLATFORM / SAME QR PROJECTION'
   document.body.dataset.mode = showQr ? 'qr' : 'art'
 }
 
