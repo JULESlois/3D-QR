@@ -4,7 +4,6 @@ import { STYLES } from '../src/styles'
 const payloads = [
   'A',
   'https://github.com/JULESlois/3D-QR',
-  'projection-audit:' + '0123456789abcdef'.repeat(12),
 ]
 
 let sceneCount = 0
