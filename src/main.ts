@@ -5,18 +5,20 @@ import { buildLeafLayouts, QR_MODULE_SCALE, QR_SPACING, type LeafLayout } from '
 import { PALETTES, isPaletteKey, type PaletteKey } from './palettes'
 import { createQRMatrix } from './qr'
 
-const stage = document.querySelector<HTMLElement>('#stage')
-const input = document.querySelector<HTMLInputElement>('#qr-input')
-const meta = document.querySelector<HTMLElement>('#qr-meta')
-const modeToggle = document.querySelector<HTMLButtonElement>('#mode-toggle')
-const modeToggleLabel = document.querySelector<HTMLElement>('#mode-toggle-label')
-const modeReadout = document.querySelector<HTMLElement>('#mode-readout')
-const stageHint = document.querySelector<HTMLElement>('#stage-hint')
-const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
-
-if (!stage || !input || !meta || !modeToggle || !modeToggleLabel || !modeReadout || !stageHint) {
-  throw new Error('Required UI elements are missing')
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector)
+  if (!element) throw new Error(`Required UI element is missing: ${selector}`)
+  return element
 }
+
+const stage = requiredElement<HTMLElement>('#stage')
+const input = requiredElement<HTMLInputElement>('#qr-input')
+const meta = requiredElement<HTMLElement>('#qr-meta')
+const modeToggle = requiredElement<HTMLButtonElement>('#mode-toggle')
+const modeToggleLabel = requiredElement<HTMLElement>('#mode-toggle-label')
+const modeReadout = requiredElement<HTMLElement>('#mode-readout')
+const stageHint = requiredElement<HTMLElement>('#stage-hint')
+const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100)
