@@ -158,7 +158,7 @@ function updateComposition(): void {
     sculptureRoot.scale.setScalar(scale)
   }
 
-  sculptureRoot.position.x = aspect > 1.15 ? 0.95 : 0
+  sculptureRoot.position.x = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
   sculptureRoot.position.y = aspect > 1.15 ? 0.42 : 1.05
 }
 
