@@ -455,6 +455,7 @@ function settleSceneCopy(): void {
   sceneChanging = false
   if (controlCopy) {
     controlCopy.style.height = ''
+    controlCopy.style.transition = ''
     delete controlCopy.dataset.scenePhase
   }
   if (sceneCurrent) delete sceneCurrent.dataset.changing
@@ -492,8 +493,14 @@ function changeSceneBy(delta: number): void {
     target.click()
     syncSceneStepper()
 
-    // scrollHeight reports the new natural copy height even while the old height is locked.
-    const newHeight = controlCopy.scrollHeight
+    // Measure the new natural height without letting that temporary layout reach paint.
+    // This works in both directions, including a long description changing to a shorter one.
+    controlCopy.style.transition = 'none'
+    controlCopy.style.height = 'auto'
+    const newHeight = controlCopy.getBoundingClientRect().height
+    controlCopy.style.height = `${oldHeight}px`
+    void controlCopy.offsetHeight
+    controlCopy.style.transition = ''
     controlCopy.dataset.scenePhase = 'height'
 
     // 3. Smooth only the container height; no visible glyph is being reflowed here.
