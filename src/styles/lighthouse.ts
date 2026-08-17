@@ -38,6 +38,23 @@ function waveHeight(cell: QRCell, seedText: string): number {
   return wave > 0.55 ? 2 : 1
 }
 
+function towerKind(level: number, topLevel: number): VoxelKind {
+  if (level === topLevel) return 'qr-top'
+
+  const belowTop = topLevel - level
+
+  // Give the beacon a distinct lantern room and gallery band instead of letting
+  // the upper shaft dissolve into a generic pale voxel column.
+  if (belowTop <= 2) return 'glass'
+  if (belowTop === 3) return 'primary'
+
+  // Classic lighthouse paint bands are deliberately aligned by absolute height
+  // across the whole tapered footprint. The silhouette stays identical in QR
+  // view because only interior voxel material changes; scanner caps are untouched.
+  const stripePhase = Math.floor((level - 1) / 2)
+  return stripePhase % 2 === 1 ? 'primary' : 'plaster'
+}
+
 export function generateLighthouse(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'lighthouse')
   const { random, center } = context
@@ -126,18 +143,12 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     lifted.add(cellKey(module.row, module.col))
 
     for (let level = 1; level <= topLevel; level += 1) {
-      let kind: VoxelKind
-      if (level === topLevel) kind = 'qr-top'
-      else if (level >= topLevel - 2) kind = 'glass'
-      else if (level === topLevel - 3) kind = 'primary'
-      else kind = 'plaster'
-
       pushVoxel(
         voxels,
         module,
         matrix.size,
         level,
-        kind,
+        towerKind(level, topLevel),
         (random() * 0.48 + level * 0.052 + d * 0.07) % 1,
       )
     }
@@ -149,7 +160,7 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     'lighthouse',
     'Lighthouse',
     lifted,
-    'SCANNER-LIGHT WAVES / FINDER REEFS / BEACON',
+    'SCANNER-LIGHT WAVES / FINDER REEFS / STRIPED BEACON / GLASS LANTERN',
     'courtyard-pad',
   )
 }
