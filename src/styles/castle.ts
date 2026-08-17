@@ -124,27 +124,40 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     const isWall = ax > 0.68 || az > 0.68
     const damage = localNoise(seedText, module.row, module.col, 'fortress-damage')
 
+    // The keep is shaped as a recognizable gatehouse instead of a single cuboid:
+    // four corner turrets rise above a lower roof, while the near face dips in the
+    // middle to suggest a recessed gate framed by two taller gate towers.
+    const isCornerTurret = isKeep && ax > 0.19 && az > 0.19
+    const isFrontGate = isKeep && nz > 0.16 && ax < 0.11
+    const isGateTower = isKeep && nz > 0.15 && ax >= 0.11 && ax < 0.28
+    const isKeepEdge = isKeep && (ax > 0.27 || az > 0.27)
+
     // Broken perimeter walls may collapse all the way back to the QR floor. The
     // central keep stays comparatively intact and becomes the sole dominant mass.
     if (isWall && !isKeep && damage < 0.28) continue
 
     let topLevel = isKeep
-      ? keepLevel - Math.floor(damage * 2)
+      ? keepLevel - 2 - Math.floor(damage * 2)
       : isWall
         ? Math.max(3, wallLevel - Math.floor(damage * 3))
         : 2 + Math.floor(localNoise(seedText, module.row, module.col, 'court-block') * 3)
 
-    if (isKeep && ((module.row + module.col) & 1) === 0) topLevel += 1
+    if (isCornerTurret) topLevel = keepLevel + 2 - Math.floor(damage * 2)
+    else if (isGateTower) topLevel = keepLevel + 1 - Math.floor(damage * 2)
+    else if (isFrontGate) topLevel = Math.max(wallLevel + 1, keepLevel - 4)
+    else if (isKeepEdge && ((module.row + module.col) & 1) === 0) topLevel += 2
+
     lifted.add(cellKey(module.row, module.col))
 
     for (let level = 1; level <= topLevel; level += 1) {
-      const upperBand = level >= topLevel - 1
+      const crownBand = level >= topLevel - 1
+      const towerAccent = isCornerTurret || isGateTower || (isKeepEdge && crownBand)
       pushVoxel(
         voxels,
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : upperBand && isKeep ? 'primary' : 'stone',
+        level === topLevel ? 'qr-top' : towerAccent ? 'primary' : 'stone',
         (random() * 0.68 + level * 0.041 + damage * 0.15) % 1,
       )
     }
@@ -156,7 +169,7 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     'castle',
     'Castle',
     lifted,
-    'CENTRAL KEEP / 3 UNEVEN RUINED BASTIONS / BROKEN TIMING WALLS / RUBBLE COURT',
+    'RECESSED GATEHOUSE / 4 CORNER TURRETS / CRENELLATED KEEP / 3 RUINED BASTIONS / RUBBLE COURT',
     'stone-plinth',
   )
 }
