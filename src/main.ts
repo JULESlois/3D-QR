@@ -577,22 +577,12 @@ function switchStyleImmediately(nextStyleId: StyleId): void {
 function requestStyleTransition(nextStyleId: StyleId): void {
   if (isExporting || nextStyleId === styleId) return
 
+  // Directional slide motion is owned by ui-controls.ts around this synchronous swap.
+  // Keep the Three.js presentation transform stable so no scale/lift/rotation competes with it.
   queuedStyleId = null
   styleTransition = null
   switchStyleImmediately(nextStyleId)
-
-  if (reducedMotion) {
-    applyPresentationTransform()
-    return
-  }
-
-  styleTransition = {
-    nextStyleId,
-    nextPaletteKey: paletteKey,
-    startedAt: performance.now(),
-    duration: 440,
-    swapped: true,
-  }
+  applyPresentationTransform()
 }
 
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
@@ -705,23 +695,7 @@ function animate(): void {
     if (rawProgress >= 1) paletteTransition = null
   }
 
-  let sceneLift = 0
-  let sceneScale = 1
-  let sceneFlipY = 0
-
-  if (styleTransition) {
-    const progress = clamp01((now - styleTransition.startedAt) / styleTransition.duration)
-    const phase = smootherstep(progress)
-
-    sceneScale = 0.94 + phase * 0.06
-    sceneLift = (1 - phase) * 0.18
-
-    if (progress >= 1) {
-      styleTransition = null
-    }
-  }
-
-  applyPresentationTransform(sceneLift, sceneScale, sceneFlipY)
+  applyPresentationTransform()
 
   const eased = smootherstep(rotationProgress)
   sculptureRoot.quaternion.slerpQuaternions(artQuaternion, qrQuaternion, eased)
