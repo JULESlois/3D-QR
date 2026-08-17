@@ -1,3 +1,4 @@
+import { CELL_SIZE, positionForCell } from '../src/sculpture'
 import { createQRMatrix } from '../src/qr'
 import { STYLES } from '../src/styles'
 
@@ -13,6 +14,37 @@ const cases: readonly ProjectionCase[] = [
   { label: 'medium-content', payload: `forest-${'mixed-case-payload/'.repeat(9)}`, minVersion: 6 },
   { label: 'large-content', payload: `city-${'projection-coverage/'.repeat(24)}`, minVersion: 10 },
 ]
+
+const EPSILON = 1e-7
+
+function assertVoxelStructure(styleId: string, matrixSize: number, voxels: ReturnType<(typeof STYLES)[number]['generate']>['voxels']): void {
+  const occupied = new Set<string>()
+
+  for (const voxel of voxels) {
+    const expected = positionForCell(voxel.row, voxel.col, matrixSize)
+    if (Math.abs(voxel.x - expected.x) > EPSILON || Math.abs(voxel.z - expected.z) > EPSILON) {
+      throw new Error(
+        `${styleId} placed voxel ${voxel.row}:${voxel.col} off its QR column: `
+        + `expected (${expected.x}, ${expected.z}), received (${voxel.x}, ${voxel.z}).`,
+      )
+    }
+
+    const level = Math.round(voxel.y / CELL_SIZE)
+    if (Math.abs(voxel.y - level * CELL_SIZE) > EPSILON) {
+      throw new Error(
+        `${styleId} placed voxel ${voxel.row}:${voxel.col} at off-grid height ${voxel.y}.`,
+      )
+    }
+
+    const key = `${voxel.row}:${voxel.col}:${level}`
+    if (occupied.has(key)) {
+      throw new Error(
+        `${styleId} generated duplicate voxels at QR column ${voxel.row}:${voxel.col}, level ${level}.`,
+      )
+    }
+    occupied.add(key)
+  }
+}
 
 let sceneCount = 0
 let previousVersion = 0
@@ -41,10 +73,11 @@ for (const testCase of cases) {
       throw new Error(`${style.id} returned mismatched style id ${build.styleId}.`)
     }
 
+    assertVoxelStructure(style.id, matrix.size, build.voxels)
     sceneCount += 1
   }
 
   console.log(`projection smoke: ${testCase.label} / QR v${matrix.version} / ${matrix.size}x${matrix.size} / ${STYLES.length} styles OK`)
 }
 
-console.log(`projection smoke: ${sceneCount} generated scenes passed projection invariants across QR v${cases[0].minVersion} to v${previousVersion}`)
+console.log(`projection smoke: ${sceneCount} generated scenes passed projection and voxel-structure invariants across QR v${cases[0].minVersion} to v${previousVersion}`)
