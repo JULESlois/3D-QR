@@ -137,6 +137,66 @@ function assertBuildMetrics(styleId: string, matrix: QRMatrixData, build: Genera
   }
 }
 
+function assertDeterministicBuild(
+  style: (typeof STYLES)[number],
+  matrix: QRMatrixData,
+  payload: string,
+  first: GeneratedBuild,
+): void {
+  const second = style.generate(matrix, payload)
+
+  const scalarFields = [
+    'styleId',
+    'label',
+    'detail',
+    'projectionLabel',
+    'footprint',
+    'physicalFootprint',
+    'maxHeight',
+    'pivotY',
+    'liftedModuleCount',
+    'groundDarkCount',
+    'baseDarkCount',
+    'baseLightCount',
+    'foundationVoxelCount',
+  ] as const
+
+  for (const field of scalarFields) {
+    if (first[field] !== second[field]) {
+      throw new Error(
+        `${style.id} is non-deterministic for identical input: build.${field} changed from `
+        + `${String(first[field])} to ${String(second[field])}.`,
+      )
+    }
+  }
+
+  if (first.voxels.length !== second.voxels.length) {
+    throw new Error(
+      `${style.id} is non-deterministic for identical input: voxel count changed from `
+      + `${first.voxels.length} to ${second.voxels.length}.`,
+    )
+  }
+
+  for (let index = 0; index < first.voxels.length; index += 1) {
+    const a = first.voxels[index]
+    const b = second.voxels[index]
+    const stable = a.row === b.row
+      && a.col === b.col
+      && a.x === b.x
+      && a.y === b.y
+      && a.z === b.z
+      && a.kind === b.kind
+      && a.colorPhase === b.colorPhase
+
+    if (!stable) {
+      throw new Error(
+        `${style.id} is non-deterministic for identical input at voxel ${index}: `
+        + `${a.row}:${a.col}/${a.kind}@${a.y} became ${b.row}:${b.col}/${b.kind}@${b.y}.`,
+      )
+    }
+  }
+}
+
 let sceneCount = 0
 let previousVersion = 0
 
@@ -167,10 +227,11 @@ for (const testCase of cases) {
     assertVoxelStructure(style.id, matrix.size, build.voxels)
     assertScannerProjection(style.id, matrix, build)
     assertBuildMetrics(style.id, matrix, build)
+    assertDeterministicBuild(style, matrix, testCase.payload, build)
     sceneCount += 1
   }
 
   console.log(`projection smoke: ${testCase.label} / QR v${matrix.version} / ${matrix.size}x${matrix.size} / ${STYLES.length} styles OK`)
 }
 
-console.log(`projection smoke: ${sceneCount} generated scenes passed column, scanner-surface, quiet-zone, and build-metric invariants across QR v${cases[0].minVersion} to v${previousVersion}`)
+console.log(`projection smoke: ${sceneCount} generated scenes passed column, scanner-surface, quiet-zone, build-metric, and determinism invariants across QR v${cases[0].minVersion} to v${previousVersion}`)
