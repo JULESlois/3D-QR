@@ -43,14 +43,14 @@ function towerKind(level: number, topLevel: number): VoxelKind {
 
   const belowTop = topLevel - level
 
-  // Give the beacon a distinct lantern room and gallery band instead of letting
-  // the upper shaft dissolve into a generic pale voxel column.
-  if (belowTop <= 2) return 'glass'
-  if (belowTop === 3) return 'primary'
+  // A taller glass lantern room sits above a dark gallery/deck band. Because the
+  // material bands only affect voxels already projected from dark QR modules,
+  // the scanner-facing caps remain unchanged.
+  if (belowTop <= 3) return 'glass'
+  if (belowTop === 4 || belowTop === 5) return 'primary'
 
-  // Classic lighthouse paint bands are deliberately aligned by absolute height
-  // across the whole tapered footprint. The silhouette stays identical in QR
-  // view because only interior voxel material changes; scanner caps are untouched.
+  // Classic lighthouse paint bands are aligned by absolute height across the
+  // tapered footprint so the clustered columns read as one architectural shaft.
   const stripePhase = Math.floor((level - 1) / 2)
   return stripePhase % 2 === 1 ? 'primary' : 'plaster'
 }
@@ -106,9 +106,13 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
 
   const nearby = [...dataModules]
     .sort((a, b) => distance(a, anchor) - distance(b, anchor))
-    .slice(0, Math.min(8, Math.max(4, Math.round(matrix.size * 0.2))))
+    .slice(0, Math.min(10, Math.max(7, Math.round(matrix.size * 0.24))))
 
-  const towerModules = nearby.slice(0, Math.min(5, nearby.length))
+  // Seven nearby dark modules form a deliberately stepped footprint: a broad
+  // lower gallery, a tighter upper shaft, then one tall lantern core. The outer
+  // columns stop well below the beacon, creating the overhanging gallery/crown
+  // silhouette that was missing from the previous generic column cluster.
+  const towerModules = nearby.slice(0, Math.min(7, nearby.length))
   const islandModules = dataModules
     .filter((module) => distance(module, anchor) <= Math.max(3.2, matrix.size * 0.13))
     .sort((a, b) => distance(a, anchor) - distance(b, anchor))
@@ -137,8 +141,10 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     const module = towerModules[i]
     const d = distance(module, anchor)
     const topLevel = i === 0
-      ? 13
-      : Math.max(8, 11 - Math.round(d * 1.8))
+      ? 15
+      : i < 3
+        ? Math.max(11, 13 - Math.round(d * 0.8))
+        : Math.max(8, 10 - Math.round(d * 0.55))
 
     lifted.add(cellKey(module.row, module.col))
 
@@ -160,7 +166,7 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     'lighthouse',
     'Lighthouse',
     lifted,
-    'SCANNER-LIGHT WAVES / FINDER REEFS / STRIPED BEACON / GLASS LANTERN',
+    'SCANNER-LIGHT WAVES / FINDER REEFS / FLARED GALLERY / GLASS LANTERN',
     'courtyard-pad',
   )
 }
