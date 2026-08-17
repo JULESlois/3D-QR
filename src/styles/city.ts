@@ -23,16 +23,18 @@ type UrbanArchetype =
   | 'crown'
   | 'needle'
   | 'ziggurat'
+  | 'bridge'
 
 interface UrbanColumn {
   cell: QRCell
+  fromLevel: number
   topLevel: number
   archetype: UrbanArchetype
   priority: number
 }
 
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
-  return (hashString(`${seedText}::city-v5::${salt}::${row}:${col}`) % 10000) / 10000
+  return (hashString(`${seedText}::city-v6::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
@@ -40,13 +42,26 @@ function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undef
   return matrix.cells[row * matrix.size + col]
 }
 
-function registerColumn(columns: Map<string, UrbanColumn>, cell: QRCell, topLevel: number, archetype: UrbanArchetype, priority: number): void {
+function registerColumn(
+  columns: Map<string, UrbanColumn>,
+  cell: QRCell,
+  topLevel: number,
+  archetype: UrbanArchetype,
+  priority: number,
+  fromLevel = 1,
+): void {
   if (cell.zone !== 'data') return
   const key = cellKey(cell.row, cell.col)
   const current = columns.get(key)
   if (current && current.priority > priority) return
   if (current && current.priority === priority && current.topLevel >= topLevel) return
-  columns.set(key, { cell, topLevel, archetype, priority })
+  columns.set(key, {
+    cell,
+    fromLevel: Math.max(1, Math.min(fromLevel, topLevel)),
+    topLevel,
+    archetype,
+    priority,
+  })
 }
 
 function registerRect(
@@ -147,6 +162,34 @@ function buildZiggurat(matrix: QRMatrixData, columns: Map<string, UrbanColumn>, 
   if (top?.zone === 'data') registerColumn(columns, top, 14, 'crown', 6)
 }
 
+function buildSkybridgeGate(matrix: QRMatrixData, columns: Map<string, UrbanColumn>, row: number, col: number): void {
+  // Two narrow pylons with a deliberately open slot create strong negative space.
+  // The upper bridge is registered only at high levels, so the street/view corridor
+  // remains physically open below it instead of becoming another solid slab block.
+  for (const dc of [-3, 3]) {
+    registerRect(matrix, columns, row, col + dc, 1, 1, (_cell, dr, innerDc) => {
+      const ring = Math.max(Math.abs(dr), Math.abs(innerDc))
+      return 16 - ring * 2 + (dc < 0 ? 1 : 0)
+    }, 'tower', 7)
+  }
+
+  for (let dc = -2; dc <= 2; dc += 1) {
+    for (let dr = -1; dr <= 1; dr += 1) {
+      const cell = getCell(matrix, row + dr, col + dc)
+      if (!cell || cell.zone !== 'data') continue
+      const topLevel = dr === 0 ? 16 : 15
+      registerColumn(columns, cell, topLevel, 'bridge', 9, 13)
+    }
+  }
+
+  // A one-cell crown on each pylon makes the pair read as a designed gateway rather
+  // than two unrelated towers that happen to touch the elevated connector.
+  for (const dc of [-3, 3]) {
+    const crown = getCell(matrix, row, col + dc)
+    if (crown?.zone === 'data') registerColumn(columns, crown, 19, 'crown', 10)
+  }
+}
+
 function bodyKind(archetype: UrbanArchetype, level: number, topLevel: number): VoxelKind {
   switch (archetype) {
     case 'landmark':
@@ -166,6 +209,8 @@ function bodyKind(archetype: UrbanArchetype, level: number, topLevel: number): V
       return level % 4 === 0 ? 'primary' : 'glass'
     case 'ziggurat':
       return level % 3 === 0 ? 'primary' : 'stone'
+    case 'bridge':
+      return level === topLevel - 1 ? 'primary' : 'glass'
     case 'crown':
       return level >= topLevel - 2 ? 'primary' : 'glass'
     case 'podium':
@@ -175,8 +220,8 @@ function bodyKind(archetype: UrbanArchetype, level: number, topLevel: number): V
 }
 
 function buildUrbanColumn(voxels: ReturnType<typeof createBaseVoxels>, column: UrbanColumn, matrixSize: number, seedText: string): void {
-  const { cell, topLevel, archetype } = column
-  for (let level = 1; level <= topLevel; level += 1) {
+  const { cell, fromLevel, topLevel, archetype } = column
+  for (let level = fromLevel; level <= topLevel; level += 1) {
     pushCellVoxel(voxels, cell, matrixSize, level, level === topLevel ? projectedCapKind(cell) : bodyKind(archetype, level, topLevel), (localNoise(seedText, cell.row, cell.col, `${archetype}-${level}`) * 0.7 + level * 0.033) % 1)
   }
 }
@@ -202,6 +247,7 @@ export function generateCity(matrix: QRMatrixData, seedText: string): SculptureB
   buildTerrace(matrix, columns, center + outer, center)
   buildNeedleTower(matrix, columns, center - Math.round(outer * 0.72), center + Math.round(outer * 0.18))
   buildZiggurat(matrix, columns, center + Math.round(outer * 0.7), center - Math.round(outer * 0.15))
+  buildSkybridgeGate(matrix, columns, center - Math.round(spread * 0.42), center - Math.round(outer * 0.7))
 
   const infill = [
     [center - Math.round(spread * 0.48), center - Math.round(spread * 0.16), 13],
@@ -241,5 +287,5 @@ export function generateCity(matrix: QRMatrixData, seedText: string): SculptureB
     if (plazaCount >= 6) break
   }
 
-  return finalizeSculpture(matrix, voxels, 'city', 'City', lifted, `DENSE SKYLINE / LANDMARK + SETBACK + TWIN + SLAB + TERRACE + NEEDLE + ZIGGURAT / ${columns.size} BUILT CELLS`, 'display-plaque')
+  return finalizeSculpture(matrix, voxels, 'city', 'City', lifted, `DENSE SKYLINE / SKYBRIDGE GATE + LANDMARK + SETBACK + TWIN + SLAB + TERRACE + NEEDLE + ZIGGURAT / ${columns.size} BUILT CELLS`, 'display-plaque')
 }
