@@ -34,11 +34,16 @@ transitionStyle.textContent = `
       backdrop-filter 260ms ease;
   }
 
-  /* Text never remains visible while the panel geometry is moving. */
+  /*
+   * Panel content uses one directional motion language. Geometry never changes
+   * while text is visible: close slides content out first; open morphs first.
+   */
   .control-panel > :not(.control-copy),
   .control-copy-heading,
   .description-body {
-    transition: opacity 120ms ease;
+    transition:
+      opacity 170ms ease,
+      transform 180ms cubic-bezier(.22,.72,.22,1);
   }
 
   body[data-controls-phase='closing'] .control-panel > :not(.control-copy),
@@ -51,6 +56,7 @@ transitionStyle.textContent = `
   body[data-controls-phase='opening'] .description-body,
   body[data-controls-phase='collapsed'] .description-body {
     opacity: 0;
+    transform: translateX(-14px);
     pointer-events: none;
   }
 
@@ -58,6 +64,7 @@ transitionStyle.textContent = `
   body[data-controls-phase='expanded'] .control-copy-heading,
   body[data-controls-phase='expanded'] .description-body {
     opacity: 1;
+    transform: translateX(0);
   }
 
   body[data-controls='collapsed'] .control-panel {
@@ -124,39 +131,112 @@ transitionStyle.textContent = `
   }
 
   .masthead {
-    transform: none !important;
-    transition: opacity 120ms ease !important;
+    transition:
+      opacity 170ms ease !important,
+      transform 180ms cubic-bezier(.22,.72,.22,1) !important;
   }
 
   body[data-controls-phase='closing'] .masthead,
   body[data-controls-phase='opening'] .masthead,
   body[data-controls-phase='collapsed'] .masthead {
     opacity: 0;
+    transform: translateX(-12px) !important;
     pointer-events: none;
   }
 
   body[data-controls-phase='expanded'] .masthead {
     opacity: 1;
+    transform: translateX(0) !important;
   }
 
-  /* Scene text swaps: fade out, change copy while invisible, then morph height. */
+  /* Scene copy slides out, changes while hidden, morphs height, then slides in. */
   .control-copy {
     overflow: hidden;
-    transition: height 260ms cubic-bezier(.22,.72,.22,1);
+    transition: height 240ms cubic-bezier(.22,.72,.22,1);
   }
 
-  body[data-controls-phase='expanded'] .control-copy[data-scene-phase='out']
+  .description-disclosure > summary > span:first-child,
+  .control-copy .description-body {
+    transition:
+      opacity 160ms ease,
+      transform 180ms cubic-bezier(.22,.72,.22,1);
+  }
+
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='next'][data-scene-phase='out']
     .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded'] .control-copy[data-scene-phase='height']
-    .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded'] .control-copy[data-scene-phase='out'] .description-body,
-  body[data-controls-phase='expanded'] .control-copy[data-scene-phase='height'] .description-body {
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='next'][data-scene-phase='out'] .description-body {
     opacity: 0;
+    transform: translateX(-18px);
+  }
+
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='prev'][data-scene-phase='out']
+    .description-disclosure > summary > span:first-child,
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='prev'][data-scene-phase='out'] .description-body {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='next'][data-scene-phase='height']
+    .description-disclosure > summary > span:first-child,
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='next'][data-scene-phase='height'] .description-body {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='prev'][data-scene-phase='height']
+    .description-disclosure > summary > span:first-child,
+  body[data-controls-phase='expanded']
+    .control-copy[data-scene-direction='prev'][data-scene-phase='height'] .description-body {
+    opacity: 0;
+    transform: translateX(-18px);
   }
 
   body[data-controls-phase='expanded'] .control-copy[data-scene-phase='in']
     .description-disclosure > summary > span:first-child,
   body[data-controls-phase='expanded'] .control-copy[data-scene-phase='in'] .description-body {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* The WebGL view itself follows the same left/right scene direction. */
+  #stage canvas {
+    transition:
+      transform 180ms cubic-bezier(.22,.72,.22,1),
+      opacity 160ms ease;
+    will-change: transform, opacity;
+  }
+
+  #stage canvas[data-scene-direction='next'][data-scene-slide='out'] {
+    transform: translateX(-6vw);
+    opacity: 0;
+  }
+
+  #stage canvas[data-scene-direction='prev'][data-scene-slide='out'] {
+    transform: translateX(6vw);
+    opacity: 0;
+  }
+
+  #stage canvas[data-scene-direction='next'][data-scene-slide='pre-in'] {
+    transform: translateX(6vw);
+    opacity: 0;
+    transition: none !important;
+  }
+
+  #stage canvas[data-scene-direction='prev'][data-scene-slide='pre-in'] {
+    transform: translateX(-6vw);
+    opacity: 0;
+    transition: none !important;
+  }
+
+  #stage canvas[data-scene-slide='in'] {
+    transform: translateX(0);
     opacity: 1;
   }
 
@@ -188,7 +268,11 @@ transitionStyle.textContent = `
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     font-size: 15px;
     line-height: 1;
-    transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+    transition:
+      border-color 150ms ease,
+      color 150ms ease,
+      background-color 150ms ease,
+      transform 120ms cubic-bezier(.22,.72,.22,1);
     touch-action: manipulation;
   }
 
@@ -198,6 +282,14 @@ transitionStyle.textContent = `
     color: var(--ink);
     background: color-mix(in srgb, var(--accent) 7%, transparent);
     outline: 0;
+  }
+
+  .scene-arrow-prev[data-pressed='true'] {
+    transform: translateX(-4px);
+  }
+
+  .scene-arrow-next[data-pressed='true'] {
+    transform: translateX(4px);
   }
 
   .scene-arrow:disabled {
@@ -219,6 +311,13 @@ transitionStyle.textContent = `
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   }
 
+  .scene-current-label,
+  .scene-current-count {
+    transition:
+      opacity 160ms ease,
+      transform 180ms cubic-bezier(.22,.72,.22,1);
+  }
+
   .scene-current-label {
     min-width: 0;
     overflow: hidden;
@@ -228,7 +327,6 @@ transitionStyle.textContent = `
     letter-spacing: .12em;
     text-overflow: ellipsis;
     white-space: nowrap;
-    transition: opacity 110ms ease;
   }
 
   .scene-current-count {
@@ -239,8 +337,29 @@ transitionStyle.textContent = `
     white-space: nowrap;
   }
 
-  .scene-current[data-changing='true'] .scene-current-label {
+  .scene-current[data-scene-direction='next'][data-scene-phase='out'] > * {
     opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  .scene-current[data-scene-direction='prev'][data-scene-phase='out'] > * {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  .scene-current[data-scene-direction='next'][data-scene-phase='height'] > * {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  .scene-current[data-scene-direction='prev'][data-scene-phase='height'] > * {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  .scene-current[data-scene-phase='in'] > * {
+    opacity: 1;
+    transform: translateX(0);
   }
 
   .footer-actions {
@@ -280,6 +399,22 @@ transitionStyle.textContent = `
     .scene-current {
       min-height: 42px;
     }
+
+    #stage canvas[data-scene-direction='next'][data-scene-slide='out'] {
+      transform: translateX(-11vw);
+    }
+
+    #stage canvas[data-scene-direction='prev'][data-scene-slide='out'] {
+      transform: translateX(11vw);
+    }
+
+    #stage canvas[data-scene-direction='next'][data-scene-slide='pre-in'] {
+      transform: translateX(11vw);
+    }
+
+    #stage canvas[data-scene-direction='prev'][data-scene-slide='pre-in'] {
+      transform: translateX(-11vw);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -289,8 +424,12 @@ transitionStyle.textContent = `
     .control-copy-heading,
     .description-body,
     .description-disclosure > summary,
+    .description-disclosure > summary > span:first-child,
     .masthead,
-    .scene-current-label {
+    .scene-arrow,
+    .scene-current-label,
+    .scene-current-count,
+    #stage canvas {
       transition: none !important;
     }
   }
@@ -298,17 +437,20 @@ transitionStyle.textContent = `
 document.head.appendChild(transitionStyle)
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-const contentFadeMs = 120
+const contentSlideMs = 180
 const panelMorphMs = 340
-const sceneFadeMs = 120
-const sceneHeightMs = 270
+const sceneSlideMs = 180
+const sceneHeightMs = 240
 
 type ControlPhase = 'expanded' | 'closing' | 'collapsed' | 'opening'
+type SceneDirection = 'prev' | 'next'
+
 let phase: ControlPhase = document.body.dataset.controls === 'collapsed' ? 'collapsed' : 'expanded'
 let phaseTimer = 0
 let sceneTimer = 0
 let sceneHeightTimer = 0
-let sceneFadeInTimer = 0
+let sceneInTimer = 0
+let arrowTimer = 0
 let sceneChanging = false
 
 function clearPhaseTimer(): void {
@@ -319,10 +461,10 @@ function clearPhaseTimer(): void {
 function clearSceneTimers(): void {
   window.clearTimeout(sceneTimer)
   window.clearTimeout(sceneHeightTimer)
-  window.clearTimeout(sceneFadeInTimer)
+  window.clearTimeout(sceneInTimer)
   sceneTimer = 0
   sceneHeightTimer = 0
-  sceneFadeInTimer = 0
+  sceneInTimer = 0
 }
 
 function syncControlPanelState(): void {
@@ -363,21 +505,20 @@ function collapseControls(): void {
     return
   }
 
-  // 1. Fade every piece of content completely out at the full panel size.
+  // 1. Slide every piece of content out while the panel geometry is still fixed.
   document.body.dataset.controls = 'expanded'
   phase = 'closing'
   syncControlPanelState()
 
-  // 2. Only once content is invisible do we start shrinking the card.
+  // 2. Only once content is fully outside do we start shrinking the card.
   phaseTimer = window.setTimeout(() => {
     document.body.dataset.controls = 'collapsed'
     syncControlPanelState()
 
-    // 3. Mark the state settled only after geometry has finished moving.
     phaseTimer = window.setTimeout(() => {
       finishCollapsed()
     }, panelMorphMs)
-  }, contentFadeMs)
+  }, contentSlideMs)
 }
 
 function expandControls(): void {
@@ -389,12 +530,12 @@ function expandControls(): void {
     return
   }
 
-  // 1. Expand an empty card. No text is visible while its available width changes.
+  // 1. Expand an empty card. No text is visible while available width changes.
   document.body.dataset.controls = 'expanded'
   phase = 'opening'
   syncControlPanelState()
 
-  // 2. Reveal content only after the card has completely reached its final geometry.
+  // 2. Only after geometry is settled do all controls slide into place.
   phaseTimer = window.setTimeout(() => {
     finishExpanded()
   }, panelMorphMs)
@@ -450,15 +591,55 @@ function syncSceneDisabledState(): void {
   if (sceneNextButton) sceneNextButton.disabled = sceneChanging || appBusy
 }
 
+function pulseArrow(direction: SceneDirection): void {
+  if (reducedMotion) return
+  const button = direction === 'next' ? sceneNextButton : scenePrevButton
+  if (!button) return
+
+  window.clearTimeout(arrowTimer)
+  button.dataset.pressed = 'true'
+  arrowTimer = window.setTimeout(() => {
+    delete button.dataset.pressed
+  }, 120)
+}
+
+function sceneCanvas(): HTMLCanvasElement | null {
+  return document.querySelector<HTMLCanvasElement>('#stage canvas')
+}
+
+function setScenePhase(direction: SceneDirection, scenePhase: 'out' | 'height' | 'in'): void {
+  if (controlCopy) {
+    controlCopy.dataset.sceneDirection = direction
+    controlCopy.dataset.scenePhase = scenePhase
+  }
+  if (sceneCurrent) {
+    sceneCurrent.dataset.sceneDirection = direction
+    sceneCurrent.dataset.scenePhase = scenePhase
+  }
+}
+
 function settleSceneCopy(): void {
   clearSceneTimers()
   sceneChanging = false
+
   if (controlCopy) {
     controlCopy.style.height = ''
     controlCopy.style.transition = ''
     delete controlCopy.dataset.scenePhase
+    delete controlCopy.dataset.sceneDirection
   }
-  if (sceneCurrent) delete sceneCurrent.dataset.changing
+
+  if (sceneCurrent) {
+    delete sceneCurrent.dataset.scenePhase
+    delete sceneCurrent.dataset.sceneDirection
+  }
+
+  const canvas = sceneCanvas()
+  if (canvas) {
+    delete canvas.dataset.sceneSlide
+    delete canvas.dataset.sceneDirection
+  }
+
   syncSceneStepper()
   syncSceneDisabledState()
 }
@@ -472,6 +653,9 @@ function changeSceneBy(delta: number): void {
   const target = sceneButtons[targetIndex]
   if (!target || target.dataset.style === document.body.dataset.style) return
 
+  const direction: SceneDirection = delta > 0 ? 'next' : 'prev'
+  pulseArrow(direction)
+
   if (reducedMotion || phase !== 'expanded') {
     target.click()
     syncSceneStepper()
@@ -480,45 +664,56 @@ function changeSceneBy(delta: number): void {
 
   sceneChanging = true
   syncSceneDisabledState()
-  sceneCurrent?.setAttribute('data-changing', 'true')
 
+  const canvas = sceneCanvas()
   const oldHeight = controlCopy.getBoundingClientRect().height
   controlCopy.style.height = `${oldHeight}px`
-  controlCopy.dataset.scenePhase = 'out'
+  setScenePhase(direction, 'out')
 
-  // 1. Old copy disappears at its original, stable height.
+  if (canvas) {
+    canvas.dataset.sceneDirection = direction
+    canvas.dataset.sceneSlide = 'out'
+  }
+
+  // 1. Model, current scene label, title and description all leave together.
   sceneTimer = window.setTimeout(() => {
-    // 2. Trigger the real, existing scene button while text is invisible.
-    // main.ts updates the model, body[data-style], title and description synchronously.
+    // 2. Replace the real scene only after everything visible has left the frame.
     target.click()
     syncSceneStepper()
 
-    // Measure the new natural height without letting that temporary layout reach paint.
-    // This works in both directions, including a long description changing to a shorter one.
+    // Measure the new natural copy height while the new glyphs remain off-canvas.
     controlCopy.style.transition = 'none'
     controlCopy.style.height = 'auto'
     const newHeight = controlCopy.getBoundingClientRect().height
     controlCopy.style.height = `${oldHeight}px`
     void controlCopy.offsetHeight
     controlCopy.style.transition = ''
-    controlCopy.dataset.scenePhase = 'height'
+    setScenePhase(direction, 'height')
 
-    // 3. Smooth only the container height; no visible glyph is being reflowed here.
+    // Teleport the invisible new WebGL view to the opposite edge without animation.
+    if (canvas) {
+      canvas.dataset.sceneSlide = 'pre-in'
+      void canvas.offsetHeight
+      requestAnimationFrame(() => {
+        canvas.dataset.sceneSlide = 'in'
+      })
+    }
+
+    // 3. Morph only the copy container height while its text remains offscreen.
     requestAnimationFrame(() => {
       controlCopy.style.height = `${newHeight}px`
     })
 
     sceneHeightTimer = window.setTimeout(() => {
       controlCopy.style.height = ''
-      controlCopy.dataset.scenePhase = 'in'
-      if (sceneCurrent) delete sceneCurrent.dataset.changing
+      setScenePhase(direction, 'in')
 
-      // 4. New copy fades in only after its final height has settled.
-      sceneFadeInTimer = window.setTimeout(() => {
+      // 4. The new text slides in only after its final layout has settled.
+      sceneInTimer = window.setTimeout(() => {
         settleSceneCopy()
-      }, sceneFadeMs)
+      }, sceneSlideMs)
     }, sceneHeightMs)
-  }, sceneFadeMs)
+  }, sceneSlideMs)
 }
 
 if (styleRow && sceneButtons.length > 0) {
