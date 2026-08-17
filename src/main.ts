@@ -50,8 +50,11 @@ const fillLight = new THREE.DirectionalLight(0xc8ddff, 0.7)
 fillLight.position.set(5, 2, 8)
 scene.add(fillLight)
 
+const presentationGroup = new THREE.Group()
+scene.add(presentationGroup)
+
 const sculptureRoot = new THREE.Group()
-scene.add(sculptureRoot)
+presentationGroup.add(sculptureRoot)
 
 const artQuaternion = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(0.76, -0.7, 0.035, 'XYZ'),
@@ -85,6 +88,24 @@ let targetRotationProgress = 0
 let currentView: 'art' | 'qr' = 'art'
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+type PaletteTransition = {
+  from: Float32Array
+  to: Float32Array
+  startedAt: number
+  duration: number
+}
+
+type StyleTransition = {
+  nextStyleId: StyleId
+  nextPaletteKey: PaletteKey
+  startedAt: number
+  duration: number
+  swapped: boolean
+}
+
+let paletteTransition: PaletteTransition | null = null
+let styleTransition: StyleTransition | null = null
 
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1)
@@ -146,15 +167,35 @@ function swatchBackground(colors: readonly string[]): string {
   return `linear-gradient(135deg, ${colors.join(', ')})`
 }
 
-function applyPalette(): void {
-  if (voxelMesh && currentBuild) {
-    for (let i = 0; i < currentBuild.voxels.length; i += 1) {
-      colorForVoxel(currentBuild.voxels[i], tempColor)
-      voxelMesh.setColorAt(i, tempColor)
-    }
-    if (voxelMesh.instanceColor) voxelMesh.instanceColor.needsUpdate = true
+function buildPaletteBuffer(): Float32Array | null {
+  if (!currentBuild) return null
+  const buffer = new Float32Array(currentBuild.voxels.length * 3)
+  for (let i = 0; i < currentBuild.voxels.length; i += 1) {
+    colorForVoxel(currentBuild.voxels[i], tempColor)
+    const offset = i * 3
+    buffer[offset] = tempColor.r
+    buffer[offset + 1] = tempColor.g
+    buffer[offset + 2] = tempColor.b
   }
+  return buffer
+}
 
+function capturePaletteBuffer(): Float32Array | null {
+  if (!voxelMesh?.instanceColor) return null
+  return new Float32Array(voxelMesh.instanceColor.array as ArrayLike<number>)
+}
+
+function applyPaletteBuffer(buffer: Float32Array): void {
+  if (!voxelMesh || !currentBuild) return
+  for (let i = 0; i < currentBuild.voxels.length; i += 1) {
+    const offset = i * 3
+    tempColor.setRGB(buffer[offset], buffer[offset + 1], buffer[offset + 2])
+    voxelMesh.setColorAt(i, tempColor)
+  }
+  if (voxelMesh.instanceColor) voxelMesh.instanceColor.needsUpdate = true
+}
+
+function updatePaletteChrome(): void {
   const style = getStyle(styleId)
   const palette = getPalette(styleId, paletteKey)
   const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
@@ -171,6 +212,32 @@ function applyPalette(): void {
     button.setAttribute('aria-label', `${style.label} palette: ${option.label}`)
     button.title = option.label
   })
+}
+
+function applyPalette(animateColors = false): void {
+  const target = buildPaletteBuffer()
+  updatePaletteChrome()
+
+  if (!target) return
+  if (!animateColors || reducedMotion || !voxelMesh) {
+    paletteTransition = null
+    applyPaletteBuffer(target)
+    return
+  }
+
+  const from = capturePaletteBuffer()
+  if (!from || from.length !== target.length) {
+    paletteTransition = null
+    applyPaletteBuffer(target)
+    return
+  }
+
+  paletteTransition = {
+    from,
+    to: target,
+    startedAt: performance.now(),
+    duration: 380,
+  }
 }
 
 function updateComposition(): void {
@@ -231,6 +298,7 @@ function rebuild(value: string): void {
     const style = getStyle(styleId)
     const build = style.generate(matrix, content)
 
+    paletteTransition = null
     disposeVoxelMesh()
     currentBuild = build
 
@@ -282,19 +350,68 @@ function toggleMode(): void {
   setMode(currentView === 'art' ? 'qr' : 'art')
 }
 
+function resetPresentationTransform(): void {
+  presentationGroup.position.set(0, 0, 0)
+  presentationGroup.scale.setScalar(1)
+  presentationGroup.rotation.set(0, 0, 0)
+}
+
+function swapStyleTransition(): void {
+  if (!styleTransition || styleTransition.swapped) return
+  styleTransition.swapped = true
+  styleId = styleTransition.nextStyleId
+  paletteKey = styleTransition.nextPaletteKey
+  updateStyleCopy()
+  rebuild(input.value)
+}
+
+function requestStyleTransition(nextStyleId: StyleId): void {
+  if (nextStyleId === styleId && !styleTransition) return
+
+  if (styleTransition) {
+    swapStyleTransition()
+    styleTransition = null
+    resetPresentationTransform()
+  }
+
+  if (reducedMotion) {
+    styleId = nextStyleId
+    paletteKey = getStyle(styleId).defaultPalette
+    updateStyleCopy()
+    rebuild(input.value)
+    return
+  }
+
+  styleTransition = {
+    nextStyleId,
+    nextPaletteKey: getStyle(nextStyleId).defaultPalette,
+    startedAt: performance.now(),
+    duration: 620,
+    swapped: false,
+  }
+}
+
+function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
+  if (nextPaletteKey === paletteKey) return
+
+  if (styleTransition) {
+    swapStyleTransition()
+    styleTransition = null
+    resetPresentationTransform()
+  }
+
+  paletteKey = nextPaletteKey
+  applyPalette(true)
+}
+
 modeToggle.addEventListener('click', toggleMode)
 renderer.domElement.addEventListener('click', toggleMode)
 
 styleButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const requested = button.dataset.style
-    if (!requested || !isStyleId(requested) || requested === styleId) return
-
-    styleId = requested
-    paletteKey = getStyle(styleId).defaultPalette
-    updateStyleCopy()
-    applyPalette()
-    rebuild(input.value)
+    if (!requested || !isStyleId(requested)) return
+    requestStyleTransition(requested)
   })
 })
 
@@ -302,8 +419,7 @@ paletteButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const requested = button.dataset.palette
     if (!requested || !isPaletteKey(requested)) return
-    paletteKey = requested
-    applyPalette()
+    requestPaletteTransition(requested)
   })
 })
 
@@ -332,6 +448,7 @@ const clock = new THREE.Clock()
 
 function animate(): void {
   const delta = Math.min(clock.getDelta(), 0.05)
+  const now = performance.now()
 
   if (reducedMotion) {
     rotationProgress = targetRotationProgress
@@ -339,6 +456,32 @@ function animate(): void {
     rotationProgress += (targetRotationProgress - rotationProgress) * (1 - Math.exp(-4.9 * delta))
     if (Math.abs(targetRotationProgress - rotationProgress) < 0.00015) {
       rotationProgress = targetRotationProgress
+    }
+  }
+
+  if (paletteTransition && voxelMesh?.instanceColor) {
+    const t = clamp01((now - paletteTransition.startedAt) / paletteTransition.duration)
+    const easedPalette = smootherstep(t)
+    const colors = voxelMesh.instanceColor.array as Float32Array
+    for (let i = 0; i < colors.length; i += 1) {
+      colors[i] = THREE.MathUtils.lerp(paletteTransition.from[i], paletteTransition.to[i], easedPalette)
+    }
+    voxelMesh.instanceColor.needsUpdate = true
+    if (t >= 1) paletteTransition = null
+  }
+
+  if (styleTransition) {
+    const t = clamp01((now - styleTransition.startedAt) / styleTransition.duration)
+    if (!styleTransition.swapped && t >= 0.5) swapStyleTransition()
+
+    const envelope = Math.sin(Math.PI * t)
+    presentationGroup.position.y = envelope * 0.66
+    presentationGroup.scale.setScalar(1 - envelope * 0.09)
+    presentationGroup.rotation.z = Math.sin(Math.PI * 2 * t) * 0.065
+
+    if (t >= 1) {
+      styleTransition = null
+      resetPresentationTransform()
     }
   }
 
