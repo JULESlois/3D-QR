@@ -51,23 +51,28 @@ function glyphFromSeed(seedText: string): string {
   return seedText.toUpperCase().match(/[A-Z0-9]/)?.[0] ?? 'Q'
 }
 
-type GlyphBand = 'face' | 'bevel' | 'field'
+type GlyphBand = 'face' | 'inner-bevel' | 'outer-bevel' | 'field'
 
-function glyphBand(bitmap: readonly string[], row: number, col: number): GlyphBand {
-  if (bitmap[row][col] === '1') return 'face'
+type GlyphSample = {
+  band: GlyphBand
+  distance: number
+}
 
-  for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
-    for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
-      if (rowOffset === 0 && colOffset === 0) continue
-      const neighborRow = row + rowOffset
-      const neighborCol = col + colOffset
-      if (neighborRow < 0 || neighborRow >= bitmap.length) continue
-      if (neighborCol < 0 || neighborCol >= bitmap[neighborRow].length) continue
-      if (bitmap[neighborRow][neighborCol] === '1') return 'bevel'
+function sampleGlyph(bitmap: readonly string[], row: number, col: number): GlyphSample {
+  let nearest = Number.POSITIVE_INFINITY
+
+  for (let glyphRow = 0; glyphRow < bitmap.length; glyphRow += 1) {
+    for (let glyphCol = 0; glyphCol < bitmap[glyphRow].length; glyphCol += 1) {
+      if (bitmap[glyphRow][glyphCol] !== '1') continue
+      const distance = Math.hypot(row - glyphRow, col - glyphCol)
+      nearest = Math.min(nearest, distance)
     }
   }
 
-  return 'field'
+  if (nearest <= 0.56) return { band: 'face', distance: nearest }
+  if (nearest <= 1.05) return { band: 'inner-bevel', distance: nearest }
+  if (nearest <= 1.55) return { band: 'outer-bevel', distance: nearest }
+  return { band: 'field', distance: nearest }
 }
 
 export function generateGlyph(matrix: QRMatrixData, seedText: string): SculptureBuild {
@@ -86,29 +91,38 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
 
     const nx = (module.col - center) / Math.max(1, matrix.size - 1) + 0.5
     const nz = (module.row - center) / Math.max(1, matrix.size - 1) + 0.5
-    const glyphCol = Math.max(0, Math.min(4, Math.round(nx * 4)))
-    const glyphRow = Math.max(0, Math.min(6, Math.round(nz * 6)))
-    const band = glyphBand(bitmap, glyphRow, glyphCol)
+    const glyphX = nx * 4
+    const glyphY = nz * 6
+    const sample = sampleGlyph(bitmap, glyphY, glyphX)
 
-    // A high face, medium shoulder and deliberately shallow residual QR field makes
-    // the character dominate the isometric silhouette without adding non-QR support.
+    // The continuous distance field gives the letter a broad readable face and two
+    // stepped bevel bands instead of snapping every QR column to a coarse 5x7 cell.
+    // Only column height/material changes; the scanner-facing top remains qr-top.
     let topLevel: number
-    if (module.role !== 'data') {
-      topLevel = module.role === 'finder' ? 2 : 1
-    } else if (band === 'face') {
-      topLevel = 10
-    } else if (band === 'bevel') {
-      topLevel = 5
+    if (sample.band === 'face') {
+      topLevel = 11
+    } else if (sample.band === 'inner-bevel') {
+      topLevel = 7
+    } else if (sample.band === 'outer-bevel') {
+      topLevel = 4
+    } else if (module.role === 'finder') {
+      topLevel = 1
     } else {
-      topLevel = (module.row * 3 + module.col * 5) % 17 === 0 ? 2 : 1
+      topLevel = (module.row * 3 + module.col * 5) % 19 === 0 ? 2 : 1
     }
 
     for (let level = 1; level <= topLevel; level += 1) {
-      const interiorKind = band === 'face'
+      const interiorKind = sample.band === 'face'
         ? 'primary'
-        : band === 'bevel'
+        : sample.band === 'inner-bevel'
           ? 'plaster'
-          : 'stone'
+          : sample.band === 'outer-bevel'
+            ? 'stone'
+            : 'stone'
+
+      const distancePhase = Number.isFinite(sample.distance)
+        ? Math.min(1, sample.distance / 1.55)
+        : 1
 
       pushVoxel(
         voxels,
@@ -116,7 +130,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
         matrix.size,
         level,
         level === topLevel ? 'qr-top' : interiorKind,
-        (random() * 0.28 + glyphRow * 0.085 + glyphCol * 0.12 + level * 0.024) % 1,
+        (random() * 0.18 + distancePhase * 0.32 + glyphY * 0.055 + glyphX * 0.075 + level * 0.021) % 1,
       )
     }
   }
@@ -127,7 +141,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `GLYPH ${glyph} / FREE-STANDING QR BODY / TALL LETTER FACE / EMPTY LIGHT FIELD`,
+    `GLYPH ${glyph} / FREE-STANDING QR BODY / CONTINUOUS BEVEL FIELD / EMPTY LIGHT FIELD`,
     'display-plaque',
   )
 }
