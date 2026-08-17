@@ -8,7 +8,41 @@ import {
   type SculptureBuild,
 } from '../sculpture'
 
-function pickTrunkModules(modules: DarkModule[], center: number): Set<string> {
+type CrownSample = {
+  dome: number
+  lobe: number
+}
+
+const crownLobes = [
+  { x: -0.34, z: 0.08, rx: 0.72, rz: 0.74, rise: 0.94 },
+  { x: 0.34, z: 0.02, rx: 0.7, rz: 0.72, rise: 0.9 },
+  { x: 0.02, z: -0.34, rx: 0.64, rz: 0.66, rise: 1.08 },
+  { x: 0.02, z: 0.36, rx: 0.68, rz: 0.62, rise: 0.86 },
+] as const
+
+function sampleCrown(module: DarkModule, center: number, size: number): CrownSample {
+  const nx = (module.col - center) / Math.max(1, size * 0.34)
+  const nz = (module.row - center) / Math.max(1, size * 0.3)
+  let bestDome = 0
+  let bestLobe = 0
+
+  crownLobes.forEach((lobe, index) => {
+    const dx = (nx - lobe.x) / lobe.rx
+    const dz = (nz - lobe.z) / lobe.rz
+    const distanceSquared = dx * dx + dz * dz
+    if (distanceSquared > 1) return
+
+    const dome = Math.sqrt(Math.max(0, 1 - distanceSquared)) * lobe.rise
+    if (dome > bestDome) {
+      bestDome = dome
+      bestLobe = index
+    }
+  })
+
+  return { dome: bestDome, lobe: bestLobe }
+}
+
+function pickTrunkModules(modules: DarkModule[], center: number): DarkModule[] {
   const sorted = [...modules].sort((a, b) => {
     const da = (a.row - center) ** 2 + (a.col - center) ** 2
     const db = (b.row - center) ** 2 + (b.col - center) ** 2
@@ -30,7 +64,38 @@ function pickTrunkModules(modules: DarkModule[], center: number): Set<string> {
     }
   }
 
-  return new Set(picked.map((module) => cellKey(module.row, module.col)))
+  return picked
+}
+
+function branchStrength(
+  module: DarkModule,
+  trunks: DarkModule[],
+  sample: CrownSample,
+  center: number,
+  size: number,
+): number {
+  if (trunks.length === 0) return 0
+
+  const lobe = crownLobes[sample.lobe]
+  const targetRow = center + lobe.z * size * 0.3
+  const targetCol = center + lobe.x * size * 0.34
+  let best = 0
+
+  for (const trunk of trunks) {
+    const vx = targetCol - trunk.col
+    const vz = targetRow - trunk.row
+    const lengthSquared = Math.max(0.001, vx * vx + vz * vz)
+    const wx = module.col - trunk.col
+    const wz = module.row - trunk.row
+    const t = Math.max(0, Math.min(1, (wx * vx + wz * vz) / lengthSquared))
+    const closestCol = trunk.col + vx * t
+    const closestRow = trunk.row + vz * t
+    const distance = Math.hypot(module.col - closestCol, module.row - closestRow)
+    const taper = 1 - t * 0.45
+    best = Math.max(best, Math.max(0, 1 - distance / 1.55) * taper)
+  }
+
+  return best
 }
 
 export function generateTree(matrix: QRMatrixData, seedText: string): SculptureBuild {
@@ -38,12 +103,9 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
   const { random, center } = context
   const voxels = createBaseVoxels(context, { mode: 'full-pad' })
 
-  const canopyCandidates = matrix.darkModules.filter((module) => {
-    if (module.role !== 'data') return false
-    const nx = (module.col - center) / Math.max(1, matrix.size * 0.34)
-    const nz = (module.row - center) / Math.max(1, matrix.size * 0.29)
-    return nx * nx + nz * nz <= 1.04 + (random() - 0.5) * 0.3
-  })
+  const canopyCandidates = matrix.darkModules.filter((module) => (
+    module.role === 'data' && sampleCrown(module, center, matrix.size).dome > 0
+  ))
 
   const canopyModules = canopyCandidates.length >= 34
     ? canopyCandidates
@@ -55,26 +117,35 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
       })
 
   const lifted = new Set(canopyModules.map((module) => cellKey(module.row, module.col)))
-  const trunkKeys = pickTrunkModules(canopyModules, center)
-  const baseLevel = Math.round(Math.max(9, Math.min(15, matrix.size * 0.32)))
-  const crownRise = Math.round(Math.max(6, Math.min(12, matrix.size * 0.25)))
+  const trunks = pickTrunkModules(canopyModules, center)
+  const trunkKeys = new Set(trunks.map((module) => cellKey(module.row, module.col)))
+  const baseLevel = Math.round(Math.max(8, Math.min(14, matrix.size * 0.29)))
+  const crownRise = Math.round(Math.max(7, Math.min(13, matrix.size * 0.27)))
 
   for (const module of canopyModules) {
     const key = cellKey(module.row, module.col)
-    const nx = (module.col - center) / Math.max(1, matrix.size * 0.34)
-    const nz = (module.row - center) / Math.max(1, matrix.size * 0.29)
-    const radialSquared = Math.min(1, nx * nx + nz * nz)
-    const dome = Math.sqrt(Math.max(0, 1 - radialSquared))
+    const sample = sampleCrown(module, center, matrix.size)
+    const dome = sample.dome > 0
+      ? sample.dome
+      : Math.max(0.18, 1 - Math.hypot(module.row - center, module.col - center) / (matrix.size * 0.45))
     const topLevel = Math.max(
       baseLevel,
-      Math.round(baseLevel + dome * crownRise + (random() - 0.5) * 2.8),
+      Math.round(baseLevel + dome * crownRise + (random() - 0.5) * 2.2),
     )
     const crownThickness = 3 + Math.floor(random() * 3)
     const crownStart = Math.max(7, topLevel - crownThickness + 1)
+    const branch = branchStrength(module, trunks, sample, center, matrix.size)
+    const isTrunk = trunkKeys.has(key)
 
-    if (trunkKeys.has(key)) {
+    if (isTrunk) {
       for (let level = 1; level < crownStart; level += 1) {
         pushVoxel(voxels, module, matrix.size, level, 'wood', level / Math.max(1, crownStart))
+      }
+    } else if (branch > 0.42) {
+      const branchTop = Math.min(crownStart - 1, Math.round(4 + branch * Math.max(3, crownStart - 5)))
+      const branchBase = Math.max(4, branchTop - (branch > 0.7 ? 3 : 2))
+      for (let level = branchBase; level <= branchTop; level += 1) {
+        pushVoxel(voxels, module, matrix.size, level, 'wood', (branch + level * 0.07) % 1)
       }
     }
 
@@ -85,10 +156,18 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
         matrix.size,
         level,
         level === topLevel ? 'qr-top' : 'primary',
-        (random() * 0.62 + dome * 0.3 + level * 0.037) % 1,
+        (random() * 0.52 + dome * 0.34 + sample.lobe * 0.11 + level * 0.031) % 1,
       )
     }
   }
 
-  return finalizeSculpture(matrix, voxels, 'tree', 'Tree', lifted, 'FULL GRASS PAD', 'full-pad')
+  return finalizeSculpture(
+    matrix,
+    voxels,
+    'tree',
+    'Tree',
+    lifted,
+    'CLUSTERED CROWN / BRANCHING TRUNK / FULL GRASS PAD',
+    'full-pad',
+  )
 }
