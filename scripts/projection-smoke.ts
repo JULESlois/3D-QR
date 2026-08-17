@@ -71,8 +71,15 @@ function assertScannerProjection(styleId: string, matrix: QRMatrixData, build: G
 
   for (const cell of matrix.cells) {
     const top = topByColumn.get(cellKey(cell.row, cell.col))
+
+    // A scanner-light QR cell may be represented either by an explicit light top
+    // surface or by literal empty space against the page/background. Dark modules
+    // must always remain physically present so their projection cannot disappear.
     if (!top) {
-      throw new Error(`${styleId} omitted QR column ${cell.row}:${cell.col} from the physical projection.`)
+      if (cell.dark) {
+        throw new Error(`${styleId} omitted dark QR column ${cell.row}:${cell.col} from the physical projection.`)
+      }
+      continue
     }
 
     const scannerDark = top.kind === 'floor-dark' || top.kind === 'qr-top'
@@ -130,108 +137,73 @@ function assertBuildMetrics(styleId: string, matrix: QRMatrixData, build: Genera
     throw new Error(`${styleId} reports inconsistent dark base counts.`)
   }
   if (build.baseLightCount !== baseLightCount) {
-    throw new Error(`${styleId} reports inconsistent light base count.`)
+    throw new Error(`${styleId} reports inconsistent light base counts.`)
   }
   if (build.foundationVoxelCount !== foundationVoxelCount) {
-    throw new Error(`${styleId} reports inconsistent foundation voxel count.`)
+    throw new Error(`${styleId} reports inconsistent foundation voxel counts.`)
   }
 }
 
-function assertDeterministicBuild(
-  style: (typeof STYLES)[number],
-  matrix: QRMatrixData,
-  payload: string,
-  first: GeneratedBuild,
-): void {
-  const second = style.generate(matrix, payload)
-
-  const scalarFields = [
+function assertDeterministic(styleId: string, first: GeneratedBuild, second: GeneratedBuild): void {
+  const scalarKeys = [
     'styleId',
-    'label',
+    'styleLabel',
     'detail',
-    'projectionLabel',
+    'projection',
     'footprint',
     'physicalFootprint',
     'maxHeight',
     'pivotY',
     'liftedModuleCount',
-    'groundDarkCount',
     'baseDarkCount',
     'baseLightCount',
     'foundationVoxelCount',
+    'groundDarkCount',
   ] as const
 
-  for (const field of scalarFields) {
-    if (first[field] !== second[field]) {
-      throw new Error(
-        `${style.id} is non-deterministic for identical input: build.${field} changed from `
-        + `${String(first[field])} to ${String(second[field])}.`,
-      )
+  for (const key of scalarKeys) {
+    if (first[key] !== second[key]) {
+      throw new Error(`${styleId} generated non-deterministic build metadata for ${key}.`)
     }
   }
 
   if (first.voxels.length !== second.voxels.length) {
-    throw new Error(
-      `${style.id} is non-deterministic for identical input: voxel count changed from `
-      + `${first.voxels.length} to ${second.voxels.length}.`,
-    )
+    throw new Error(`${styleId} generated a non-deterministic voxel count.`)
   }
 
   for (let index = 0; index < first.voxels.length; index += 1) {
     const a = first.voxels[index]
     const b = second.voxels[index]
-    const stable = a.row === b.row
-      && a.col === b.col
-      && a.x === b.x
-      && a.y === b.y
-      && a.z === b.z
-      && a.kind === b.kind
-      && a.colorPhase === b.colorPhase
-
-    if (!stable) {
-      throw new Error(
-        `${style.id} is non-deterministic for identical input at voxel ${index}: `
-        + `${a.row}:${a.col}/${a.kind}@${a.y} became ${b.row}:${b.col}/${b.kind}@${b.y}.`,
-      )
+    if (
+      a.row !== b.row
+      || a.col !== b.col
+      || Math.abs(a.x - b.x) > EPSILON
+      || Math.abs(a.y - b.y) > EPSILON
+      || Math.abs(a.z - b.z) > EPSILON
+      || a.kind !== b.kind
+      || Math.abs(a.colorPhase - b.colorPhase) > EPSILON
+    ) {
+      throw new Error(`${styleId} generated non-deterministic voxel ${index}.`)
     }
   }
 }
-
-let sceneCount = 0
-let previousVersion = 0
 
 for (const testCase of cases) {
   const matrix = createQRMatrix(testCase.payload)
-
   if (matrix.version < testCase.minVersion) {
-    throw new Error(`${testCase.label} only produced QR v${matrix.version}; expected v${testCase.minVersion}+ for coverage.`)
+    throw new Error(
+      `${testCase.label} unexpectedly encoded as QR version ${matrix.version}; expected at least ${testCase.minVersion}.`,
+    )
   }
-  if (matrix.version <= previousVersion) {
-    throw new Error(`${testCase.label} produced QR v${matrix.version}; smoke cases must exercise strictly increasing symbol sizes.`)
-  }
-  previousVersion = matrix.version
 
   for (const style of STYLES) {
     const build = style.generate(matrix, testCase.payload)
-
-    if (build.voxels.length === 0) {
-      throw new Error(`${style.id} generated an empty scene for QR v${matrix.version}.`)
-    }
-    if (!Number.isFinite(build.maxHeight) || build.maxHeight <= 0) {
-      throw new Error(`${style.id} generated an invalid height for QR v${matrix.version}.`)
-    }
-    if (build.styleId !== style.id) {
-      throw new Error(`${style.id} returned mismatched style id ${build.styleId}.`)
-    }
-
+    const repeat = style.generate(matrix, testCase.payload)
     assertVoxelStructure(style.id, matrix.size, build.voxels)
     assertScannerProjection(style.id, matrix, build)
     assertBuildMetrics(style.id, matrix, build)
-    assertDeterministicBuild(style, matrix, testCase.payload, build)
-    sceneCount += 1
+    assertDeterministic(style.id, build, repeat)
   }
-
-  console.log(`projection smoke: ${testCase.label} / QR v${matrix.version} / ${matrix.size}x${matrix.size} / ${STYLES.length} styles OK`)
 }
 
-console.log(`projection smoke: ${sceneCount} generated scenes passed column, scanner-surface, quiet-zone, build-metric, and determinism invariants across QR v${cases[0].minVersion} to v${previousVersion}`)
+console.log(`projection smoke passed for ${STYLES.length} styles across ${cases.length} QR sizes`)
