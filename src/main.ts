@@ -23,6 +23,7 @@ const headline = requiredElement<HTMLElement>('#style-headline')
 const lede = requiredElement<HTMLElement>('#style-lede')
 const specimen = requiredElement<HTMLElement>('#style-specimen')
 const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
+const styleRow = requiredElement<HTMLElement>('.style-row')
 const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
 const panelFooter = requiredElement<HTMLElement>('.panel-footer')
@@ -573,55 +574,25 @@ function switchStyleImmediately(nextStyleId: StyleId): void {
   rebuild(input.value)
 }
 
-function swapStyleAtMidpoint(): void {
-  if (!styleTransition || styleTransition.swapped) return
-  styleTransition.swapped = true
-  styleId = styleTransition.nextStyleId
-  paletteKey = styleTransition.nextPaletteKey
-  updateStyleCopy()
-  rebuild(input.value)
-}
-
-function startStyleTransition(nextStyleId: StyleId): void {
-  paletteTransition = null
-  styleTransition = {
-    nextStyleId,
-    nextPaletteKey: getStyle(nextStyleId).defaultPalette,
-    startedAt: performance.now(),
-    duration: 620,
-    swapped: false,
-  }
-}
-
 function requestStyleTransition(nextStyleId: StyleId): void {
-  if (isExporting) return
+  if (isExporting || nextStyleId === styleId) return
+
+  queuedStyleId = null
+  styleTransition = null
+  switchStyleImmediately(nextStyleId)
 
   if (reducedMotion) {
-    queuedStyleId = null
-    styleTransition = null
-    switchStyleImmediately(nextStyleId)
+    applyPresentationTransform()
     return
   }
 
-  if (styleTransition) {
-    if (!styleTransition.swapped) {
-      if (nextStyleId === styleId) {
-        styleTransition = null
-        applyPresentationTransform()
-        return
-      }
-      styleTransition.nextStyleId = nextStyleId
-      styleTransition.nextPaletteKey = getStyle(nextStyleId).defaultPalette
-      return
-    }
-
-    if (nextStyleId !== styleId) queuedStyleId = nextStyleId
-    return
+  styleTransition = {
+    nextStyleId,
+    nextPaletteKey: paletteKey,
+    startedAt: performance.now(),
+    duration: 440,
+    swapped: true,
   }
-
-  if (nextStyleId === styleId) return
-  queuedStyleId = null
-  startStyleTransition(nextStyleId)
 }
 
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
@@ -658,12 +629,14 @@ exportGifButton.addEventListener('click', () => {
 })
 renderer.domElement.addEventListener('click', toggleMode)
 
-styleButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    const requested = button.dataset.style
-    if (!requested || !isStyleId(requested)) return
-    requestStyleTransition(requested)
-  })
+styleRow.addEventListener('click', (event) => {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const button = target.closest<HTMLButtonElement>('[data-style]')
+  if (!button || button.disabled || !styleRow.contains(button)) return
+  const requested = button.dataset.style
+  if (!requested || !isStyleId(requested)) return
+  requestStyleTransition(requested)
 })
 
 paletteButtons.forEach((button) => {
@@ -738,28 +711,14 @@ function animate(): void {
 
   if (styleTransition) {
     const progress = clamp01((now - styleTransition.startedAt) / styleTransition.duration)
+    const phase = smootherstep(progress)
 
-    if (!styleTransition.swapped && progress >= 0.5) {
-      swapStyleAtMidpoint()
-    }
-
-    if (progress < 0.5) {
-      const phase = smootherstep(progress * 2)
-      sceneFlipY = phase * Math.PI * 0.5
-      sceneScale = 1 - phase * 0.08
-      sceneLift = phase * 0.22
-    } else {
-      const phase = smootherstep((progress - 0.5) * 2)
-      sceneFlipY = -(1 - phase) * Math.PI * 0.5
-      sceneScale = 0.92 + phase * 0.08
-      sceneLift = (1 - phase) * 0.22
-    }
+    sceneFlipY = -(1 - phase) * Math.PI * 0.38
+    sceneScale = 0.94 + phase * 0.06
+    sceneLift = (1 - phase) * 0.18
 
     if (progress >= 1) {
       styleTransition = null
-      const queued = queuedStyleId
-      queuedStyleId = null
-      if (queued && queued !== styleId) startStyleTransition(queued)
     }
   }
 
