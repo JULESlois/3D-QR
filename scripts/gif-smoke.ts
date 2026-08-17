@@ -1,4 +1,8 @@
-import { GIFEncoder, applyPalette, quantize } from 'gifenc'
+import { createRequire } from 'node:module'
+import type * as GifencModule from 'gifenc'
+
+const require = createRequire(import.meta.url)
+const { GIFEncoder, applyPalette, quantize } = require('gifenc') as typeof GifencModule
 
 const width = 2
 const height = 2
