@@ -279,6 +279,41 @@ export function pushSolidColumn(
   }
 }
 
+function isScannerCap(kind: VoxelKind): boolean {
+  return kind === 'qr-top' || kind === 'light-top'
+}
+
+function canonicalizeVoxelOccupancy(voxels: SculptureVoxel[]): SculptureVoxel[] {
+  const occupied = new Map<string, SculptureVoxel>()
+
+  for (const voxel of voxels) {
+    const level = Math.round(voxel.y / CELL_SIZE)
+    const key = `${voxel.row}:${voxel.col}:${level}`
+    const existing = occupied.get(key)
+
+    if (!existing) {
+      occupied.set(key, voxel)
+      continue
+    }
+
+    const existingCap = isScannerCap(existing.kind)
+    const incomingCap = isScannerCap(voxel.kind)
+
+    if (existingCap && incomingCap && existing.kind !== voxel.kind) {
+      throw new Error(
+        `Conflicting scanner caps occupy QR column ${voxel.row}:${voxel.col}, level ${level}.`,
+      )
+    }
+
+    // Scanner-facing caps always win an overlap. For ordinary body geometry the
+    // later builder wins, matching the compositional intent of scene generators
+    // while guaranteeing exactly one render instance per physical voxel slot.
+    if (incomingCap || !existingCap) occupied.set(key, voxel)
+  }
+
+  return Array.from(occupied.values())
+}
+
 function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixData): void {
   const topByColumn = new Map<string, SculptureVoxel>()
 
@@ -335,7 +370,8 @@ export function finalizeSculpture(
   detail?: string,
   projection: ProjectionStrategy = 'full-pad',
 ): SculptureBuild {
-  validateProjectionInvariant(voxels, matrix)
+  const canonicalVoxels = canonicalizeVoxelOccupancy(voxels)
+  validateProjectionInvariant(canonicalVoxels, matrix)
 
   let maxHeight = CELL_SIZE
   let baseDarkCount = 0
@@ -346,7 +382,7 @@ export function finalizeSculpture(
   let minZ = Number.POSITIVE_INFINITY
   let maxZ = Number.NEGATIVE_INFINITY
 
-  for (const voxel of voxels) {
+  for (const voxel of canonicalVoxels) {
     maxHeight = Math.max(maxHeight, voxel.y + CELL_SIZE)
     minX = Math.min(minX, voxel.x)
     maxX = Math.max(maxX, voxel.x)
@@ -367,7 +403,7 @@ export function finalizeSculpture(
     styleLabel,
     detail,
     projection,
-    voxels,
+    voxels: canonicalVoxels,
     footprint: projectionFootprint,
     physicalFootprint,
     maxHeight,
