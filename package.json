@@ -7,11 +7,13 @@
   "scripts": {
     "dev": "vite",
     "test:projection": "tsx scripts/projection-smoke.ts",
-    "build": "npm run test:projection && tsc --noEmit && vite build",
+    "test:gif": "tsx scripts/gif-smoke.ts",
+    "build": "npm run test:projection && npm run test:gif && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "engines": { "node": ">=20.19.0" },
   "dependencies": {
+    "gifenc": "1.0.3",
     "qrcode": "^1.5.4",
     "three": "^0.185.1"
   },
