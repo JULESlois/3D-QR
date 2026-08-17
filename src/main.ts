@@ -713,7 +713,6 @@ function animate(): void {
     const progress = clamp01((now - styleTransition.startedAt) / styleTransition.duration)
     const phase = smootherstep(progress)
 
-    sceneFlipY = -(1 - phase) * Math.PI * 0.38
     sceneScale = 0.94 + phase * 0.06
     sceneLift = (1 - phase) * 0.18
 
