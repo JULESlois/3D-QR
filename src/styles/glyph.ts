@@ -5,6 +5,7 @@ import {
   finalizeSculpture,
   pushVoxel,
   type SculptureBuild,
+  type SculptureVoxel,
 } from '../sculpture'
 
 const FONT_5X7: Record<string, readonly string[]> = {
@@ -75,7 +76,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
   // No plaque or light floor: the QR-dark columns are the entire physical object.
   // Light modules and the quiet zone remain literal empty space, so the page/background
   // supplies scanner-light contrast while the sculpture reads as a floating monolith.
-  const voxels = []
+  const voxels: SculptureVoxel[] = []
   const glyph = glyphFromSeed(seedText)
   const bitmap = FONT_5X7[glyph] ?? FONT_5X7.Q
   const lifted = new Set<string>()
