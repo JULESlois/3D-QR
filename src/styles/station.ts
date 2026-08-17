@@ -12,12 +12,16 @@ import {
 
 type StationRole = 'rail' | 'platform' | 'canopy' | 'post' | 'concourse' | 'clock' | 'train'
 
-interface StationColumn {
-  cell: QRCell
+interface StationSegment {
   fromLevel: number
   topLevel: number
   role: StationRole
   priority: number
+}
+
+interface StationColumn {
+  cell: QRCell
+  segments: StationSegment[]
 }
 
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
@@ -34,14 +38,17 @@ function register(
   priority: number,
 ): void {
   if (!cell || cell.zone === 'finder') return
+
   const key = cellKey(cell.row, cell.col)
-  const current = columns.get(key)
-  if (current && current.priority > priority) return
-  if (current && current.priority === priority && current.topLevel >= topLevel) return
-  columns.set(key, {
-    cell,
+  let column = columns.get(key)
+  if (!column) {
+    column = { cell, segments: [] }
+    columns.set(key, column)
+  }
+
+  column.segments.push({
     fromLevel: Math.max(1, Math.min(fromLevel, topLevel)),
-    topLevel,
+    topLevel: Math.max(1, topLevel),
     role,
     priority,
   })
@@ -76,13 +83,41 @@ function buildColumn(
   column: StationColumn,
   matrixSize: number,
 ): void {
-  for (let level = column.fromLevel; level <= column.topLevel; level += 1) {
+  const occupied = new Map<number, StationSegment>()
+
+  // Resolve overlap per level instead of replacing the entire QR column. This lets
+  // rails/platforms survive underneath suspended canopies and lets a train keep the
+  // rail bed below it while still giving higher-priority architecture precedence
+  // where two pieces physically occupy the same height.
+  for (const segment of column.segments) {
+    for (let level = segment.fromLevel; level <= segment.topLevel; level += 1) {
+      const current = occupied.get(level)
+      if (
+        !current
+        || segment.priority > current.priority
+        || (segment.priority === current.priority && segment.topLevel > current.topLevel)
+      ) {
+        occupied.set(level, segment)
+      }
+    }
+  }
+
+  const levels = Array.from(occupied.keys()).sort((a, b) => a - b)
+  const visibleTop = levels.at(-1)
+  if (visibleTop === undefined) return
+
+  for (const level of levels) {
+    const segment = occupied.get(level)
+    if (!segment) continue
+
     pushCellVoxel(
       voxels,
       column.cell,
       matrixSize,
       level,
-      level === column.topLevel ? projectedCapKind(column.cell) : bodyKind(column.role, level, column.topLevel),
+      level === visibleTop
+        ? projectedCapKind(column.cell)
+        : bodyKind(segment.role, level, segment.topLevel),
       (column.cell.row * 0.071 + column.cell.col * 0.043 + level * 0.057) % 1,
     )
   }
@@ -197,9 +232,10 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     }
   }
 
-  // The roofs are genuinely suspended: only levels 6-7 exist across most of the
-  // canopy, while narrow posts descend at regular bays. This preserves sightlines
-  // through the platforms and stops the station reading as two solid slab blocks.
+  // These are now truly layered suspended roofs: the platform segment remains at
+  // levels 1-2 while the canopy occupies only 6-7, with narrow posts joining them
+  // at regular bays. The open vertical gap is real geometry, not just an intention
+  // in the generator comments.
   const canopyCenters = [center - 5, center + 5]
   for (const row of canopyCenters) {
     for (let col = center - halfSpan + 3; col <= center + halfSpan - 3; col += 1) {
@@ -213,11 +249,12 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
   }
 
   // A visible train on one track supplies an immediate rail-station cue while the
-  // opposite track stays open, retaining depth and the long terminal perspective.
+  // opposite track stays open. Its level-2+ body now layers over the level-1 rail
+  // instead of deleting that rail segment from the same QR column.
   buildWaitingTrain(matrix, columns, center, halfSpan)
 
-  // The head-house now carries the dominant station identity: a broad stepped
-  // gable, two low wings and a clock lantern frame the linear rail elements.
+  // The head-house carries the dominant station identity: a broad stepped gable,
+  // two low wings and a clock lantern frame the linear rail elements.
   buildGrandTerminal(matrix, columns, center, halfSpan)
 
   for (const column of columns.values()) {
@@ -225,13 +262,16 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     lifted.add(cellKey(column.cell.row, column.cell.col))
   }
 
+  const segmentCount = Array.from(columns.values())
+    .reduce((total, column) => total + column.segments.length, 0)
+
   return finalizeSculpture(
     matrix,
     voxels,
     'station',
     'Station',
     lifted,
-    `GABLED TERMINAL / CLOCK LANTERN / OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS`,
+    `GABLED TERMINAL / CLOCK LANTERN / LAYERED OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
     'display-plaque',
   )
 }
