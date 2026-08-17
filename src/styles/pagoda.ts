@@ -59,25 +59,47 @@ function chooseMainAnchor(matrix: QRMatrixData, seedText: string): QRCell | unde
 }
 
 function pagodaFootprint(matrix: QRMatrixData, anchor: QRCell): QRCell[] {
-  return matrix.cells.filter((cell) => (
-    cell.zone === 'data'
-    && Math.abs(cell.row - anchor.row) <= 2
-    && Math.abs(cell.col - anchor.col) <= 2
-  ))
+  return matrix.cells.filter((cell) => {
+    if (cell.zone !== 'data') return false
+
+    const dr = Math.abs(cell.row - anchor.row)
+    const dc = Math.abs(cell.col - anchor.col)
+    const ring = Math.max(dr, dc)
+
+    if (ring <= 2) return true
+    if (ring !== 3) return false
+
+    // The lowest eave projects farther along the four cardinal faces while the
+    // corners stay cut back. This produces a temple-roof cross instead of a
+    // generic seven-by-seven stepped pyramid.
+    return dr <= 1 || dc <= 1
+  })
 }
 
 function pagodaHeight(cell: QRCell, anchor: QRCell, seedText: string): number {
-  const ring = Math.max(Math.abs(cell.row - anchor.row), Math.abs(cell.col - anchor.col))
+  const dr = Math.abs(cell.row - anchor.row)
+  const dc = Math.abs(cell.col - anchor.col)
+  const ring = Math.max(dr, dc)
   const noise = localNoise(seedText, cell.row, cell.col, 'height')
 
-  if (ring === 0) return 15
-  if (ring === 1) return 10 + Math.round(noise * 2)
-  return 6 + Math.round(noise * 2)
+  if (ring === 0) return 16
+  if (ring === 1) return 12 + Math.round(noise)
+
+  if (ring === 2) {
+    // The second roof is broader along its faces, but its corners sit lower so
+    // each storey reads as a distinct flared eave in isometric view.
+    const face = dr <= 1 || dc <= 1
+    return face ? 9 : 7
+  }
+
+  // Outermost cardinal arms form the broad first-storey roof. They stay low
+  // enough to leave a clear visual gap to the second tier above.
+  return 5
 }
 
 function pagodaBodyKind(level: number, topLevel: number, ring: number): VoxelKind {
   const nearTop = level >= topLevel - 1
-  const eaveBand = level > 1 && (level % 4 === 0 || nearTop)
+  const eaveBand = level === 4 || level === 8 || level === 12 || nearTop
 
   if (eaveBand) return 'primary'
   if (ring === 0 || level % 3 === 1) return 'wood'
@@ -167,8 +189,10 @@ export function generatePagoda(matrix: QRMatrixData, seedText: string): Sculptur
   const footprint = pagodaFootprint(matrix, anchor)
   const footprintKeys = new Set(footprint.map((cell) => cellKey(cell.row, cell.col)))
 
-  // One coherent five-by-five-ish main pagoda intentionally crosses light and dark
-  // data cells. Its stepped height field creates stacked eaves in isometric view.
+  // The main pagoda uses a cut-corner seven-cell footprint with three deliberate
+  // roof terraces. The broad cardinal first eave, tighter second eave and narrow
+  // upper storey create the familiar stacked Japanese pagoda silhouette without
+  // adding geometry outside the QR columns themselves.
   for (const cell of footprint) {
     pushPagodaColumn(voxels, cell, matrix.size, anchor, seedText)
     lifted.add(cellKey(cell.row, cell.col))
@@ -182,9 +206,9 @@ export function generatePagoda(matrix: QRMatrixData, seedText: string): Sculptur
     if (footprintKeys.has(key)) continue
 
     const d = distance(cell, anchor)
-    const court = d >= 2.8
-      && d <= Math.max(5.2, matrix.size * 0.19)
-      && localNoise(seedText, cell.row, cell.col, 'court') > 0.76
+    const court = d >= 3.8
+      && d <= Math.max(6.2, matrix.size * 0.21)
+      && localNoise(seedText, cell.row, cell.col, 'court') > 0.79
 
     if (!court) continue
 
@@ -200,9 +224,9 @@ export function generatePagoda(matrix: QRMatrixData, seedText: string): Sculptur
     if (footprintKeys.has(key)) continue
 
     const d = distance(cell, anchor)
-    const accent = d >= 3.5
-      && d <= Math.max(7, matrix.size * 0.27)
-      && localNoise(seedText, cell.row, cell.col, 'lantern') > 0.93
+    const accent = d >= 4.2
+      && d <= Math.max(7.5, matrix.size * 0.28)
+      && localNoise(seedText, cell.row, cell.col, 'lantern') > 0.94
 
     if (!accent) continue
 
@@ -217,7 +241,7 @@ export function generatePagoda(matrix: QRMatrixData, seedText: string): Sculptur
     'pagoda',
     'Pagoda',
     lifted,
-    'MIXED-POLARITY MAIN PAGODA / FINDER PAVILIONS / TIMING CORRIDORS',
+    'THREE-TIER CROSS-EAVE PAGODA / FINDER PAVILIONS / TIMING CORRIDORS',
     'courtyard-pad',
   )
 }
