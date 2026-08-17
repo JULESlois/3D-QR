@@ -51,6 +51,27 @@ function glyphFromSeed(seedText: string): string {
   return seedText.toUpperCase().match(/[A-Z0-9]/)?.[0] ?? 'Q'
 }
 
+type GlyphBand = 'face' | 'bevel' | 'field'
+
+function glyphBand(bitmap: readonly string[], row: number, col: number): GlyphBand {
+  if (bitmap[row][col] === '1') return 'face'
+
+  // One bitmap-cell shoulder gives the embossed character a readable bevel instead
+  // of letting tall strokes rise directly out of unrelated QR texture.
+  for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+    for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
+      if (rowOffset === 0 && colOffset === 0) continue
+      const neighborRow = row + rowOffset
+      const neighborCol = col + colOffset
+      if (neighborRow < 0 || neighborRow >= bitmap.length) continue
+      if (neighborCol < 0 || neighborCol >= bitmap[neighborRow].length) continue
+      if (bitmap[neighborRow][neighborCol] === '1') return 'bevel'
+    }
+  }
+
+  return 'field'
+}
+
 export function generateGlyph(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'glyph')
   const { random, center } = context
@@ -70,21 +91,35 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     const nz = (module.row - center) / Math.max(1, matrix.size - 1) + 0.5
     const glyphCol = Math.max(0, Math.min(4, Math.round(nx * 4)))
     const glyphRow = Math.max(0, Math.min(6, Math.round(nz * 6)))
-    const active = bitmap[glyphRow][glyphCol] === '1'
+    const band = glyphBand(bitmap, glyphRow, glyphCol)
 
-    const baseHeight = module.role === 'finder' ? 2 : 1
-    const topLevel = active
-      ? 7 + Math.floor(random() * 3)
-      : baseHeight + (random() > 0.82 ? 1 : 0)
+    // Functional patterns stay intentionally low so the central character remains
+    // the dominant isometric silhouette. QR polarity is still restored by each cap.
+    let topLevel: number
+    if (module.role !== 'data') {
+      topLevel = module.role === 'finder' ? 2 : 1
+    } else if (band === 'face') {
+      topLevel = 9
+    } else if (band === 'bevel') {
+      topLevel = 4
+    } else {
+      topLevel = (module.row + module.col) % 9 === 0 ? 2 : 1
+    }
 
     for (let level = 1; level <= topLevel; level += 1) {
+      const interiorKind = band === 'face'
+        ? 'primary'
+        : band === 'bevel'
+          ? 'plaster'
+          : 'stone'
+
       pushVoxel(
         voxels,
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : active ? 'primary' : 'stone',
-        (random() * 0.55 + glyphRow * 0.08 + glyphCol * 0.11 + level * 0.025) % 1,
+        level === topLevel ? 'qr-top' : interiorKind,
+        (random() * 0.34 + glyphRow * 0.08 + glyphCol * 0.11 + level * 0.025) % 1,
       )
     }
   }
@@ -95,7 +130,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `GLYPH ${glyph} / SYMBOL PLAQUE / 2-LAYER`,
+    `GLYPH ${glyph} / CRISP LETTERPRESS FACE / BEVELED SHOULDER / LOW QR FIELD`,
     'display-plaque',
   )
 }
