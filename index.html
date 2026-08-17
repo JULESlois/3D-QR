@@ -34,6 +34,19 @@
         outline-offset: 3px;
       }
 
+      .description-disclosure .eyebrow {
+        display: block;
+      }
+
+      .control-copy-heading {
+        display: block;
+        margin: 0;
+        font-size: clamp(34px, 4.4vw, 52px);
+        line-height: .94;
+        letter-spacing: -.05em;
+        font-weight: 590;
+      }
+
       .description-toggle {
         display: grid;
         place-items: center;
@@ -89,6 +102,12 @@
       }
 
       @media (max-width: 760px) {
+        .control-copy-heading {
+          max-width: 100%;
+          font-size: clamp(27px, 9vw, 34px);
+          line-height: .96;
+        }
+
         .description-toggle {
           width: 30px;
           height: 30px;
@@ -99,6 +118,19 @@
           margin-right: 38px;
           font-size: 10px;
           line-height: 1.5;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .control-copy-heading {
+          font-size: clamp(25px, 8.5vw, 30px);
+        }
+      }
+
+      @media (max-height: 600px) and (min-width: 600px) {
+        .control-copy-heading {
+          font-size: 28px;
+          line-height: .95;
         }
       }
 
