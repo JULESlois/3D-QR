@@ -25,6 +25,28 @@ const specimen = requiredElement<HTMLElement>('#style-specimen')
 const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
 const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
+const panelFooter = requiredElement<HTMLElement>('.panel-footer')
+
+const exportGifButton = document.createElement('button')
+exportGifButton.type = 'button'
+exportGifButton.className = 'style-chip'
+exportGifButton.textContent = 'EXPORT GIF'
+exportGifButton.title = 'Export a looping sculpture-to-QR reveal'
+exportGifButton.setAttribute('aria-label', 'Export reveal as GIF')
+exportGifButton.style.minHeight = '38px'
+exportGifButton.style.minWidth = '92px'
+exportGifButton.style.paddingInline = '11px'
+
+const footerActions = document.createElement('div')
+footerActions.style.display = 'flex'
+footerActions.style.alignItems = 'stretch'
+footerActions.style.justifyContent = 'flex-end'
+footerActions.style.gap = '8px'
+footerActions.style.width = '100%'
+footerActions.append(exportGifButton, modeToggle)
+panelFooter.append(footerActions)
+modeToggle.style.flex = '1 1 auto'
+modeToggle.style.width = 'auto'
 
 const scene = new THREE.Scene()
 const camera = new THREE.OrthographicCamera(-6, 6, 6, -6, 0.1, 50)
@@ -89,6 +111,7 @@ let currentView: 'art' | 'qr' = 'art'
 let composedScale = 1
 let composedX = 0
 let composedY = 0
+let isExporting = false
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -106,6 +129,21 @@ type StyleTransition = {
   startedAt: number
   duration: number
   swapped: boolean
+}
+
+type GifEncoderModule = {
+  GIFEncoder: () => {
+    writeFrame: (
+      index: Uint8Array,
+      width: number,
+      height: number,
+      options: { palette: number[][]; delay: number; repeat: number },
+    ) => void
+    finish: () => void
+    bytes: () => Uint8Array
+  }
+  quantize: (rgba: Uint8Array | Uint8ClampedArray, maxColors: number) => number[][]
+  applyPalette: (rgba: Uint8Array | Uint8ClampedArray, palette: number[][]) => Uint8Array
 }
 
 let paletteTransition: PaletteTransition | null = null
@@ -248,6 +286,145 @@ function applyPalette(): void {
   updatePaletteUi()
 }
 
+function setExportUiBusy(busy: boolean): void {
+  isExporting = busy
+  exportGifButton.disabled = busy
+  exportGifButton.setAttribute('aria-busy', String(busy))
+  modeToggle.disabled = busy
+  input.disabled = busy
+  for (const button of styleButtons) button.disabled = busy
+  for (const button of paletteButtons) button.disabled = busy
+  renderer.domElement.style.pointerEvents = busy ? 'none' : ''
+}
+
+function revealRotationProgress(progress: number): number {
+  if (progress < 0.12) return 0
+  if (progress < 0.42) return (progress - 0.12) / 0.3
+  if (progress < 0.62) return 1
+  if (progress < 0.92) return 1 - (progress - 0.62) / 0.3
+  return 0
+}
+
+async function loadGifEncoder(): Promise<GifEncoderModule> {
+  const moduleUrl = 'https://esm.sh/gifenc@1.0.3'
+  return import(/* @vite-ignore */ moduleUrl) as Promise<GifEncoderModule>
+}
+
+async function exportRevealGif(): Promise<void> {
+  if (isExporting || !currentBuild || styleTransition) return
+
+  const exportBuild = currentBuild
+  const exportStyleId = styleId
+  const previousMeta = meta.textContent
+  const savedQuaternion = sculptureRoot.quaternion.clone()
+  const savedPosition = presentationGroup.position.clone()
+  const savedScale = presentationGroup.scale.clone()
+  const savedPresentationQuaternion = presentationGroup.quaternion.clone()
+
+  setExportUiBusy(true)
+  exportGifButton.textContent = 'PREPARING…'
+  renderer.setAnimationLoop(null)
+
+  let exportRenderer: THREE.WebGLRenderer | null = null
+
+  try {
+    const { GIFEncoder, quantize, applyPalette } = await loadGifEncoder()
+    const size = 640
+    const fps = 20
+    const frameCount = 64
+    const frameDelay = Math.round(1000 / fps)
+    const gif = GIFEncoder()
+
+    exportRenderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true,
+    })
+    exportRenderer.setPixelRatio(1)
+    exportRenderer.setSize(size, size, false)
+    exportRenderer.outputColorSpace = THREE.SRGBColorSpace
+    exportRenderer.toneMapping = THREE.ACESFilmicToneMapping
+    exportRenderer.toneMappingExposure = renderer.toneMappingExposure
+
+    const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim()
+    exportRenderer.setClearColor(new THREE.Color(paper || '#f2f0e7'), 1)
+
+    const exportCamera = camera.clone()
+    const viewHeight = 10.6
+    exportCamera.top = viewHeight / 2
+    exportCamera.bottom = -viewHeight / 2
+    exportCamera.left = -viewHeight / 2
+    exportCamera.right = viewHeight / 2
+    exportCamera.updateProjectionMatrix()
+
+    const captureCanvas = document.createElement('canvas')
+    captureCanvas.width = size
+    captureCanvas.height = size
+    const captureContext = captureCanvas.getContext('2d', { willReadFrequently: true })
+    if (!captureContext) throw new Error('Canvas capture is unavailable in this browser')
+
+    const exportScale = Math.min(1.08, 8.35 / exportBuild.footprint)
+    presentationGroup.position.set(0, 0.42, 0)
+    presentationGroup.scale.setScalar(exportScale)
+    presentationGroup.rotation.set(0, 0, 0)
+
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const progress = frame / (frameCount - 1)
+      const revealProgress = smootherstep(revealRotationProgress(progress))
+      sculptureRoot.quaternion.slerpQuaternions(artQuaternion, qrQuaternion, revealProgress)
+
+      exportRenderer.render(scene, exportCamera)
+      captureContext.clearRect(0, 0, size, size)
+      captureContext.drawImage(exportRenderer.domElement, 0, 0, size, size)
+      const pixels = captureContext.getImageData(0, 0, size, size).data
+      const palette = quantize(pixels, 192)
+      const indexed = applyPalette(pixels, palette)
+      gif.writeFrame(indexed, size, size, {
+        palette,
+        delay: frameDelay,
+        repeat: 0,
+      })
+
+      const percent = Math.round(((frame + 1) / frameCount) * 100)
+      exportGifButton.textContent = `GIF ${percent}%`
+      meta.textContent = `ENCODING REVEAL · ${percent}% · ${size}×${size} · ${fps} FPS`
+
+      if (frame % 4 === 3) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      }
+    }
+
+    gif.finish()
+    const output = gif.bytes()
+    const outputCopy = new Uint8Array(output)
+    const blob = new Blob([outputCopy.buffer], { type: 'image/gif' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `3d-qr-${exportStyleId}-reveal.gif`
+    anchor.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+    meta.textContent = `GIF EXPORTED · ${size}×${size} · ${fps} FPS · ${(frameCount / fps).toFixed(1)}S LOOP`
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown export error'
+    meta.textContent = `GIF EXPORT ERROR · ${message}`
+  } finally {
+    sculptureRoot.quaternion.copy(savedQuaternion)
+    presentationGroup.position.copy(savedPosition)
+    presentationGroup.scale.copy(savedScale)
+    presentationGroup.quaternion.copy(savedPresentationQuaternion)
+    exportRenderer?.dispose()
+    exportGifButton.textContent = 'EXPORT GIF'
+    setExportUiBusy(false)
+    renderer.setAnimationLoop(animate)
+
+    if (!meta.textContent?.startsWith('GIF ')) {
+      meta.textContent = previousMeta
+    }
+  }
+}
+
 function applyPresentationTransform(lift = 0, scaleFactor = 1, flipY = 0): void {
   presentationGroup.position.set(composedX, composedY + lift, 0)
   presentationGroup.scale.setScalar(composedScale * scaleFactor)
@@ -364,6 +541,7 @@ function setMode(next: 'art' | 'qr'): void {
 }
 
 function toggleMode(): void {
+  if (isExporting) return
   setMode(currentView === 'art' ? 'qr' : 'art')
 }
 
@@ -395,6 +573,8 @@ function startStyleTransition(nextStyleId: StyleId): void {
 }
 
 function requestStyleTransition(nextStyleId: StyleId): void {
+  if (isExporting) return
+
   if (reducedMotion) {
     queuedStyleId = null
     styleTransition = null
@@ -424,7 +604,7 @@ function requestStyleTransition(nextStyleId: StyleId): void {
 }
 
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
-  if (nextPaletteKey === paletteKey || styleTransition) return
+  if (isExporting || nextPaletteKey === paletteKey || styleTransition) return
 
   const from = captureCurrentColors()
   paletteKey = nextPaletteKey
@@ -452,6 +632,9 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
 }
 
 modeToggle.addEventListener('click', toggleMode)
+exportGifButton.addEventListener('click', () => {
+  void exportRevealGif()
+})
 renderer.domElement.addEventListener('click', toggleMode)
 
 styleButtons.forEach((button) => {
@@ -471,6 +654,7 @@ paletteButtons.forEach((button) => {
 })
 
 input.addEventListener('input', () => {
+  if (isExporting) return
   window.clearTimeout(rebuildTimer)
   meta.textContent = 'REBUILDING VOXEL FIELD…'
   rebuildTimer = window.setTimeout(() => rebuild(input.value), 180)
