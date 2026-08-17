@@ -86,12 +86,16 @@ let rebuildTimer = 0
 let rotationProgress = 0
 let targetRotationProgress = 0
 let currentView: 'art' | 'qr' = 'art'
+let composedScale = 1
+let composedX = 0
+let composedY = 0
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 type PaletteTransition = {
   from: Float32Array
   to: Float32Array
+  delays: Float32Array
   startedAt: number
   duration: number
 }
@@ -106,6 +110,7 @@ type StyleTransition = {
 
 let paletteTransition: PaletteTransition | null = null
 let styleTransition: StyleTransition | null = null
+let queuedStyleId: StyleId | null = null
 
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1)
@@ -167,11 +172,10 @@ function swatchBackground(colors: readonly string[]): string {
   return `linear-gradient(135deg, ${colors.join(', ')})`
 }
 
-function buildPaletteBuffer(): Float32Array | null {
-  if (!currentBuild) return null
-  const buffer = new Float32Array(currentBuild.voxels.length * 3)
-  for (let i = 0; i < currentBuild.voxels.length; i += 1) {
-    colorForVoxel(currentBuild.voxels[i], tempColor)
+function computePaletteColors(build: SculptureBuild): Float32Array {
+  const buffer = new Float32Array(build.voxels.length * 3)
+  for (let i = 0; i < build.voxels.length; i += 1) {
+    colorForVoxel(build.voxels[i], tempColor)
     const offset = i * 3
     buffer[offset] = tempColor.r
     buffer[offset + 1] = tempColor.g
@@ -180,12 +184,7 @@ function buildPaletteBuffer(): Float32Array | null {
   return buffer
 }
 
-function capturePaletteBuffer(): Float32Array | null {
-  if (!voxelMesh?.instanceColor) return null
-  return new Float32Array(voxelMesh.instanceColor.array as ArrayLike<number>)
-}
-
-function applyPaletteBuffer(buffer: Float32Array): void {
+function applyColorBuffer(buffer: Float32Array): void {
   if (!voxelMesh || !currentBuild) return
   for (let i = 0; i < currentBuild.voxels.length; i += 1) {
     const offset = i * 3
@@ -195,7 +194,34 @@ function applyPaletteBuffer(buffer: Float32Array): void {
   if (voxelMesh.instanceColor) voxelMesh.instanceColor.needsUpdate = true
 }
 
-function updatePaletteChrome(): void {
+function captureCurrentColors(): Float32Array | null {
+  const attribute = voxelMesh?.instanceColor
+  if (!attribute) return null
+  return Float32Array.from(attribute.array as ArrayLike<number>)
+}
+
+function createPaletteDelays(build: SculptureBuild): Float32Array {
+  const delays = new Float32Array(build.voxels.length)
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+
+  for (const voxel of build.voxels) {
+    const coordinate = voxel.x + voxel.z * 0.72 + (voxel.y - build.pivotY) * 0.24
+    min = Math.min(min, coordinate)
+    max = Math.max(max, coordinate)
+  }
+
+  const span = Math.max(0.0001, max - min)
+  for (let i = 0; i < build.voxels.length; i += 1) {
+    const voxel = build.voxels[i]
+    const coordinate = voxel.x + voxel.z * 0.72 + (voxel.y - build.pivotY) * 0.24
+    delays[i] = clamp01((coordinate - min) / span)
+  }
+
+  return delays
+}
+
+function updatePaletteUi(): void {
   const style = getStyle(styleId)
   const palette = getPalette(styleId, paletteKey)
   const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
@@ -214,30 +240,18 @@ function updatePaletteChrome(): void {
   })
 }
 
-function applyPalette(animateColors = false): void {
-  const target = buildPaletteBuffer()
-  updatePaletteChrome()
-
-  if (!target) return
-  if (!animateColors || reducedMotion || !voxelMesh) {
-    paletteTransition = null
-    applyPaletteBuffer(target)
-    return
+function applyPalette(): void {
+  paletteTransition = null
+  if (voxelMesh && currentBuild) {
+    applyColorBuffer(computePaletteColors(currentBuild))
   }
+  updatePaletteUi()
+}
 
-  const from = capturePaletteBuffer()
-  if (!from || from.length !== target.length) {
-    paletteTransition = null
-    applyPaletteBuffer(target)
-    return
-  }
-
-  paletteTransition = {
-    from,
-    to: target,
-    startedAt: performance.now(),
-    duration: 380,
-  }
+function applyPresentationTransform(lift = 0, scaleFactor = 1, flipY = 0): void {
+  presentationGroup.position.set(composedX, composedY + lift, 0)
+  presentationGroup.scale.setScalar(composedScale * scaleFactor)
+  presentationGroup.rotation.set(0, flipY, 0)
 }
 
 function updateComposition(): void {
@@ -259,12 +273,15 @@ function updateComposition(): void {
       : aspect < 1
         ? 7.35
         : 8.25
-    const scale = Math.min(1.08, targetFootprint / currentBuild.footprint)
-    sculptureRoot.scale.setScalar(scale)
+    composedScale = Math.min(1.08, targetFootprint / currentBuild.footprint)
+  } else {
+    composedScale = 1
   }
 
-  sculptureRoot.position.x = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
-  sculptureRoot.position.y = aspect > 1.15 ? 0.42 : 1.05
+  composedX = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
+  composedY = aspect > 1.15 ? 0.42 : 1.05
+
+  if (!styleTransition) applyPresentationTransform()
 }
 
 function disposeVoxelMesh(): void {
@@ -350,13 +367,14 @@ function toggleMode(): void {
   setMode(currentView === 'art' ? 'qr' : 'art')
 }
 
-function resetPresentationTransform(): void {
-  presentationGroup.position.set(0, 0, 0)
-  presentationGroup.scale.setScalar(1)
-  presentationGroup.rotation.set(0, 0, 0)
+function switchStyleImmediately(nextStyleId: StyleId): void {
+  styleId = nextStyleId
+  paletteKey = getStyle(styleId).defaultPalette
+  updateStyleCopy()
+  rebuild(input.value)
 }
 
-function swapStyleTransition(): void {
+function swapStyleAtMidpoint(): void {
   if (!styleTransition || styleTransition.swapped) return
   styleTransition.swapped = true
   styleId = styleTransition.nextStyleId
@@ -365,23 +383,8 @@ function swapStyleTransition(): void {
   rebuild(input.value)
 }
 
-function requestStyleTransition(nextStyleId: StyleId): void {
-  if (nextStyleId === styleId && !styleTransition) return
-
-  if (styleTransition) {
-    swapStyleTransition()
-    styleTransition = null
-    resetPresentationTransform()
-  }
-
-  if (reducedMotion) {
-    styleId = nextStyleId
-    paletteKey = getStyle(styleId).defaultPalette
-    updateStyleCopy()
-    rebuild(input.value)
-    return
-  }
-
+function startStyleTransition(nextStyleId: StyleId): void {
+  paletteTransition = null
   styleTransition = {
     nextStyleId,
     nextPaletteKey: getStyle(nextStyleId).defaultPalette,
@@ -391,17 +394,61 @@ function requestStyleTransition(nextStyleId: StyleId): void {
   }
 }
 
-function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
-  if (nextPaletteKey === paletteKey) return
-
-  if (styleTransition) {
-    swapStyleTransition()
+function requestStyleTransition(nextStyleId: StyleId): void {
+  if (reducedMotion) {
+    queuedStyleId = null
     styleTransition = null
-    resetPresentationTransform()
+    switchStyleImmediately(nextStyleId)
+    return
   }
 
+  if (styleTransition) {
+    if (!styleTransition.swapped) {
+      if (nextStyleId === styleId) {
+        styleTransition = null
+        applyPresentationTransform()
+        return
+      }
+      styleTransition.nextStyleId = nextStyleId
+      styleTransition.nextPaletteKey = getStyle(nextStyleId).defaultPalette
+      return
+    }
+
+    if (nextStyleId !== styleId) queuedStyleId = nextStyleId
+    return
+  }
+
+  if (nextStyleId === styleId) return
+  queuedStyleId = null
+  startStyleTransition(nextStyleId)
+}
+
+function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
+  if (nextPaletteKey === paletteKey || styleTransition) return
+
+  const from = captureCurrentColors()
   paletteKey = nextPaletteKey
-  applyPalette(true)
+  updatePaletteUi()
+
+  if (!currentBuild || !voxelMesh || reducedMotion) {
+    applyPalette()
+    return
+  }
+
+  const to = computePaletteColors(currentBuild)
+  if (!from || from.length !== to.length) {
+    applyColorBuffer(to)
+    paletteTransition = null
+    return
+  }
+
+  paletteTransition = {
+    from,
+    to,
+    delays: createPaletteDelays(currentBuild),
+    startedAt: performance.now(),
+    duration: 520,
+  }
 }
 
 modeToggle.addEventListener('click', toggleMode)
@@ -460,30 +507,58 @@ function animate(): void {
   }
 
   if (paletteTransition && voxelMesh?.instanceColor) {
-    const t = clamp01((now - paletteTransition.startedAt) / paletteTransition.duration)
-    const easedPalette = smootherstep(t)
+    const rawProgress = clamp01((now - paletteTransition.startedAt) / paletteTransition.duration)
     const colors = voxelMesh.instanceColor.array as Float32Array
-    for (let i = 0; i < colors.length; i += 1) {
-      colors[i] = THREE.MathUtils.lerp(paletteTransition.from[i], paletteTransition.to[i], easedPalette)
+    const delaySpan = 0.34
+    const activeSpan = 1 - delaySpan
+
+    for (let i = 0; i < paletteTransition.delays.length; i += 1) {
+      const localProgress = clamp01(
+        (rawProgress - paletteTransition.delays[i] * delaySpan) / activeSpan,
+      )
+      const eased = smootherstep(localProgress)
+      const offset = i * 3
+      colors[offset] = THREE.MathUtils.lerp(paletteTransition.from[offset], paletteTransition.to[offset], eased)
+      colors[offset + 1] = THREE.MathUtils.lerp(paletteTransition.from[offset + 1], paletteTransition.to[offset + 1], eased)
+      colors[offset + 2] = THREE.MathUtils.lerp(paletteTransition.from[offset + 2], paletteTransition.to[offset + 2], eased)
     }
+
     voxelMesh.instanceColor.needsUpdate = true
-    if (t >= 1) paletteTransition = null
+    if (rawProgress >= 1) paletteTransition = null
   }
+
+  let sceneLift = 0
+  let sceneScale = 1
+  let sceneFlipY = 0
 
   if (styleTransition) {
-    const t = clamp01((now - styleTransition.startedAt) / styleTransition.duration)
-    if (!styleTransition.swapped && t >= 0.5) swapStyleTransition()
+    const progress = clamp01((now - styleTransition.startedAt) / styleTransition.duration)
 
-    const envelope = Math.sin(Math.PI * t)
-    presentationGroup.position.y = envelope * 0.66
-    presentationGroup.scale.setScalar(1 - envelope * 0.09)
-    presentationGroup.rotation.z = Math.sin(Math.PI * 2 * t) * 0.065
+    if (!styleTransition.swapped && progress >= 0.5) {
+      swapStyleAtMidpoint()
+    }
 
-    if (t >= 1) {
+    if (progress < 0.5) {
+      const phase = smootherstep(progress * 2)
+      sceneFlipY = phase * Math.PI * 0.5
+      sceneScale = 1 - phase * 0.08
+      sceneLift = phase * 0.22
+    } else {
+      const phase = smootherstep((progress - 0.5) * 2)
+      sceneFlipY = -(1 - phase) * Math.PI * 0.5
+      sceneScale = 0.92 + phase * 0.08
+      sceneLift = (1 - phase) * 0.22
+    }
+
+    if (progress >= 1) {
       styleTransition = null
-      resetPresentationTransform()
+      const queued = queuedStyleId
+      queuedStyleId = null
+      if (queued && queued !== styleId) startStyleTransition(queued)
     }
   }
+
+  applyPresentationTransform(sceneLift, sceneScale, sceneFlipY)
 
   const eased = smootherstep(rotationProgress)
   sculptureRoot.quaternion.slerpQuaternions(artQuaternion, qrQuaternion, eased)
