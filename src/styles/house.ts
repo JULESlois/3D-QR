@@ -255,6 +255,11 @@ function buildRoofEaves(
 ): void {
   for (const row of [center - halfDepth - 1, center + halfDepth + 1]) {
     for (let col = center - halfWidth - 1; col <= center + halfWidth + 1; col += 1) {
+      // The front gable starts on the same row as the front eave. Leaving its
+      // seven-cell span to the gable avoids two independent builders occupying
+      // the exact same voxel levels while preserving the continuous side eaves.
+      if (row > center && Math.abs(col - center) <= 3) continue
+
       const cell = getCell(matrix, row, col)
       if (!cell || cell.zone !== 'data') continue
       pushProjectedColumn(voxels, cell, matrix.size, wallHeight + 1, wallHeight + 2, 'wood', random)
