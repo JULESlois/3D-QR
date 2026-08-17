@@ -35,7 +35,7 @@
       }
 
       .description-disclosure .eyebrow {
-        display: block;
+        display: none;
       }
 
       .control-copy-heading {
@@ -101,6 +101,23 @@
         line-height: 1.55;
       }
 
+      .control-panel .panel-footer {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .panel-footer .sr-status {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        border: 0;
+        white-space: nowrap;
+      }
+
       @media (max-width: 760px) {
         .control-copy-heading {
           max-width: 100%;
@@ -144,9 +161,7 @@
   </head>
   <body data-mode="art" data-style="tree">
     <main class="app-shell">
-      <section class="stage" id="stage" aria-label="Interactive voxel QR sculpture">
-        <div class="stage-grain" aria-hidden="true"></div>
-      </section>
+      <section class="stage" id="stage" aria-label="Interactive voxel QR sculpture"></section>
 
       <header class="masthead">
         <a class="brand" href="#" aria-label="3D QR home">
@@ -155,10 +170,7 @@
         </a>
         <div class="header-actions">
           <a class="source-link" href="https://github.com/JULESlois/3D-QR" target="_blank" rel="noreferrer">SOURCE ↗</a>
-          <div class="mode-readout">
-            <span class="mode-dot" aria-hidden="true"></span>
-            <span id="mode-readout">TREE / ISOMETRIC</span>
-          </div>
+          <span id="mode-readout" hidden></span>
         </div>
       </header>
 
@@ -183,7 +195,7 @@
         </div>
 
         <label class="url-field" for="qr-input">
-          <span>SEED / URL OR TEXT</span>
+          <span>URL OR TEXT</span>
           <input
             id="qr-input"
             type="text"
@@ -196,7 +208,7 @@
         </label>
 
         <div class="style-control">
-          <span class="palette-label">FORM / GENERATOR</span>
+          <span class="palette-label">SCENE</span>
           <div class="style-row" aria-label="Sculpture style">
             <button class="style-chip is-active" type="button" data-style="tree">TREE</button>
             <button class="style-chip" type="button" data-style="forest">FOREST</button>
@@ -214,7 +226,7 @@
         </div>
 
         <div class="palette-control">
-          <span class="palette-label">SURFACE / PALETTE</span>
+          <span class="palette-label">PALETTE</span>
           <div class="palette-row" aria-label="Sculpture palette">
             <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
             <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
@@ -224,7 +236,7 @@
         </div>
 
         <div class="panel-footer">
-          <p id="qr-meta">BUILDING VOXEL FIELD…</p>
+          <p id="qr-meta" class="sr-status" role="status" aria-live="polite"></p>
           <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
             <span id="mode-toggle-label">VIEW QR</span>
             <span class="toggle-glyph" aria-hidden="true">↗</span>
@@ -232,11 +244,8 @@
         </div>
       </section>
 
-      <aside class="specimen-meta" aria-hidden="true">
-        <span id="style-specimen">TREE + GROUND = QR</span>
-        <span>STYLE MODULE / SINGLE VOXEL FIELD</span>
-      </aside>
-      <p class="stage-hint" id="stage-hint">CLICK TO ROTATE · ONE SCULPTURE / TWO VIEWS</p>
+      <span id="style-specimen" hidden></span>
+      <span id="stage-hint" hidden></span>
     </main>
 
     <script type="module" src="/src/main.ts"></script>
