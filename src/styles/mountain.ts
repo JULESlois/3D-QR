@@ -129,14 +129,28 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
     ) / Math.max(3.2, matrix.size * 0.31),
   )
 
+  // Windward snow builds a narrow cornice immediately above the summit ridge,
+  // while the opposite side is cut back into a steep exposed rock face. The
+  // stepped height contrast reads as a sharp alpine crest from the art camera
+  // without introducing any non-QR geometry or unsupported overhangs.
+  const crestSide = clamp01(
+    0.5 + (mainPeakRow - cell.row) / Math.max(1.4, matrix.size * 0.08),
+  )
+  const cornice = summitRidge * crestSide
+  const cliffSide = clamp01(
+    0.42 + (cell.col - mainPeakCol) / Math.max(1.6, matrix.size * 0.1),
+  )
+  const cliffFace = mainPeak * cliffSide * (0.55 + summitRidge * 0.45)
+
   const relief = (
     mainPeak * 10.8
     + secondaryPeak * 7.3
     + summitRidge * 3.2
     + shoulder * 2.0
     + leeSlope * 1.9
+    + cornice * 2.35
     + jagged
-  ) * edgeFeather - valley * 4.2
+  ) * edgeFeather - valley * 4.2 - cliffFace * 2.65
 
   let height = Math.max(1, Math.min(14, 1 + Math.round(relief)))
 
@@ -148,10 +162,29 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
   return height
 }
 
-function terrainKind(cell: QRCell, height: number): VoxelKind {
+function terrainKind(
+  cell: QRCell,
+  height: number,
+  matrix: QRMatrixData,
+  seedText: string,
+): VoxelKind {
   if (!cell.dark && cell.zone === 'data' && height <= 1) return 'water'
-  if (height >= 10) return 'plaster'
-  if (height >= 7) return 'stone'
+
+  const center = (matrix.size - 1) / 2
+  const phase = cell.col / Math.max(1, matrix.size - 1)
+  const noise = seededCellNoise(cell, `${seedText}::material`)
+
+  // Keep snow concentrated on the upper windward face instead of painting every
+  // high voxel white. A wavering snowline plus exposed vertical scars produces
+  // three readable material bands: wooded foothill, rock wall and snow cap.
+  const snowLine = 8.35
+    + Math.sin(phase * Math.PI * 2.1 + 0.45) * 0.8
+    + (cell.row - center) / Math.max(10, matrix.size) * 1.25
+  const windward = cell.col <= center + matrix.size * 0.2
+  if (height >= snowLine && (windward || noise > 0.36)) return 'plaster'
+
+  const rockScar = Math.sin(cell.row * 0.72 + cell.col * 0.31) * 0.5 + 0.5
+  if (height >= 6 && (rockScar > 0.34 || !windward)) return 'stone'
   return 'primary'
 }
 
@@ -177,7 +210,7 @@ export function generateMountain(matrix: QRMatrixData, seedText: string): Sculpt
       matrix.size,
       1,
       height,
-      terrainKind(cell, height),
+      terrainKind(cell, height, matrix, seedText),
       random,
     )
     lifted.add(cellKey(cell.row, cell.col))
@@ -189,7 +222,7 @@ export function generateMountain(matrix: QRMatrixData, seedText: string): Sculpt
     'mountain',
     'Mountain',
     lifted,
-    'TWIN ALPINE SUMMITS / CONNECTING RIDGE / CUT VALLEY',
+    'TWIN ALPINE SUMMITS / WIND-CUT CORNICE / ROCK FACE / CUT VALLEY',
     'full-pad',
   )
 }
