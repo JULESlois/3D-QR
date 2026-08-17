@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import './styles.css'
 import { CELL_SIZE, type SculptureBuild, type SculptureVoxel } from './sculpture'
-import { PALETTES, isPaletteKey, type PaletteKey } from './palettes'
+import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { createQRMatrix } from './qr'
 import { getStyle, isStyleId, type StyleId } from './styles'
 
@@ -22,6 +22,7 @@ const eyebrow = requiredElement<HTMLElement>('#style-eyebrow')
 const headline = requiredElement<HTMLElement>('#style-headline')
 const lede = requiredElement<HTMLElement>('#style-lede')
 const specimen = requiredElement<HTMLElement>('#style-specimen')
+const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
 const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
 
@@ -67,10 +68,10 @@ const voxelMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.015,
 })
 
-const woodColors = ['#563b2d', '#6d4b34', '#815b3a'].map((value) => new THREE.Color(value))
-const stoneColors = ['#6f746d', '#85897e', '#a09d8d', '#5d655f'].map((value) => new THREE.Color(value))
-const plasterColors = ['#d8cbb4', '#e7dbc5', '#c9b99e', '#eee6d8'].map((value) => new THREE.Color(value))
-const glassColors = ['#5e8790', '#83a7aa', '#496f78'].map((value) => new THREE.Color(value))
+const fallbackWood = ['#563b2d', '#6d4b34', '#815b3a'] as const
+const fallbackStone = ['#6f746d', '#85897e', '#a09d8d', '#5d655f'] as const
+const fallbackPlaster = ['#d8cbb4', '#e7dbc5', '#c9b99e', '#eee6d8'] as const
+const fallbackGlass = ['#5e8790', '#83a7aa', '#496f78'] as const
 const tempColor = new THREE.Color()
 const dummy = new THREE.Object3D()
 
@@ -94,53 +95,55 @@ function smootherstep(value: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10)
 }
 
-function indexedColor(colors: readonly THREE.Color[], phase: number, target: THREE.Color): THREE.Color {
-  const index = Math.min(colors.length - 1, Math.floor(clamp01(phase) * colors.length))
-  return target.copy(colors[index])
-}
-
 function indexedHexColor(colors: readonly string[], phase: number, target: THREE.Color): THREE.Color {
   const index = Math.min(colors.length - 1, Math.floor(clamp01(phase) * colors.length))
   return target.set(colors[index])
 }
 
 function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color {
-  const palette = PALETTES[paletteKey]
+  const palette = getPalette(styleId, paletteKey)
   const appearance = getStyle(styleId).appearance
+  const baseLight = palette.baseLight ?? appearance.baseLight
 
   switch (voxel.kind) {
     case 'floor-light':
-      return target.set(appearance.baseLight)
+      return target.set(baseLight)
     case 'floor-dark':
-      return indexedHexColor(appearance.baseDark, voxel.colorPhase, target)
+      return indexedHexColor(palette.baseDark ?? appearance.baseDark, voxel.colorPhase, target)
     case 'light-top':
-      return target.set(appearance.lightTop ?? appearance.baseLight)
-    case 'water':
-      return appearance.water
-        ? indexedHexColor(appearance.water, voxel.colorPhase, target)
-        : target.set(appearance.baseLight)
-    case 'crystal':
-      return appearance.crystal
-        ? indexedHexColor(appearance.crystal, voxel.colorPhase, target)
-        : indexedColor(glassColors, voxel.colorPhase, target)
-    case 'foundation':
-      return indexedHexColor(appearance.foundation, voxel.colorPhase, target)
-    case 'wood':
-      return indexedColor(woodColors, voxel.colorPhase, target)
-    case 'stone':
-      return indexedColor(stoneColors, voxel.colorPhase, target)
-    case 'plaster':
-      return indexedColor(plasterColors, voxel.colorPhase, target)
-    case 'glass':
-      return indexedColor(glassColors, voxel.colorPhase, target)
-    case 'qr-top':
-      return target.set(appearance.qrTop === 'palette' ? palette.qrDark : appearance.qrTop)
-    case 'primary':
-    default: {
-      const index = Math.min(palette.colors.length - 1, Math.floor(clamp01(voxel.colorPhase) * palette.colors.length))
-      return target.set(palette.colors[index])
+      return target.set(palette.lightTop ?? appearance.lightTop ?? baseLight)
+    case 'water': {
+      const colors = palette.water ?? appearance.water
+      return colors
+        ? indexedHexColor(colors, voxel.colorPhase, target)
+        : target.set(baseLight)
     }
+    case 'crystal':
+      return indexedHexColor(
+        palette.crystal ?? appearance.crystal ?? palette.glass ?? fallbackGlass,
+        voxel.colorPhase,
+        target,
+      )
+    case 'foundation':
+      return indexedHexColor(palette.foundation ?? appearance.foundation, voxel.colorPhase, target)
+    case 'wood':
+      return indexedHexColor(palette.wood ?? fallbackWood, voxel.colorPhase, target)
+    case 'stone':
+      return indexedHexColor(palette.stone ?? fallbackStone, voxel.colorPhase, target)
+    case 'plaster':
+      return indexedHexColor(palette.plaster ?? fallbackPlaster, voxel.colorPhase, target)
+    case 'glass':
+      return indexedHexColor(palette.glass ?? fallbackGlass, voxel.colorPhase, target)
+    case 'qr-top':
+      return target.set(palette.qrDark)
+    case 'primary':
+    default:
+      return indexedHexColor(palette.colors, voxel.colorPhase, target)
   }
+}
+
+function swatchBackground(colors: readonly string[]): string {
+  return `linear-gradient(135deg, ${colors.join(', ')})`
 }
 
 function applyPalette(): void {
@@ -152,11 +155,21 @@ function applyPalette(): void {
     if (voxelMesh.instanceColor) voxelMesh.instanceColor.needsUpdate = true
   }
 
-  const palette = PALETTES[paletteKey]
+  const style = getStyle(styleId)
+  const palette = getPalette(styleId, paletteKey)
   const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
   document.documentElement.style.setProperty('--accent', accent)
+  paletteLabel.textContent = `SURFACE / ${palette.label.toUpperCase()}`
+
   paletteButtons.forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.palette === paletteKey)
+    const requested = button.dataset.palette
+    if (!requested || !isPaletteKey(requested)) return
+
+    const option = getPalette(styleId, requested)
+    button.classList.toggle('is-active', requested === paletteKey)
+    button.style.background = swatchBackground(option.swatch)
+    button.setAttribute('aria-label', `${style.label} palette: ${option.label}`)
+    button.title = option.label
   })
 }
 
