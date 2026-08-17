@@ -27,11 +27,12 @@ const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[d
 const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
 const panelFooter = requiredElement<HTMLElement>('.panel-footer')
 
+const exportGifTitle = 'Export a looping sculpture-to-QR reveal'
 const exportGifButton = document.createElement('button')
 exportGifButton.type = 'button'
 exportGifButton.className = 'style-chip'
 exportGifButton.textContent = 'EXPORT GIF'
-exportGifButton.title = 'Export a looping sculpture-to-QR reveal'
+exportGifButton.title = exportGifTitle
 exportGifButton.setAttribute('aria-label', 'Export reveal as GIF')
 exportGifButton.style.minHeight = '38px'
 exportGifButton.style.minWidth = '92px'
@@ -105,6 +106,7 @@ let paletteKey: PaletteKey = getStyle(styleId).defaultPalette
 let voxelMesh: THREE.InstancedMesh | null = null
 let currentBuild: SculptureBuild | null = null
 let rebuildTimer = 0
+let exportFeedbackTimer = 0
 let rotationProgress = 0
 let targetRotationProgress = 0
 let currentView: 'art' | 'qr' = 'art'
@@ -129,21 +131,6 @@ type StyleTransition = {
   startedAt: number
   duration: number
   swapped: boolean
-}
-
-type GifEncoderModule = {
-  GIFEncoder: () => {
-    writeFrame: (
-      index: Uint8Array,
-      width: number,
-      height: number,
-      options: { palette: number[][]; delay: number; repeat: number },
-    ) => void
-    finish: () => void
-    bytes: () => Uint8Array
-  }
-  quantize: (rgba: Uint8Array | Uint8ClampedArray, maxColors: number) => number[][]
-  applyPalette: (rgba: Uint8Array | Uint8ClampedArray, palette: number[][]) => Uint8Array
 }
 
 let paletteTransition: PaletteTransition | null = null
@@ -297,6 +284,16 @@ function setExportUiBusy(busy: boolean): void {
   renderer.domElement.style.pointerEvents = busy ? 'none' : ''
 }
 
+function showExportFeedback(label: string, title: string): void {
+  window.clearTimeout(exportFeedbackTimer)
+  exportGifButton.textContent = label
+  exportGifButton.title = title
+  exportFeedbackTimer = window.setTimeout(() => {
+    exportGifButton.textContent = 'EXPORT GIF'
+    exportGifButton.title = exportGifTitle
+  }, 2200)
+}
+
 function revealRotationProgress(progress: number): number {
   if (progress < 0.12) return 0
   if (progress < 0.42) return (progress - 0.12) / 0.3
@@ -305,13 +302,22 @@ function revealRotationProgress(progress: number): number {
   return 0
 }
 
-async function loadGifEncoder(): Promise<GifEncoderModule> {
-  const moduleUrl = 'https://esm.sh/gifenc@1.0.3'
-  return import(/* @vite-ignore */ moduleUrl) as Promise<GifEncoderModule>
+async function loadGifEncoder() {
+  return import('gifenc')
 }
 
 async function exportRevealGif(): Promise<void> {
-  if (isExporting || !currentBuild || styleTransition) return
+  if (isExporting) return
+
+  if (styleTransition) {
+    const exportTarget = queuedStyleId ?? styleTransition.nextStyleId
+    styleTransition = null
+    queuedStyleId = null
+    switchStyleImmediately(exportTarget)
+    applyPresentationTransform()
+  }
+
+  if (!currentBuild) return
 
   const exportBuild = currentBuild
   const exportStyleId = styleId
@@ -321,17 +327,21 @@ async function exportRevealGif(): Promise<void> {
   const savedScale = presentationGroup.scale.clone()
   const savedPresentationQuaternion = presentationGroup.quaternion.clone()
 
+  window.clearTimeout(exportFeedbackTimer)
+  exportFeedbackTimer = 0
   setExportUiBusy(true)
   exportGifButton.textContent = 'PREPARING…'
+  exportGifButton.title = 'Preparing GIF export'
   renderer.setAnimationLoop(null)
 
   let exportRenderer: THREE.WebGLRenderer | null = null
+  let feedback: { label: string; title: string } | null = null
 
   try {
     const { GIFEncoder, quantize, applyPalette } = await loadGifEncoder()
-    const size = 640
-    const fps = 20
-    const frameCount = 64
+    const size = 512
+    const fps = 18
+    const frameCount = 54
     const frameDelay = Math.round(1000 / fps)
     const gif = GIFEncoder()
 
@@ -389,7 +399,7 @@ async function exportRevealGif(): Promise<void> {
       exportGifButton.textContent = `GIF ${percent}%`
       meta.textContent = `ENCODING REVEAL · ${percent}% · ${size}×${size} · ${fps} FPS`
 
-      if (frame % 4 === 3) {
+      if (frame % 2 === 1) {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       }
     }
@@ -402,22 +412,33 @@ async function exportRevealGif(): Promise<void> {
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = `3d-qr-${exportStyleId}-reveal.gif`
+    anchor.style.display = 'none'
+    document.body.appendChild(anchor)
     anchor.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500)
 
     meta.textContent = `GIF EXPORTED · ${size}×${size} · ${fps} FPS · ${(frameCount / fps).toFixed(1)}S LOOP`
+    feedback = { label: 'EXPORTED ✓', title: 'GIF saved' }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown export error'
     meta.textContent = `GIF EXPORT ERROR · ${message}`
+    feedback = { label: 'EXPORT FAILED', title: message }
   } finally {
     sculptureRoot.quaternion.copy(savedQuaternion)
     presentationGroup.position.copy(savedPosition)
     presentationGroup.scale.copy(savedScale)
     presentationGroup.quaternion.copy(savedPresentationQuaternion)
     exportRenderer?.dispose()
-    exportGifButton.textContent = 'EXPORT GIF'
     setExportUiBusy(false)
     renderer.setAnimationLoop(animate)
+
+    if (feedback) {
+      showExportFeedback(feedback.label, feedback.title)
+    } else {
+      exportGifButton.textContent = 'EXPORT GIF'
+      exportGifButton.title = exportGifTitle
+    }
 
     if (!meta.textContent?.startsWith('GIF ')) {
       meta.textContent = previousMeta
