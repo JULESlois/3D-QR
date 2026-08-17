@@ -1,7 +1,6 @@
 import type { QRMatrixData } from '../qr'
 import {
   cellKey,
-  createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
   pushVoxel,
@@ -56,8 +55,6 @@ type GlyphBand = 'face' | 'bevel' | 'field'
 function glyphBand(bitmap: readonly string[], row: number, col: number): GlyphBand {
   if (bitmap[row][col] === '1') return 'face'
 
-  // One bitmap-cell shoulder gives the embossed character a readable bevel instead
-  // of letting tall strokes rise directly out of unrelated QR texture.
   for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
     for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
       if (rowOffset === 0 && colOffset === 0) continue
@@ -75,11 +72,10 @@ function glyphBand(bitmap: readonly string[], row: number, col: number): GlyphBa
 export function generateGlyph(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'glyph')
   const { random, center } = context
-  const voxels = createBaseVoxels(context, {
-    mode: 'symbol-pad',
-    thickness: 2,
-    foundationKind: 'foundation',
-  })
+  // No plaque or light floor: the QR-dark columns are the entire physical object.
+  // Light modules and the quiet zone remain literal empty space, so the page/background
+  // supplies scanner-light contrast while the sculpture reads as a floating monolith.
+  const voxels = []
   const glyph = glyphFromSeed(seedText)
   const bitmap = FONT_5X7[glyph] ?? FONT_5X7.Q
   const lifted = new Set<string>()
@@ -93,17 +89,17 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     const glyphRow = Math.max(0, Math.min(6, Math.round(nz * 6)))
     const band = glyphBand(bitmap, glyphRow, glyphCol)
 
-    // Functional patterns stay intentionally low so the central character remains
-    // the dominant isometric silhouette. QR polarity is still restored by each cap.
+    // A high face, medium shoulder and deliberately shallow residual QR field makes
+    // the character dominate the isometric silhouette without adding non-QR support.
     let topLevel: number
     if (module.role !== 'data') {
       topLevel = module.role === 'finder' ? 2 : 1
     } else if (band === 'face') {
-      topLevel = 9
+      topLevel = 10
     } else if (band === 'bevel') {
-      topLevel = 4
+      topLevel = 5
     } else {
-      topLevel = (module.row + module.col) % 9 === 0 ? 2 : 1
+      topLevel = (module.row * 3 + module.col * 5) % 17 === 0 ? 2 : 1
     }
 
     for (let level = 1; level <= topLevel; level += 1) {
@@ -119,7 +115,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
         matrix.size,
         level,
         level === topLevel ? 'qr-top' : interiorKind,
-        (random() * 0.34 + glyphRow * 0.08 + glyphCol * 0.11 + level * 0.025) % 1,
+        (random() * 0.28 + glyphRow * 0.085 + glyphCol * 0.12 + level * 0.024) % 1,
       )
     }
   }
@@ -130,7 +126,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `GLYPH ${glyph} / CRISP LETTERPRESS FACE / BEVELED SHOULDER / LOW QR FIELD`,
+    `GLYPH ${glyph} / FREE-STANDING QR BODY / TALL LETTER FACE / EMPTY LIGHT FIELD`,
     'display-plaque',
   )
 }
