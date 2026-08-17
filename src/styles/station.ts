@@ -58,6 +58,7 @@ function bodyKind(role: StationRole, level: number, topLevel: number): VoxelKind
     case 'post':
       return 'stone'
     case 'concourse':
+      if (level >= topLevel - 2) return 'wood'
       return level % 3 === 0 ? 'glass' : 'plaster'
     case 'clock':
       return level >= topLevel - 2 ? 'primary' : level % 4 === 0 ? 'glass' : 'stone'
@@ -114,6 +115,60 @@ function buildWaitingTrain(
   }
 }
 
+function buildGrandTerminal(
+  matrix: QRMatrixData,
+  columns: Map<string, StationColumn>,
+  center: number,
+  halfSpan: number,
+): number {
+  // Put the head-house close enough to the platforms to read as one station, but
+  // far enough from the symbol corners that finder reservations do not shear off
+  // most of the facade on compact QR versions.
+  const concourseCol = center - Math.round(halfSpan * 0.36)
+  const halfWidth = Math.max(7, Math.min(10, Math.round(matrix.size * 0.3)))
+
+  // A stepped gable replaces the previous flat rectangular concourse. Height rises
+  // towards the centre line, producing a clear terminal roof silhouette from the
+  // default isometric camera while the rear depth steps down slightly like roof bays.
+  for (let row = center - halfWidth; row <= center + halfWidth; row += 1) {
+    const rowDistance = Math.abs(row - center)
+    const normalized = 1 - rowDistance / Math.max(1, halfWidth)
+    const gableLift = Math.max(0, Math.round(normalized * 5))
+
+    for (let col = concourseCol - 3; col <= concourseCol + 3; col += 1) {
+      const depth = Math.abs(col - concourseCol)
+      if (rowDistance >= halfWidth - 1 && depth >= 2) continue
+
+      const topLevel = Math.max(6, 8 + gableLift - Math.max(0, depth - 1))
+      register(columns, getCell(matrix, row, col), 1, topLevel, 'concourse', 8)
+    }
+  }
+
+  // Low side wings anchor the tall gable into the platforms. Their shorter roofs
+  // make the main hall read as a deliberate civic building rather than one tower.
+  for (const direction of [-1, 1]) {
+    const wingCenter = center + direction * Math.max(6, halfWidth - 1)
+    for (let row = wingCenter - 2; row <= wingCenter + 2; row += 1) {
+      for (let col = concourseCol - 2; col <= concourseCol + 2; col += 1) {
+        const rowDistance = Math.abs(row - wingCenter)
+        register(columns, getCell(matrix, row, col), 1, rowDistance === 0 ? 7 : 6, 'concourse', 8)
+      }
+    }
+  }
+
+  // A compact clock lantern rises directly from the gable ridge. Keeping its
+  // footprint narrow avoids turning Station into another generic skyline scene.
+  for (let row = center - 1; row <= center + 1; row += 1) {
+    for (let col = concourseCol - 1; col <= concourseCol + 1; col += 1) {
+      const distance = Math.max(Math.abs(row - center), Math.abs(col - concourseCol))
+      const topLevel = distance === 0 ? 17 : distance === 1 ? 14 : 12
+      register(columns, getCell(matrix, row, col), 1, topLevel, 'clock', 10)
+    }
+  }
+
+  return concourseCol
+}
+
 export function generateStation(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'station')
   const voxels = createBaseVoxels(context, {
@@ -161,23 +216,9 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
   // opposite track stays open, retaining depth and the long terminal perspective.
   buildWaitingTrain(matrix, columns, center, halfSpan)
 
-  // A broad central concourse bridges the platforms near one end, giving the
-  // composition a recognizable terminal/head-house rather than just train tracks.
-  const concourseCol = center - Math.round(halfSpan * 0.48)
-  for (let row = center - 8; row <= center + 8; row += 1) {
-    for (let col = concourseCol - 2; col <= concourseCol + 2; col += 1) {
-      register(columns, getCell(matrix, row, col), 1, 8, 'concourse', 8)
-    }
-  }
-
-  // One narrow clock/sign tower acts as station identity without turning the scene
-  // into another skyline. It remains attached to the concourse and secondary.
-  for (let row = center - 1; row <= center + 1; row += 1) {
-    for (let col = concourseCol - 1; col <= concourseCol + 1; col += 1) {
-      const distance = Math.max(Math.abs(row - center), Math.abs(col - concourseCol))
-      register(columns, getCell(matrix, row, col), 1, distance === 0 ? 13 : 10, 'clock', 10)
-    }
-  }
+  // The head-house now carries the dominant station identity: a broad stepped
+  // gable, two low wings and a clock lantern frame the linear rail elements.
+  buildGrandTerminal(matrix, columns, center, halfSpan)
 
   for (const column of columns.values()) {
     buildColumn(voxels, column, matrix.size)
@@ -190,7 +231,7 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     'station',
     'Station',
     lifted,
-    `OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / TERMINAL CONCOURSE / ${columns.size} BUILT CELLS`,
+    `GABLED TERMINAL / CLOCK LANTERN / OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS`,
     'display-plaque',
   )
 }
