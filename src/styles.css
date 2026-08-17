@@ -199,15 +199,18 @@ body[data-mode='qr'] .control-panel {
 }
 .url-field:focus-within { border-bottom-color: var(--ink); }
 
-.style-control,
+.style-control {
+  display: block;
+  padding: 14px 0 5px;
+}
+.style-control > .palette-label { margin-bottom: 7px; }
 .palette-control {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
+  padding: 10px 0 15px;
 }
-.style-control { padding: 14px 0 5px; }
-.palette-control { padding: 10px 0 15px; }
 .palette-label { margin: 0; }
 
 .palette-row {
@@ -217,19 +220,20 @@ body[data-mode='qr'] .control-panel {
   gap: 9px;
 }
 .style-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   min-width: 0;
-  align-items: center;
-  gap: 7px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 3px 8px 4px 0;
-  overscroll-behavior-inline: contain;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  touch-action: pan-x;
+  gap: 5px;
+  overflow: visible;
+  padding: 0;
+  touch-action: auto;
 }
-.style-row::-webkit-scrollbar { display: none; }
+.style-row .style-chip {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 4px;
+  text-align: center;
+}
 .style-chip {
   flex: 0 0 auto;
   min-height: 28px;
@@ -380,11 +384,26 @@ body[data-mode='qr'] .control-panel {
     display: block;
   }
   .style-control { padding: 11px 0 2px; }
+  .style-control > .palette-label { margin-bottom: 6px; }
   .palette-control { padding: 9px 0 11px; }
   .style-row {
+    display: flex;
+    align-items: center;
     gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
     margin-right: -14px;
     padding: 0 14px 3px 0;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+  .style-row::-webkit-scrollbar { display: none; }
+  .style-row .style-chip {
+    width: auto;
+    min-width: max-content;
+    padding-inline: 9px;
   }
   .style-chip {
     min-height: 34px;
@@ -440,14 +459,17 @@ body[data-mode='qr'] .control-panel {
     line-height: .95;
   }
   .url-field { margin-top: 10px; }
-  .style-control,
+  .style-control {
+    display: block;
+    padding: 8px 0 2px;
+  }
+  .style-control > .palette-label { margin-bottom: 5px; }
   .palette-control {
     display: grid;
     grid-template-columns: 88px minmax(0, 1fr);
     gap: 10px;
+    padding: 7px 0 9px;
   }
-  .style-control { padding: 8px 0 2px; }
-  .palette-control { padding: 7px 0 9px; }
   .style-chip { min-height: 28px; padding: 7px; }
   .panel-footer p { display: none; }
   .panel-footer { display: block; }
