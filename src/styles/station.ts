@@ -10,7 +10,7 @@ import {
   type VoxelKind,
 } from '../sculpture'
 
-type StationRole = 'rail' | 'platform' | 'canopy' | 'post' | 'concourse' | 'clock' | 'train'
+type StationRole = 'rail' | 'platform' | 'canopy' | 'post' | 'concourse' | 'clock' | 'train' | 'bridge'
 
 interface StationSegment {
   fromLevel: number
@@ -73,6 +73,8 @@ function bodyKind(role: StationRole, level: number, topLevel: number): VoxelKind
       if (level === 2) return 'stone'
       if (level >= 4 && level < topLevel) return 'glass'
       return 'primary'
+    case 'bridge':
+      return level >= topLevel - 1 ? 'wood' : 'stone'
     default:
       return 'stone'
   }
@@ -145,6 +147,45 @@ function buildWaitingTrain(
         const edgeRow = Math.abs(row - trainRow) === 1
         const topLevel = endDistance === 0 ? 4 : edgeRow ? 5 : 6
         register(columns, getCell(matrix, row, col), 2, topLevel, 'train', 7)
+      }
+    }
+  }
+}
+
+function buildFootbridge(
+  matrix: QRMatrixData,
+  columns: Map<string, StationColumn>,
+  center: number,
+  halfSpan: number,
+): void {
+  // Place the bridge away from the terminal and waiting train so its transverse
+  // silhouette remains legible. The deck is genuinely suspended above both tracks:
+  // only the two platform-side towers connect it to ground level.
+  const bridgeCol = center + Math.max(4, Math.round(halfSpan * 0.42))
+  const deckHalfSpan = 6
+
+  for (let row = center - deckHalfSpan; row <= center + deckHalfSpan; row += 1) {
+    for (const col of [bridgeCol, bridgeCol + 1]) {
+      register(columns, getCell(matrix, row, col), 9, 10, 'bridge', 9)
+    }
+  }
+
+  // Two narrow lift/stair towers make the suspended strip read as a passenger
+  // footbridge rather than another canopy. The stepped outer runs descend toward
+  // the platform surface while preserving open air over the rails themselves.
+  for (const direction of [-1, 1]) {
+    const towerRow = center + direction * 5
+    for (let row = towerRow - 1; row <= towerRow + 1; row += 1) {
+      for (const col of [bridgeCol, bridgeCol + 1]) {
+        register(columns, getCell(matrix, row, col), 1, 10, 'bridge', 9)
+      }
+    }
+
+    for (let step = 1; step <= 4; step += 1) {
+      const row = towerRow + direction * step
+      const fromLevel = Math.max(2, 9 - step * 2)
+      for (const col of [bridgeCol, bridgeCol + 1]) {
+        register(columns, getCell(matrix, row, col), fromLevel, 10, 'bridge', 9)
       }
     }
   }
@@ -253,6 +294,10 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
   // instead of deleting that rail segment from the same QR column.
   buildWaitingTrain(matrix, columns, center, halfSpan)
 
+  // The transverse bridge adds a second, unmistakably railway-specific silhouette:
+  // an elevated passenger crossing over both tracks with stairs landing on platforms.
+  buildFootbridge(matrix, columns, center, halfSpan)
+
   // The head-house carries the dominant station identity: a broad stepped gable,
   // two low wings and a clock lantern frame the linear rail elements.
   buildGrandTerminal(matrix, columns, center, halfSpan)
@@ -271,7 +316,7 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     'station',
     'Station',
     lifted,
-    `GABLED TERMINAL / CLOCK LANTERN / LAYERED OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
+    `GABLED TERMINAL / CLOCK LANTERN / SUSPENDED FOOTBRIDGE + STAIRS / OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
     'display-plaque',
   )
 }
