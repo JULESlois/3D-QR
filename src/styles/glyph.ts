@@ -57,6 +57,7 @@ const GLYPH_TOKEN = /[A-Z0-9@#?!+&]/g
 const URL_SCHEME = /^[A-Z][A-Z0-9+.-]*:\/\//i
 const GENERIC_HOST_PREFIX = /^(?:WWW\d*|MOBILE|M)\./i
 const MONOGRAM_LIMIT = 2
+const GLYPH_FIELD_SPAN = 0.76
 
 function glyphTokens(value: string): string[] {
   return (value.toUpperCase().match(GLYPH_TOKEN) ?? []).slice(0, MONOGRAM_LIMIT)
@@ -128,6 +129,10 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
   const bitmap = buildMonogramBitmap(glyphs)
   const bitmapWidth = bitmap[0].length
   const bitmapHeight = bitmap.length
+  const bitmapSpan = Math.max(bitmapWidth, bitmapHeight)
+  const glyphPitch = GLYPH_FIELD_SPAN / bitmapSpan
+  const glyphCenterX = (bitmapWidth - 1) / 2
+  const glyphCenterY = (bitmapHeight - 1) / 2
   const lifted = new Set<string>()
 
   for (const module of matrix.darkModules) {
@@ -135,8 +140,13 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
 
     const nx = (module.col - center) / Math.max(1, matrix.size - 1) + 0.5
     const nz = (module.row - center) / Math.max(1, matrix.size - 1) + 0.5
-    const glyphX = nx * Math.max(1, bitmapWidth - 1)
-    const glyphY = nz * Math.max(1, bitmapHeight - 1)
+
+    // Map both bitmap axes through the same physical pitch. Previously width and height
+    // were independently stretched to fill the square QR footprint, which compressed
+    // 11x7 monograms and widened 5x7 glyphs. A shared pitch preserves the font's intended
+    // proportions and keeps single/double identities centered in the same sculpture field.
+    const glyphX = (nx - 0.5) / glyphPitch + glyphCenterX
+    const glyphY = (nz - 0.5) / glyphPitch + glyphCenterY
     const sample = sampleGlyph(bitmap, glyphY, glyphX)
 
     // The distance field scales to either a single glyph or a two-character monogram.
@@ -183,7 +193,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `MONOGRAM ${identity} / PAYLOAD-AWARE IDENTITY / FREE-STANDING QR BODY / 1-2 GLYPHS`,
+    `MONOGRAM ${identity} / PROPORTION-PRESERVING IDENTITY / FREE-STANDING QR BODY / 1-2 GLYPHS`,
     'free-standing-glyph',
   )
 }
