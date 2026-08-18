@@ -51,6 +51,36 @@ function distanceToSegment(
   return Math.hypot(row - nearestRow, col - nearestCol)
 }
 
+function meltwaterInfluence(cell: Pick<QRCell, 'row' | 'col'>, matrix: QRMatrixData): number {
+  const center = (matrix.size - 1) / 2
+  const upperRow = center - matrix.size * 0.035
+  const upperCol = center + matrix.size * 0.115
+  const bendRow = center + matrix.size * 0.095
+  const bendCol = center + matrix.size * 0.045
+  const lowerRow = center + matrix.size * 0.31
+  const lowerCol = center - matrix.size * 0.075
+  const width = Math.max(0.78, matrix.size * 0.028)
+
+  const upperDistance = distanceToSegment(
+    cell.row,
+    cell.col,
+    upperRow,
+    upperCol,
+    bendRow,
+    bendCol,
+  )
+  const lowerDistance = distanceToSegment(
+    cell.row,
+    cell.col,
+    bendRow,
+    bendCol,
+    lowerRow,
+    lowerCol,
+  )
+
+  return clamp01(1 - Math.min(upperDistance, lowerDistance) / width)
+}
+
 function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): number {
   const center = (matrix.size - 1) / 2
   const span = Math.max(1, matrix.size - 1)
@@ -142,6 +172,16 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
   )
   const cliffFace = mainPeak * cliffSide * (0.55 + summitRidge * 0.45)
 
+  // A narrow meltwater gorge leaves the glacial bowl below the main summit, cuts
+  // diagonally through the exposed face, then bends toward the foreground valley.
+  // The carve is intentionally strongest on the main massif so it reads as a real
+  // ravine instead of a decorative blue stripe painted over an unchanged heightmap.
+  const meltwater = meltwaterInfluence(cell, matrix)
+  const downstream = clamp01(
+    (cell.row - (center - matrix.size * 0.06)) / Math.max(1, matrix.size * 0.34),
+  )
+  const gorgeCut = meltwater * (1.35 + mainPeak * 2.7 + downstream * 0.9)
+
   const relief = (
     mainPeak * 10.8
     + secondaryPeak * 7.3
@@ -150,7 +190,7 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
     + leeSlope * 1.9
     + cornice * 2.35
     + jagged
-  ) * edgeFeather - valley * 4.2 - cliffFace * 2.65
+  ) * edgeFeather - valley * 4.2 - cliffFace * 2.65 - gorgeCut
 
   let height = Math.max(1, Math.min(14, 1 + Math.round(relief)))
 
@@ -173,6 +213,18 @@ function terrainKind(
   const center = (matrix.size - 1) / 2
   const phase = cell.col / Math.max(1, matrix.size - 1)
   const noise = seededCellNoise(cell, `${seedText}::material`)
+  const meltwater = meltwaterInfluence(cell, matrix)
+  const belowGlacialBowl = cell.row >= center - matrix.size * 0.055
+
+  // The carved channel becomes a genuine material feature: dark and light QR cells
+  // both use the paired water ramp, so the stream can remain blue while preserving
+  // scanner polarity. The shoulders stay exposed stone to frame the cascade.
+  if (cell.zone === 'data' && belowGlacialBowl && meltwater > 0.56 && height <= 9) {
+    return 'water'
+  }
+  if (cell.zone === 'data' && belowGlacialBowl && meltwater > 0.22 && height >= 4) {
+    return 'stone'
+  }
 
   // Keep snow concentrated on the upper windward face instead of painting every
   // high voxel white. A wavering snowline plus exposed vertical scars produces
@@ -200,8 +252,8 @@ export function generateMountain(matrix: QRMatrixData, seedText: string): Sculpt
   const lifted = new Set<string>()
 
   // Every symbol cell participates in one continuous relief surface. Side walls
-  // carry forest / rock / snow materials, while pushProjectedColumn() restores
-  // the exact scanner polarity on the visible top face of every QR cell.
+  // carry forest / rock / snow / meltwater materials, while pushProjectedColumn()
+  // restores the exact scanner polarity on the visible top face of every QR cell.
   for (const cell of matrix.cells) {
     const height = terrainHeight(cell, matrix, seedText)
     pushProjectedColumn(
@@ -222,7 +274,7 @@ export function generateMountain(matrix: QRMatrixData, seedText: string): Sculpt
     'mountain',
     'Mountain',
     lifted,
-    'TWIN ALPINE SUMMITS / WIND-CUT CORNICE / ROCK FACE / CUT VALLEY',
+    'TWIN ALPINE SUMMITS / GLACIAL BOWL / MELTWATER GORGE / ROCK FACE / CUT VALLEY',
     'full-pad',
   )
 }
