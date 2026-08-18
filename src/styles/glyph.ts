@@ -3,6 +3,7 @@ import {
   cellKey,
   createGenerationContext,
   finalizeSculpture,
+  projectionToneForCell,
   pushVoxel,
   type SculptureBuild,
   type SculptureVoxel,
@@ -58,6 +59,8 @@ const URL_SCHEME = /^[A-Z][A-Z0-9+.-]*:\/\//i
 const GENERIC_HOST_PREFIX = /^(?:WWW\d*|MOBILE|M)\./i
 const MONOGRAM_LIMIT = 2
 const GLYPH_FIELD_SPAN = 0.76
+const EXTRUSION_ROW_OFFSET = -0.9
+const EXTRUSION_COL_OFFSET = 0.85
 
 function glyphTokens(value: string): string[] {
   return (value.toUpperCase().match(GLYPH_TOKEN) ?? []).slice(0, MONOGRAM_LIMIT)
@@ -148,16 +151,27 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     const glyphX = (nx - 0.5) / glyphPitch + glyphCenterX
     const glyphY = (nz - 0.5) / glyphPitch + glyphCenterY
     const sample = sampleGlyph(bitmap, glyphY, glyphX)
+    const extrusionSample = sampleGlyph(
+      bitmap,
+      glyphY + EXTRUSION_ROW_OFFSET,
+      glyphX + EXTRUSION_COL_OFFSET,
+    )
 
-    // The distance field scales to either a single glyph or a two-character monogram.
-    // Only column height/material changes; scanner-facing occupancy remains identical.
+    // A diagonal secondary sample creates a short rearward extrusion visible from the
+    // default isometric camera. It only changes the height/material of existing dark QR
+    // columns, so the physical projection remains identical while the monogram gains a
+    // readable side wall instead of looking like a flat height-map stamped into the code.
+    const extrusionBand = sample.band === 'field' && extrusionSample.band !== 'field'
+
     let topLevel: number
     if (sample.band === 'face') {
-      topLevel = 11
+      topLevel = 12
     } else if (sample.band === 'inner-bevel') {
-      topLevel = 7
+      topLevel = 8
     } else if (sample.band === 'outer-bevel') {
-      topLevel = 4
+      topLevel = 5
+    } else if (extrusionBand) {
+      topLevel = extrusionSample.band === 'face' ? 6 : 4
     } else if (module.role === 'finder') {
       topLevel = 1
     } else {
@@ -169,10 +183,17 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
         ? 'primary'
         : sample.band === 'inner-bevel'
           ? 'plaster'
-          : 'stone'
+          : sample.band === 'outer-bevel'
+            ? 'stone'
+            : extrusionBand
+              ? 'stone'
+              : 'stone'
 
-      const distancePhase = Number.isFinite(sample.distance)
-        ? Math.min(1, sample.distance / 1.55)
+      const relevantDistance = sample.band === 'field' && extrusionBand
+        ? extrusionSample.distance
+        : sample.distance
+      const distancePhase = Number.isFinite(relevantDistance)
+        ? Math.min(1, relevantDistance / 1.55)
         : 1
 
       pushVoxel(
@@ -180,8 +201,9 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : interiorKind,
+        interiorKind,
         (random() * 0.18 + distancePhase * 0.32 + glyphY * 0.055 + glyphX * 0.075 + level * 0.021) % 1,
+        level === topLevel ? projectionToneForCell(module) : undefined,
       )
     }
   }
@@ -193,7 +215,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `MONOGRAM ${identity} / PROPORTION-PRESERVING IDENTITY / FREE-STANDING QR BODY / 1-2 GLYPHS`,
+    `MONOGRAM ${identity} / DIRECTIONAL EXTRUSION / PROPORTION-PRESERVING IDENTITY / FREE-STANDING QR BODY`,
     'free-standing-glyph',
   )
 }
