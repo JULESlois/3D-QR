@@ -53,38 +53,44 @@ const FONT_5X7: Record<string, readonly string[]> = {
   '&': ['01100','10010','10100','01000','10101','10010','01101'],
 }
 
-const GLYPH_TOKEN = /[A-Z0-9@#?!+&]/
+const GLYPH_TOKEN = /[A-Z0-9@#?!+&]/g
 const URL_SCHEME = /^[A-Z][A-Z0-9+.-]*:\/\//i
 const GENERIC_HOST_PREFIX = /^(?:WWW\d*|MOBILE|M)\./i
+const MONOGRAM_LIMIT = 2
 
-function firstGlyphToken(value: string): string | null {
-  return value.toUpperCase().match(GLYPH_TOKEN)?.[0] ?? null
+function glyphTokens(value: string): string[] {
+  return (value.toUpperCase().match(GLYPH_TOKEN) ?? []).slice(0, MONOGRAM_LIMIT)
 }
 
-function glyphFromSeed(seedText: string): string {
+function glyphsFromSeed(seedText: string): string[] {
   const trimmed = seedText.trim()
 
-  // Raw URL payloads used to almost always become "H" because the first token came
-  // from "https". For URLs, derive the sculpture identity from the destination host
-  // instead, stripping generic www/mobile prefixes. The QR payload itself is untouched.
+  // URL payloads identify from the destination rather than the protocol. Keeping two
+  // tokens gives the sculpture a stronger monogram identity without changing QR data.
   if (URL_SCHEME.test(trimmed)) {
     try {
       const url = new URL(trimmed)
       const meaningfulHost = url.hostname.replace(GENERIC_HOST_PREFIX, '')
-      const fromHost = firstGlyphToken(meaningfulHost)
-      if (fromHost) return fromHost
+      const fromHost = glyphTokens(meaningfulHost)
+      if (fromHost.length > 0) return fromHost
 
-      // Hostless/custom schemes still get a deterministic fallback from their path.
-      const fromPath = firstGlyphToken(url.pathname)
-      if (fromPath) return fromPath
+      const fromPath = glyphTokens(url.pathname)
+      if (fromPath.length > 0) return fromPath
     } catch {
       // Malformed URLs fall through to normal text token selection.
     }
   }
 
-  // Protocol-less www.example.com should identify as E rather than W.
   const withoutGenericHostPrefix = trimmed.replace(GENERIC_HOST_PREFIX, '')
-  return firstGlyphToken(withoutGenericHostPrefix) ?? 'Q'
+  const tokens = glyphTokens(withoutGenericHostPrefix)
+  return tokens.length > 0 ? tokens : ['Q']
+}
+
+function buildMonogramBitmap(glyphs: readonly string[]): readonly string[] {
+  const bitmaps = glyphs.map((glyph) => FONT_5X7[glyph] ?? FONT_5X7.Q)
+  if (bitmaps.length <= 1) return bitmaps[0]
+
+  return bitmaps[0].map((row, index) => `${row}0${bitmaps[1][index]}`)
 }
 
 type GlyphBand = 'face' | 'inner-bevel' | 'outer-bevel' | 'field'
@@ -118,8 +124,10 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
   // Light modules and the quiet zone remain literal empty space, so the page/background
   // supplies scanner-light contrast while the sculpture reads as a floating monolith.
   const voxels: SculptureVoxel[] = []
-  const glyph = glyphFromSeed(seedText)
-  const bitmap = FONT_5X7[glyph] ?? FONT_5X7.Q
+  const glyphs = glyphsFromSeed(seedText)
+  const bitmap = buildMonogramBitmap(glyphs)
+  const bitmapWidth = bitmap[0].length
+  const bitmapHeight = bitmap.length
   const lifted = new Set<string>()
 
   for (const module of matrix.darkModules) {
@@ -127,13 +135,12 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
 
     const nx = (module.col - center) / Math.max(1, matrix.size - 1) + 0.5
     const nz = (module.row - center) / Math.max(1, matrix.size - 1) + 0.5
-    const glyphX = nx * 4
-    const glyphY = nz * 6
+    const glyphX = nx * Math.max(1, bitmapWidth - 1)
+    const glyphY = nz * Math.max(1, bitmapHeight - 1)
     const sample = sampleGlyph(bitmap, glyphY, glyphX)
 
-    // The continuous distance field gives the glyph a broad readable face and two
-    // stepped bevel bands instead of snapping every QR column to a coarse 5x7 cell.
-    // Only column height/material changes; the scanner-facing top remains qr-top.
+    // The distance field scales to either a single glyph or a two-character monogram.
+    // Only column height/material changes; scanner-facing occupancy remains identical.
     let topLevel: number
     if (sample.band === 'face') {
       topLevel = 11
@@ -169,13 +176,14 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     }
   }
 
+  const identity = glyphs.join('')
   return finalizeSculpture(
     matrix,
     voxels,
     'glyph',
     'Glyph',
     lifted,
-    `GLYPH ${glyph} / PAYLOAD-AWARE IDENTITY / FREE-STANDING QR BODY / SYMBOL SET A-Z 0-9 @ # ? ! + &`,
+    `MONOGRAM ${identity} / PAYLOAD-AWARE IDENTITY / FREE-STANDING QR BODY / 1-2 GLYPHS`,
     'free-standing-glyph',
   )
 }
