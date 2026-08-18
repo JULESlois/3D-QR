@@ -5,6 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
+  projectionToneForCell,
   pushProjectedColumn,
   pushVoxel,
   type SculptureBuild,
@@ -38,21 +39,21 @@ function waveHeight(cell: QRCell, seedText: string): number {
   return wave > 0.55 ? 2 : 1
 }
 
-function towerKind(level: number, topLevel: number): VoxelKind {
-  if (level === topLevel) return 'qr-top'
+function towerBodyKind(level: number, role: 'apron' | 'gallery' | 'shaft' | 'lantern'): VoxelKind {
+  if (role === 'apron') return level <= 2 ? 'stone' : 'plaster'
 
-  const belowTop = topLevel - level
+  // A dark structural ring under the gallery gives the tower a crisp horizontal
+  // break when viewed isometrically, instead of reading as one tapered voxel cone.
+  if (level === 9 || level === 10) return 'primary'
 
-  // A taller glass lantern room sits above a dark gallery/deck band. Because the
-  // material bands only affect voxels already projected from dark QR modules,
-  // the scanner-facing caps remain unchanged.
-  if (belowTop <= 3) return 'glass'
-  if (belowTop === 4 || belowTop === 5) return 'primary'
+  if (role === 'gallery') return level >= 9 ? 'primary' : level % 4 < 2 ? 'plaster' : 'primary'
+  if (role === 'shaft') return level >= 12 ? 'glass' : level % 4 < 2 ? 'plaster' : 'primary'
 
-  // Classic lighthouse paint bands are aligned by absolute height across the
-  // tapered footprint so the clustered columns read as one architectural shaft.
-  const stripePhase = Math.floor((level - 1) / 2)
-  return stripePhase % 2 === 1 ? 'primary' : 'plaster'
+  // The lantern core stays visibly glazed above the gallery while the very top is
+  // capped by a dark roof material. Projection polarity is applied separately.
+  if (level >= 14 && level <= 18) return 'glass'
+  if (level >= 19) return 'primary'
+  return level % 4 < 2 ? 'plaster' : 'primary'
 }
 
 export function generateLighthouse(matrix: QRMatrixData, seedText: string): SculptureBuild {
@@ -106,22 +107,27 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
 
   const nearby = [...dataModules]
     .sort((a, b) => distance(a, anchor) - distance(b, anchor))
-    .slice(0, Math.min(10, Math.max(7, Math.round(matrix.size * 0.24))))
+    .slice(0, Math.min(14, Math.max(10, Math.round(matrix.size * 0.31))))
 
-  // Seven nearby dark modules form a deliberately stepped footprint: a broad
-  // lower gallery, a tighter upper shaft, then one tall lantern core. The outer
-  // columns stop well below the beacon, creating the overhanging gallery/crown
-  // silhouette that was missing from the previous generic column cluster.
-  const towerModules = nearby.slice(0, Math.min(7, nearby.length))
+  // Build four concentric visual roles from the same QR-aligned dark columns.
+  // A low stone apron establishes the island, seven columns form a visibly flared
+  // gallery, three continue into the narrow shaft, and one lantern core rises above
+  // everything else. The silhouette now reads like a lighthouse before its stripes
+  // or color treatment are considered.
+  const apronModules = nearby.slice(0, Math.min(10, nearby.length))
+  const galleryModules = nearby.slice(0, Math.min(7, nearby.length))
+  const shaftModules = nearby.slice(0, Math.min(3, nearby.length))
+  const lanternModule = nearby[0]
+
   const islandModules = dataModules
     .filter((module) => distance(module, anchor) <= Math.max(3.2, matrix.size * 0.13))
     .sort((a, b) => distance(a, anchor) - distance(b, anchor))
-    .slice(0, Math.min(18, dataModules.length))
+    .slice(0, Math.min(20, dataModules.length))
 
-  const towerKeys = new Set(towerModules.map((module) => cellKey(module.row, module.col)))
+  const apronKeys = new Set(apronModules.map((module) => cellKey(module.row, module.col)))
 
   for (const module of islandModules) {
-    if (towerKeys.has(cellKey(module.row, module.col))) continue
+    if (apronKeys.has(cellKey(module.row, module.col))) continue
     const topLevel = random() > 0.72 ? 3 : 2
     lifted.add(cellKey(module.row, module.col))
 
@@ -131,22 +137,35 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : 'stone',
+        'stone',
         (random() * 0.6 + level * 0.08) % 1,
+        level === topLevel ? projectionToneForCell(module) : undefined,
       )
     }
   }
 
-  for (let i = 0; i < towerModules.length; i += 1) {
-    const module = towerModules[i]
-    const d = distance(module, anchor)
-    const topLevel = i === 0
-      ? 15
-      : i < 3
-        ? Math.max(11, 13 - Math.round(d * 0.8))
-        : Math.max(8, 10 - Math.round(d * 0.55))
+  const galleryKeys = new Set(galleryModules.map((module) => cellKey(module.row, module.col)))
+  const shaftKeys = new Set(shaftModules.map((module) => cellKey(module.row, module.col)))
+  const lanternKey = cellKey(lanternModule.row, lanternModule.col)
 
-    lifted.add(cellKey(module.row, module.col))
+  for (const module of apronModules) {
+    const key = cellKey(module.row, module.col)
+    const role = key === lanternKey
+      ? 'lantern'
+      : shaftKeys.has(key)
+        ? 'shaft'
+        : galleryKeys.has(key)
+          ? 'gallery'
+          : 'apron'
+    const topLevel = role === 'lantern'
+      ? 20
+      : role === 'shaft'
+        ? 15
+        : role === 'gallery'
+          ? 11
+          : 6
+
+    lifted.add(key)
 
     for (let level = 1; level <= topLevel; level += 1) {
       pushVoxel(
@@ -154,8 +173,9 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
         module,
         matrix.size,
         level,
-        towerKind(level, topLevel),
-        (random() * 0.48 + level * 0.052 + d * 0.07) % 1,
+        towerBodyKind(level, role),
+        (random() * 0.48 + level * 0.052 + distance(module, anchor) * 0.07) % 1,
+        level === topLevel ? projectionToneForCell(module) : undefined,
       )
     }
   }
@@ -166,7 +186,7 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     'lighthouse',
     'Lighthouse',
     lifted,
-    'SCANNER-LIGHT WAVES / FINDER REEFS / FLARED GALLERY / GLASS LANTERN',
+    'SCANNER-LIGHT WAVES / FINDER REEFS / STONE APRON / FLARED GALLERY / GLASS LANTERN / ROOF CAP',
     'courtyard-pad',
   )
 }
