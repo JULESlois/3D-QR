@@ -1,3 +1,4 @@
+import './palette-defaults'
 import type { DarkModule, QRCell, QRMatrixData } from './qr'
 
 export const CELL_SIZE = 0.245
@@ -6,9 +7,11 @@ export const QUIET_ZONE = 4
 export type VoxelKind =
   | 'floor-light'
   | 'floor-dark'
+  /** @deprecated Scanner polarity is now stored in projectionTone. */
   | 'light-top'
   | 'foundation'
   | 'primary'
+  /** @deprecated Scanner polarity is now stored in projectionTone. */
   | 'qr-top'
   | 'wood'
   | 'stone'
@@ -16,6 +19,8 @@ export type VoxelKind =
   | 'glass'
   | 'water'
   | 'crystal'
+
+export type ProjectionTone = 'dark' | 'light'
 
 export type ProjectionStrategy =
   | 'full-pad'
@@ -48,6 +53,12 @@ export interface SculptureVoxel {
   col: number
   kind: VoxelKind
   colorPhase: number
+  /**
+   * QR polarity of this visible surface. It deliberately does not replace material kind:
+   * water stays water, stone stays stone, foliage stays primary, etc. The paired scene
+   * palettes use this tone to select a darker or lighter variant of the same material.
+   */
+  projectionTone?: ProjectionTone
 }
 
 export interface SculptureBuild {
@@ -121,6 +132,17 @@ export function positionForCell(row: number, col: number, matrixSize: number): {
   }
 }
 
+export function projectionToneForCell(cell: Pick<QRCell, 'dark'>): ProjectionTone {
+  return cell.dark ? 'dark' : 'light'
+}
+
+function toneBiasedColorPhase(colorPhase: number, tone: ProjectionTone): number {
+  const phase = Math.max(0, Math.min(0.999999, colorPhase))
+  return tone === 'dark'
+    ? phase * 0.5
+    : 0.5 + phase * 0.5
+}
+
 function makeBaseVoxel(
   context: GenerationContext,
   row: number,
@@ -129,6 +151,13 @@ function makeBaseVoxel(
   kind: VoxelKind,
 ): SculptureVoxel {
   const { center, random } = context
+  const projectionTone = kind === 'floor-dark'
+    ? 'dark'
+    : kind === 'floor-light'
+      ? 'light'
+      : undefined
+  const rawPhase = kind === 'floor-light' ? 0 : random()
+
   return {
     x: (col - center) * CELL_SIZE,
     y,
@@ -136,7 +165,8 @@ function makeBaseVoxel(
     row,
     col,
     kind,
-    colorPhase: kind === 'floor-light' ? 0 : random(),
+    colorPhase: projectionTone ? toneBiasedColorPhase(rawPhase, projectionTone) : rawPhase,
+    projectionTone,
   }
 }
 
@@ -208,6 +238,7 @@ export function pushCellVoxel(
   level: number,
   kind: VoxelKind,
   colorPhase: number,
+  projectionTone?: ProjectionTone,
 ): void {
   const { x, z } = positionForCell(cell.row, cell.col, matrixSize)
   voxels.push({
@@ -217,7 +248,8 @@ export function pushCellVoxel(
     row: cell.row,
     col: cell.col,
     kind,
-    colorPhase,
+    colorPhase: projectionTone ? toneBiasedColorPhase(colorPhase, projectionTone) : colorPhase,
+    projectionTone,
   })
 }
 
@@ -228,10 +260,12 @@ export function pushVoxel(
   level: number,
   kind: VoxelKind,
   colorPhase: number,
+  projectionTone?: ProjectionTone,
 ): void {
-  pushCellVoxel(voxels, module, matrixSize, level, kind, colorPhase)
+  pushCellVoxel(voxels, module, matrixSize, level, kind, colorPhase, projectionTone)
 }
 
+/** @deprecated Use projectionToneForCell and preserve the material kind on the top voxel. */
 export function projectedCapKind(cell: Pick<QRCell, 'dark'>): 'qr-top' | 'light-top' {
   return cell.dark ? 'qr-top' : 'light-top'
 }
@@ -247,6 +281,7 @@ export function pushProjectedColumn(
 ): void {
   const start = Math.max(1, Math.floor(fromLevel))
   const end = Math.max(start, Math.floor(toLevel))
+  const tone = projectionToneForCell(cell)
 
   for (let level = start; level <= end; level += 1) {
     pushCellVoxel(
@@ -254,8 +289,9 @@ export function pushProjectedColumn(
       cell,
       matrixSize,
       level,
-      level === end ? projectedCapKind(cell) : bodyKind,
+      bodyKind,
       (random() * 0.72 + level * 0.041) % 1,
+      level === end ? tone : undefined,
     )
   }
 }
@@ -272,6 +308,7 @@ export function pushSolidColumn(
 ): void {
   const start = Math.max(1, Math.floor(fromLevel))
   const end = Math.max(start, Math.floor(toLevel))
+  const semanticCapKind = capKind === 'qr-top' || capKind === 'light-top' ? bodyKind : capKind
 
   for (let level = start; level <= end; level += 1) {
     pushVoxel(
@@ -279,14 +316,55 @@ export function pushSolidColumn(
       module,
       matrixSize,
       level,
-      level === end ? capKind : bodyKind,
+      level === end ? semanticCapKind : bodyKind,
       (random() * 0.72 + level * 0.041) % 1,
+      level === end ? 'dark' : undefined,
     )
   }
 }
 
-function isScannerCap(kind: VoxelKind): boolean {
+function isLegacyScannerCap(kind: VoxelKind): kind is 'qr-top' | 'light-top' {
   return kind === 'qr-top' || kind === 'light-top'
+}
+
+function normalizeLegacyProjectionCaps(voxels: SculptureVoxel[]): SculptureVoxel[] {
+  const materialByColumn = new Map<string, SculptureVoxel[]>()
+
+  for (const voxel of voxels) {
+    if (isLegacyScannerCap(voxel.kind)) continue
+    const key = cellKey(voxel.row, voxel.col)
+    const column = materialByColumn.get(key)
+    if (column) column.push(voxel)
+    else materialByColumn.set(key, [voxel])
+  }
+
+  for (const column of materialByColumn.values()) {
+    column.sort((a, b) => a.y - b.y)
+  }
+
+  return voxels.map((voxel) => {
+    if (!isLegacyScannerCap(voxel.kind)) return voxel
+
+    const tone: ProjectionTone = voxel.kind === 'qr-top' ? 'dark' : 'light'
+    const column = materialByColumn.get(cellKey(voxel.row, voxel.col)) ?? []
+    let materialKind: VoxelKind = 'primary'
+
+    for (let index = column.length - 1; index >= 0; index -= 1) {
+      const candidate = column[index]
+      if (candidate.y >= voxel.y) continue
+      if (candidate.y > 0 || (candidate.kind !== 'floor-light' && candidate.kind !== 'floor-dark')) {
+        materialKind = candidate.kind
+        break
+      }
+    }
+
+    return {
+      ...voxel,
+      kind: materialKind,
+      colorPhase: toneBiasedColorPhase(voxel.colorPhase, tone),
+      projectionTone: tone,
+    }
+  })
 }
 
 function canonicalizeVoxelOccupancy(voxels: SculptureVoxel[]): SculptureVoxel[] {
@@ -302,19 +380,18 @@ function canonicalizeVoxelOccupancy(voxels: SculptureVoxel[]): SculptureVoxel[] 
       continue
     }
 
-    const existingCap = isScannerCap(existing.kind)
-    const incomingCap = isScannerCap(voxel.kind)
+    const existingTone = existing.projectionTone
+    const incomingTone = voxel.projectionTone
 
-    if (existingCap && incomingCap && existing.kind !== voxel.kind) {
+    if (existingTone && incomingTone && existingTone !== incomingTone) {
       throw new Error(
-        `Conflicting scanner caps occupy QR column ${voxel.row}:${voxel.col}, level ${level}.`,
+        `Conflicting projection tones occupy QR column ${voxel.row}:${voxel.col}, level ${level}.`,
       )
     }
 
-    // Scanner-facing caps always win an overlap. For ordinary body geometry the
-    // later builder wins, matching the compositional intent of scene generators
-    // while guaranteeing exactly one render instance per physical voxel slot.
-    if (incomingCap || !existingCap) occupied.set(key, voxel)
+    // A scanner-facing surface wins an overlap, but it keeps its semantic material.
+    // Ordinary body geometry still uses the later-builder-wins rule.
+    if (incomingTone || !existingTone) occupied.set(key, voxel)
   }
 
   return Array.from(occupied.values())
@@ -324,13 +401,17 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
   const topByColumn = new Map<string, SculptureVoxel>()
 
   for (const voxel of voxels) {
+    if (isLegacyScannerCap(voxel.kind)) {
+      throw new Error('Legacy qr-top/light-top material tags must be normalized before validation.')
+    }
+
     const inside = voxel.row >= 0
       && voxel.row < matrix.size
       && voxel.col >= 0
       && voxel.col < matrix.size
 
     // Keep the external quiet zone conservative. Inside the QR symbol both light
-    // and dark cells may rise into semantic geometry; only their visible cap matters.
+    // and dark cells may rise into semantic geometry; only their visible tone matters.
     if (!inside && voxel.y > 0) {
       throw new Error('Elevated geometry may not occupy the QR quiet zone.')
     }
@@ -343,15 +424,18 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
   for (const cell of matrix.cells) {
     const top = topByColumn.get(cellKey(cell.row, cell.col))
 
-    if (cell.dark) {
-      if (!top) {
+    if (!top) {
+      if (cell.dark) {
         throw new Error(`Style generator omitted dark QR module ${cell.row}:${cell.col}.`)
       }
-      if (top.kind !== 'floor-dark' && top.kind !== 'qr-top') {
-        throw new Error(`QR column ${cell.row}:${cell.col} is missing a scanner-dark top surface.`)
-      }
-    } else if (top && top.kind !== 'floor-light' && top.kind !== 'light-top') {
-      throw new Error(`Light QR module ${cell.row}:${cell.col} is missing a scanner-light top surface.`)
+      continue
+    }
+
+    const expectedTone = projectionToneForCell(cell)
+    if (top.projectionTone !== expectedTone) {
+      throw new Error(
+        `QR column ${cell.row}:${cell.col} exposes ${top.kind} with ${top.projectionTone ?? 'no'} projection tone; expected ${expectedTone}.`,
+      )
     }
   }
 
@@ -361,8 +445,8 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
       && top.col >= 0
       && top.col < matrix.size
 
-    if (!inside && top.kind !== 'floor-light') {
-      throw new Error('The visible surface of a physical quiet-zone platform must remain scanner-light.')
+    if (!inside && (top.kind !== 'floor-light' || top.projectionTone !== 'light')) {
+      throw new Error('The visible surface of a physical quiet-zone platform must remain light floor material.')
     }
   }
 }
@@ -376,7 +460,8 @@ export function finalizeSculpture(
   detail?: string,
   projection: ProjectionStrategy = 'full-pad',
 ): SculptureBuild {
-  const canonicalVoxels = canonicalizeVoxelOccupancy(voxels)
+  const normalizedVoxels = normalizeLegacyProjectionCaps(voxels)
+  const canonicalVoxels = canonicalizeVoxelOccupancy(normalizedVoxels)
   validateProjectionInvariant(canonicalVoxels, matrix)
 
   let maxHeight = CELL_SIZE

@@ -39,6 +39,14 @@ function assertVoxelStructure(styleId: string, matrixSize: number, voxels: Gener
       )
     }
 
+    if (voxel.kind === 'qr-top' || voxel.kind === 'light-top') {
+      throw new Error(`${styleId} leaked deprecated scanner-cap material ${voxel.kind}.`)
+    }
+
+    if (voxel.projectionTone !== undefined && voxel.projectionTone !== 'dark' && voxel.projectionTone !== 'light') {
+      throw new Error(`${styleId} emitted invalid projection tone at ${voxel.row}:${voxel.col}.`)
+    }
+
     const key = `${voxel.row}:${voxel.col}:${level}`
     if (occupied.has(key)) {
       throw new Error(
@@ -72,9 +80,8 @@ function assertScannerProjection(styleId: string, matrix: QRMatrixData, build: G
   for (const cell of matrix.cells) {
     const top = topByColumn.get(cellKey(cell.row, cell.col))
 
-    // A scanner-light QR cell may be represented either by an explicit light top
-    // surface or by literal empty space against the page/background. Dark modules
-    // must always remain physically present so their projection cannot disappear.
+    // A light QR cell may still be literal empty space. Dark modules must remain
+    // physically present, but neither polarity is required to use a black/white material.
     if (!top) {
       if (cell.dark) {
         throw new Error(`${styleId} omitted dark QR column ${cell.row}:${cell.col} from the physical projection.`)
@@ -82,17 +89,11 @@ function assertScannerProjection(styleId: string, matrix: QRMatrixData, build: G
       continue
     }
 
-    const scannerDark = top.kind === 'floor-dark' || top.kind === 'qr-top'
-    const scannerLight = top.kind === 'floor-light' || top.kind === 'light-top'
-
-    if (cell.dark && !scannerDark) {
+    const expectedTone = cell.dark ? 'dark' : 'light'
+    if (top.projectionTone !== expectedTone) {
       throw new Error(
-        `${styleId} exposes ${top.kind} above dark QR module ${cell.row}:${cell.col}.`,
-      )
-    }
-    if (!cell.dark && !scannerLight) {
-      throw new Error(
-        `${styleId} exposes ${top.kind} above light QR module ${cell.row}:${cell.col}.`,
+        `${styleId} exposes ${top.kind} with ${top.projectionTone ?? 'no'} tone above `
+        + `${expectedTone} QR module ${cell.row}:${cell.col}.`,
       )
     }
   }
@@ -102,9 +103,10 @@ function assertScannerProjection(styleId: string, matrix: QRMatrixData, build: G
       && top.row < matrix.size
       && top.col >= 0
       && top.col < matrix.size
-    if (!insideSymbol && top.kind !== 'floor-light') {
+    if (!insideSymbol && (top.kind !== 'floor-light' || top.projectionTone !== 'light')) {
       throw new Error(
-        `${styleId} exposes ${top.kind} in quiet-zone column ${top.row}:${top.col}; expected floor-light.`,
+        `${styleId} exposes ${top.kind}/${top.projectionTone ?? 'none'} in quiet-zone column `
+        + `${top.row}:${top.col}; expected light floor material.`,
       )
     }
   }
@@ -181,6 +183,7 @@ function assertDeterministic(styleId: string, first: GeneratedBuild, second: Gen
       || Math.abs(a.y - b.y) > EPSILON
       || Math.abs(a.z - b.z) > EPSILON
       || a.kind !== b.kind
+      || a.projectionTone !== b.projectionTone
       || Math.abs(a.colorPhase - b.colorPhase) > EPSILON
     ) {
       throw new Error(`${styleId} generated non-deterministic voxel ${index}.`)
