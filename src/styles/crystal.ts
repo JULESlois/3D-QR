@@ -10,7 +10,7 @@ import {
 } from '../sculpture'
 
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
-  return (hashString(`${seedText}::crystal-v4::${salt}::${row}:${col}`) % 10000) / 10000
+  return (hashString(`${seedText}::crystal-v5::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
@@ -90,57 +90,55 @@ function buildFloatingCore(
   lifted: Set<string>,
   center: number,
 ): void {
-  // Treat the hero mineral as a fractured cluster rather than one symmetric voxel
-  // pyramid. Each shard stays inside its QR column, but staggered roots and tips create
-  // a much more recognizable crystalline silhouette in the isometric view.
-  const shards = [
-    [0, 0, 5, 20],
-    [-1, 0, 6, 18],
-    [0, 1, 7, 17],
-    [1, 0, 7, 15],
-    [0, -1, 8, 14],
-    [-2, 1, 8, 16],
-    [-2, 2, 10, 14],
-    [-1, 2, 9, 13],
+  // Give the hero crystal a deliberately broad faceted silhouette instead of a bundle
+  // of narrow towers. The upper crown spreads left/right, the middle contracts, and a
+  // long lower point hangs over the basin. Every shard still occupies only its own QR
+  // column, so the sculpture remains projection-safe when viewed from the QR camera.
+  const heroShards = [
+    // Central spine and hanging point.
+    [0, 0, 4, 22],
+    [1, 0, 5, 19],
+    [2, 0, 6, 15],
+    [3, 0, 8, 12],
+
+    // Wide upper crown: asymmetric heights keep the outline crystalline rather than pyramidal.
+    [-1, -1, 6, 20],
+    [-1, 1, 6, 18],
+    [-2, -2, 8, 18],
+    [-2, 2, 8, 17],
+    [-2, -3, 10, 16],
+    [-3, 1, 10, 17],
+    [-3, 3, 11, 15],
+
+    // Mid-body shoulders and fractured side planes.
+    [0, -1, 6, 17],
+    [0, 1, 6, 16],
+    [0, -2, 8, 15],
+    [0, 2, 8, 14],
     [1, -2, 8, 14],
-    [2, -2, 10, 13],
-    [2, -1, 9, 12],
-    [-1, -3, 9, 12],
-    [1, 3, 10, 13],
+    [1, 2, 9, 13],
+    [2, -1, 8, 13],
+    [2, 1, 9, 12],
   ] as const
 
-  for (const [dr, dc, fromLevel, topLevel] of shards) {
+  for (const [dr, dc, fromLevel, topLevel] of heroShards) {
     const cell = getCell(matrix, center + dr, center + dc)
     if (!cell) continue
     pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
     lifted.add(cellKey(cell.row, cell.col))
   }
 
-  // Short buttress facets around the roots make the suspended cluster widen toward
-  // the basin without turning it back into a solid diamond mass.
-  const rootFacets = [
-    [1, 1, 6, 10],
-    [-1, -1, 6, 11],
-    [2, 0, 7, 10],
-    [0, 2, 8, 11],
-    [-2, -1, 8, 11],
+  // Detached crown splinters exaggerate the broken mineral outline without competing
+  // with the central mass. They sit closer to the hero than the old satellites, so the
+  // eye reads one large fractured crystal instead of three unrelated monuments.
+  const splinters = [
+    [-2, -5, 10, 15],
+    [-1, 5, 11, 14],
+    [1, -4, 9, 13],
+    [2, 4, 10, 12],
   ] as const
 
-  for (const [dr, dc, fromLevel, topLevel] of rootFacets) {
-    const cell = getCell(matrix, center + dr, center + dc)
-    if (!cell) continue
-    pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
-    lifted.add(cellKey(cell.row, cell.col))
-  }
-
-  // Two detached satellite shards give the cluster a broken, energetic outline while
-  // remaining close enough to read as one object instead of competing monuments.
-  const satellites = [
-    [-1, -5, 8, 13],
-    [2, 5, 9, 12],
-  ] as const
-
-  for (const [dr, dc, fromLevel, topLevel] of satellites) {
+  for (const [dr, dc, fromLevel, topLevel] of splinters) {
     const cell = getCell(matrix, center + dr, center + dc)
     if (!cell) continue
     pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
@@ -214,7 +212,7 @@ export function generateCrystal(matrix: QRMatrixData, seedText: string): Sculptu
     'crystal',
     'Crystal',
     lifted,
-    'ASYMMETRIC SHARD CLUSTER / SUSPENDED ROOT FACETS / ENERGY BASIN / LOW SANCTUM FRAME',
+    'BROAD FRACTURED HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / LOW SANCTUM FRAME',
     'mineral-slab',
   )
 }
