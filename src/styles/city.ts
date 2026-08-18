@@ -85,15 +85,38 @@ function registerRect(
 }
 
 function buildLandmark(matrix: QRMatrixData, columns: Map<string, UrbanColumn>, row: number, col: number, seedText: string): void {
-  registerRect(matrix, columns, row, col, 3, 3, () => 4, 'podium', 3)
+  // Give the skyline one unmistakable Art-Deco anchor instead of another generic
+  // rectangular tower. A broad podium steps inward through three shoulder bands;
+  // the cross-shaped crown then rises above the diagonal corners before terminating
+  // in a single tall spire. Every piece still occupies an original QR data column.
+  registerRect(matrix, columns, row, col, 3, 3, (cell, dr, dc) => {
+    const ring = Math.max(Math.abs(dr), Math.abs(dc))
+    const n = localNoise(seedText, cell.row, cell.col, 'landmark-podium')
+    return ring === 3 ? 5 : 6 + Math.round(n)
+  }, 'podium', 3)
+
   registerRect(matrix, columns, row, col, 2, 2, (cell, dr, dc) => {
     const ring = Math.max(Math.abs(dr), Math.abs(dc))
-    const n = localNoise(seedText, cell.row, cell.col, 'landmark-body')
-    return ring === 0 ? 18 : ring === 1 ? 15 + Math.round(n) : 12 + Math.round(n)
+    const n = localNoise(seedText, cell.row, cell.col, 'landmark-setback')
+    if (ring === 2) return 10 + Math.round(n)
+    if (ring === 1) return 15 + Math.round(n)
+    return 20
   }, 'landmark', 7)
-  registerRect(matrix, columns, row, col, 1, 1, () => 19, 'landmark', 8)
+
+  // Cardinal shoulders make the crown read as a deliberate stepped skyscraper in
+  // isometric view; keeping diagonals lower preserves visible notches around it.
+  for (const [dr, dc, height] of [
+    [-1, 0, 21],
+    [1, 0, 20],
+    [0, -1, 22],
+    [0, 1, 21],
+  ] as const) {
+    const shoulder = getCell(matrix, row + dr, col + dc)
+    if (shoulder?.zone === 'data') registerColumn(columns, shoulder, height, 'crown', 9)
+  }
+
   const spire = getCell(matrix, row, col)
-  if (spire?.zone === 'data') registerColumn(columns, spire, 24, 'crown', 10)
+  if (spire?.zone === 'data') registerColumn(columns, spire, 28, 'crown', 10)
 }
 
 function buildSetbackTower(matrix: QRMatrixData, columns: Map<string, UrbanColumn>, row: number, col: number, seedText: string): void {
