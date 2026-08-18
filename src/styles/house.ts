@@ -5,7 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
-  projectedCapKind,
+  projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
   type SculptureBuild,
@@ -13,7 +13,7 @@ import {
 } from '../sculpture'
 
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
-  return (hashString(`${seedText}::house-v4::${salt}::${row}:${col}`) % 10000) / 10000
+  return (hashString(`${seedText}::house-v5::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
@@ -42,7 +42,11 @@ function pushStyledColumn(
   for (let level = fromLevel; level <= topLevel; level += 1) {
     let kind: VoxelKind
     if (level === topLevel) {
-      kind = projectedCapKind(cell)
+      kind = flags.chimney && topLevel > wallHeight
+        ? 'stone'
+        : topLevel > wallHeight
+          ? 'primary'
+          : 'plaster'
     } else if (flags.chimney && level > wallHeight) {
       kind = 'stone'
     } else if (flags.door && level <= Math.min(4, wallHeight)) {
@@ -66,6 +70,7 @@ function pushStyledColumn(
       level,
       kind,
       (localNoise(seedText, cell.row, cell.col, `${salt}-${level}`) * 0.6 + level * 0.039) % 1,
+      level === topLevel ? projectionToneForCell(cell) : undefined,
     )
   }
 }
@@ -118,6 +123,63 @@ function buildMainHouse(
   }
 }
 
+function buildSideCrossGable(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  seedText: string,
+  lifted: Set<string>,
+  center: number,
+  mainHalfWidth: number,
+  wallHeight: number,
+): void {
+  const wingCenterCol = center - mainHalfWidth - 1
+  const wingHalfWidth = 3
+  const wingHalfDepth = 2
+  const wingWall = Math.max(4, wallHeight - 1)
+  const wingRoofRise = 4
+  const outwardCol = wingCenterCol - wingHalfWidth
+
+  for (let row = center - wingHalfDepth; row <= center + wingHalfDepth; row += 1) {
+    for (let col = wingCenterCol - wingHalfWidth; col <= wingCenterCol + wingHalfWidth; col += 1) {
+      const cell = getCell(matrix, row, col)
+      if (!cell || cell.zone !== 'data') continue
+
+      const roofLevel = wingWall + Math.max(1, wingRoofRise - Math.abs(row - center))
+      const outwardWindow = col === outwardCol && Math.abs(row - center) <= 1
+      const sideWindow = Math.abs(row - center) === wingHalfDepth
+        && col >= wingCenterCol - 1
+        && col <= wingCenterCol + 1
+
+      pushStyledColumn(
+        voxels,
+        cell,
+        matrix.size,
+        roofLevel,
+        wingWall,
+        seedText,
+        'cross-gable',
+        { window: outwardWindow || sideWindow },
+      )
+      lifted.add(cellKey(cell.row, cell.col))
+    }
+  }
+
+  for (let row = center - 1; row <= center + 1; row += 1) {
+    const cell = getCell(matrix, row, outwardCol - 1)
+    if (!cell || cell.zone !== 'data') continue
+    pushProjectedColumn(
+      voxels,
+      cell,
+      matrix.size,
+      1,
+      2,
+      'stone',
+      () => localNoise(seedText, row, outwardCol - 1, 'bay-sill'),
+    )
+    lifted.add(cellKey(cell.row, cell.col))
+  }
+}
+
 function buildFrontGable(
   voxels: ReturnType<typeof createBaseVoxels>,
   matrix: QRMatrixData,
@@ -140,10 +202,6 @@ function buildFrontGable(
       const isFrontWall = dr === depth
       const isDoor = isFrontWall && Math.abs(dc) <= 1
       const isWindow = isFrontWall && Math.abs(dc) === 2
-
-      // The central three bays are now genuinely open below the gable roof. Side
-      // piers remain full-height, so the projection-safe roof reads as a covered
-      // porch instead of another solid rectangular appendage.
       const openPorchBay = !isFrontWall && Math.abs(dc) <= 2
       const fromLevel = openPorchBay ? Math.max(3, wallHeight - 1) : 1
 
@@ -189,14 +247,13 @@ function buildRoofDormers(
         const fromLevel = existingRoof + 1
 
         for (let level = fromLevel; level <= topLevel; level += 1) {
-          let kind: VoxelKind
-          if (level === topLevel) {
-            kind = projectedCapKind(cell)
-          } else if (dr === 1 && level === fromLevel) {
-            kind = 'glass'
-          } else {
-            kind = level >= topLevel - 1 ? 'primary' : 'wood'
-          }
+          const kind: VoxelKind = level === topLevel
+            ? 'primary'
+            : dr === 1 && level === fromLevel
+              ? 'glass'
+              : level >= topLevel - 1
+                ? 'primary'
+                : 'wood'
 
           pushCellVoxel(
             voxels,
@@ -205,6 +262,7 @@ function buildRoofDormers(
             level,
             kind,
             (localNoise(seedText, row, col, `dormer-${level}`) * 0.58 + level * 0.043) % 1,
+            level === topLevel ? projectionToneForCell(cell) : undefined,
           )
         }
 
@@ -255,11 +313,7 @@ function buildRoofEaves(
 ): void {
   for (const row of [center - halfDepth - 1, center + halfDepth + 1]) {
     for (let col = center - halfWidth - 1; col <= center + halfWidth + 1; col += 1) {
-      // The front gable starts on the same row as the front eave. Leaving its
-      // seven-cell span to the gable avoids two independent builders occupying
-      // the exact same voxel levels while preserving the continuous side eaves.
       if (row > center && Math.abs(col - center) <= 3) continue
-
       const cell = getCell(matrix, row, col)
       if (!cell || cell.zone !== 'data') continue
       pushProjectedColumn(voxels, cell, matrix.size, wallHeight + 1, wallHeight + 2, 'wood', random)
@@ -276,9 +330,6 @@ function buildEntryStepsAndPath(
   center: number,
   frontGableRow: number,
 ): void {
-  // Keep the foreground light now that the gable itself provides the porch roof.
-  // Two shallow stone steps lead directly into the open bay rather than adding a
-  // second canopy that would thicken the silhouette again.
   for (let row = frontGableRow + 1; row <= frontGableRow + 2; row += 1) {
     const halfStep = row === frontGableRow + 1 ? 2 : 1
     for (let col = center - halfStep; col <= center + halfStep; col += 1) {
@@ -319,6 +370,7 @@ export function generateHouse(matrix: QRMatrixData, seedText: string): Sculpture
   const frontGableRow = frontRow + 4
 
   buildMainHouse(voxels, matrix, seedText, lifted, center, halfWidth, halfDepth, wallHeight, roofRise)
+  buildSideCrossGable(voxels, matrix, seedText, lifted, center, halfWidth, wallHeight)
   buildFrontGable(voxels, matrix, seedText, lifted, center, frontRow, wallHeight)
   buildRoofDormers(voxels, matrix, seedText, lifted, center, halfDepth, wallHeight, roofRise)
   buildGarageWing(voxels, matrix, seedText, lifted, center, halfWidth, frontRow)
@@ -331,7 +383,7 @@ export function generateHouse(matrix: QRMatrixData, seedText: string): Sculpture
     'house',
     'House',
     lifted,
-    'GABLED HOME / OPEN COVERED PORCH / TWIN DORMERS / 2-CELL CHIMNEY / GARAGE WING / ENTRY STEPS + PATH',
+    'L-SHAPED CROSS-GABLE HOME / OPEN PORCH / BAY WINDOW / TWIN DORMERS / STONE CHIMNEY / GARAGE WING / ENTRY PATH',
     'courtyard-pad',
   )
 }
