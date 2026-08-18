@@ -1,6 +1,6 @@
 import { CELL_SIZE, QUIET_ZONE, cellKey, positionForCell } from '../src/sculpture'
 import { createQRMatrix, type QRMatrixData } from '../src/qr'
-import { getPalette, type ScenePaletteDefinition } from '../src/palettes'
+import { PALETTE_KEYS, getPalette, type ScenePaletteDefinition } from '../src/palettes'
 import { STYLES } from '../src/styles'
 
 interface ProjectionCase {
@@ -91,34 +91,39 @@ function assertPairedMaterialContrast(
   }
 }
 
-function assertDefaultPaletteContrast(): number {
+function assertAllPaletteContrast(): { pairedMaterialCount: number; paletteCount: number } {
   let pairedMaterialCount = 0
+  let paletteCount = 0
 
   for (const style of STYLES) {
-    const palette = getPalette(style.id, style.defaultPalette)
+    for (const paletteKey of PALETTE_KEYS) {
+      const palette = getPalette(style.id, paletteKey)
+      const paletteLabel = `${paletteKey}/${palette.label}`
+      paletteCount += 1
 
-    if (!palette.baseLight || !palette.baseDark?.length) {
-      throw new Error(`${style.id}/${palette.label} must define both baseLight and baseDark for projection polarity.`)
-    }
+      if (!palette.baseLight || !palette.baseDark?.length) {
+        throw new Error(`${style.id}/${paletteLabel} must define both baseLight and baseDark for projection polarity.`)
+      }
 
-    const baseLight = relativeLuminance(palette.baseLight)
-    const brightestBaseDark = Math.max(...palette.baseDark.map(relativeLuminance))
-    const baseGap = baseLight - brightestBaseDark
-    if (baseGap < MIN_BASE_LUMINANCE_GAP) {
-      throw new Error(
-        `${style.id}/${palette.label} base field luminance gap ${baseGap.toFixed(4)} is below ${MIN_BASE_LUMINANCE_GAP}.`,
-      )
-    }
+      const baseLight = relativeLuminance(palette.baseLight)
+      const brightestBaseDark = Math.max(...palette.baseDark.map(relativeLuminance))
+      const baseGap = baseLight - brightestBaseDark
+      if (baseGap < MIN_BASE_LUMINANCE_GAP) {
+        throw new Error(
+          `${style.id}/${paletteLabel} base field luminance gap ${baseGap.toFixed(4)} is below ${MIN_BASE_LUMINANCE_GAP}.`,
+        )
+      }
 
-    for (const material of PAIRED_MATERIAL_KEYS) {
-      const colors = palette[material]
-      if (!Array.isArray(colors)) continue
-      assertPairedMaterialContrast(style.id, palette.label, material, colors)
-      pairedMaterialCount += 1
+      for (const material of PAIRED_MATERIAL_KEYS) {
+        const colors = palette[material]
+        if (!Array.isArray(colors)) continue
+        assertPairedMaterialContrast(style.id, paletteLabel, material, colors)
+        pairedMaterialCount += 1
+      }
     }
   }
 
-  return pairedMaterialCount
+  return { pairedMaterialCount, paletteCount }
 }
 
 function assertVoxelStructure(styleId: string, matrixSize: number, voxels: GeneratedVoxel[]): void {
@@ -292,7 +297,7 @@ function assertDeterministic(styleId: string, first: GeneratedBuild, second: Gen
   }
 }
 
-const pairedMaterialCount = assertDefaultPaletteContrast()
+const { pairedMaterialCount, paletteCount } = assertAllPaletteContrast()
 
 for (const testCase of cases) {
   const matrix = createQRMatrix(testCase.payload)
@@ -314,5 +319,5 @@ for (const testCase of cases) {
 
 console.log(
   `projection smoke passed for ${STYLES.length} styles across ${cases.length} QR sizes; `
-  + `${pairedMaterialCount} default paired material ramps preserve luminance polarity`,
+  + `${pairedMaterialCount} paired material ramps across ${paletteCount} palettes preserve luminance polarity`,
 )
