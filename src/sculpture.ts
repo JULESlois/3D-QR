@@ -17,7 +17,13 @@ export type VoxelKind =
   | 'water'
   | 'crystal'
 
-export type ProjectionStrategy = 'full-pad' | 'courtyard-pad' | 'stone-plinth' | 'display-plaque' | 'mineral-slab'
+export type ProjectionStrategy =
+  | 'full-pad'
+  | 'courtyard-pad'
+  | 'stone-plinth'
+  | 'display-plaque'
+  | 'mineral-slab'
+  | 'free-standing-glyph'
 export type BaseFieldMode = 'full-pad' | 'symbol-pad' | 'dark-only' | 'window' | 'none'
 
 export interface BaseFieldProfile {
