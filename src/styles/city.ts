@@ -249,6 +249,38 @@ function buildUrbanColumn(voxels: ReturnType<typeof createBaseVoxels>, column: U
   }
 }
 
+type StreetRole = 'lane' | 'sidewalk' | 'crosswalk'
+
+function streetRole(cell: QRCell, center: number, spread: number, outer: number): StreetRole | null {
+  if (cell.zone !== 'data') return null
+
+  const dr = cell.row - center
+  const dc = cell.col - center
+  const adr = Math.abs(dr)
+  const adc = Math.abs(dc)
+  if (adr > outer + 2 || adc > outer + 2) return null
+
+  // Four boulevard spokes run toward the central landmark. Their two-cell shoulders
+  // make the street mass visible in isometric view while the landmark itself is free
+  // to interrupt the avenue physically, like a civic block at the city center.
+  const verticalBoulevard = adc <= 1
+  const horizontalBoulevard = adr <= 1
+
+  // A one-cell square ring creates a legible block boundary around the landmark and
+  // reconnects the four spokes. This is deliberately geometric rather than noisy so
+  // the base reads as planned streets instead of leftover QR cells.
+  const ringRadius = Math.max(5, Math.round(spread * 0.72))
+  const onRing = Math.max(adr, adc) === ringRadius
+
+  if (!verticalBoulevard && !horizontalBoulevard && !onRing) return null
+
+  const atRingJunction = onRing && (adc <= 1 || adr <= 1)
+  if (atRingJunction && ((cell.row + cell.col) & 1) === 0) return 'crosswalk'
+
+  const centerLane = adc === 0 || adr === 0 || onRing
+  return centerLane ? 'lane' : 'sidewalk'
+}
+
 export function generateCity(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'city')
   const { random } = context
@@ -297,18 +329,20 @@ export function generateCity(matrix: QRMatrixData, seedText: string): SculptureB
     lifted.add(cellKey(column.cell.row, column.cell.col))
   }
 
-  let plazaCount = 0
+  let streetCount = 0
   for (const cell of matrix.cells) {
-    if (cell.zone !== 'data' || cell.dark) continue
     if (columns.has(cellKey(cell.row, cell.col))) continue
-    const d = Math.hypot(cell.row - center, cell.col - center)
-    if (d > outer + 2) continue
-    if (localNoise(seedText, cell.row, cell.col, 'plaza') < 0.98) continue
-    pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'plaster', random)
+    const role = streetRole(cell, center, spread, outer)
+    if (!role) continue
+
+    // Roads may cross both dark and light QR cells. pushProjectedColumn preserves
+    // that polarity on the visible surface, so asphalt/sidewalk remains a coherent
+    // material system without forcing the street network back to black-and-white.
+    const material: VoxelKind = role === 'lane' ? 'stone' : 'plaster'
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 1, material, random)
     lifted.add(cellKey(cell.row, cell.col))
-    plazaCount += 1
-    if (plazaCount >= 6) break
+    streetCount += 1
   }
 
-  return finalizeSculpture(matrix, voxels, 'city', 'City', lifted, `DENSE SKYLINE / SKYBRIDGE GATE + LANDMARK + SETBACK + TWIN + SLAB + TERRACE + NEEDLE + ZIGGURAT / ${columns.size} BUILT CELLS`, 'display-plaque')
+  return finalizeSculpture(matrix, voxels, 'city', 'City', lifted, `DENSE SKYLINE / ART-DECO LANDMARK + RING ROAD + 4 BOULEVARD SPOKES / ${columns.size} BUILT CELLS + ${streetCount} STREET CELLS`, 'display-plaque')
 }
