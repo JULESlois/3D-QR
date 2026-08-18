@@ -6,6 +6,7 @@ import {
   finalizeSculpture,
   hashString,
   projectedCapKind,
+  projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
   type SculptureBuild,
@@ -199,40 +200,86 @@ function buildTorii(
 ): void {
   const safeHalfWidth = Math.max(6, Math.min(Math.floor(matrix.size * 0.36), Math.floor((matrix.size - 3) / 2)))
   const postOffset = Math.max(3, safeHalfWidth - 3)
+  const toriiRows = [toriiRow, Math.min(matrix.size - 1, toriiRow + 1)]
   const postColumns = [
     center - postOffset - 1,
     center - postOffset,
     center + postOffset,
     center + postOffset + 1,
   ]
-  const toriiRows = [toriiRow, Math.min(matrix.size - 1, toriiRow + 1)]
 
+  // Four two-cell posts produce a broad ceremonial frame without filling the opening.
+  // Their visible tops retain the vermilion material instead of becoming scanner caps.
   for (const row of toriiRows) {
     for (const col of postColumns) {
       const cell = getCell(matrix, row, col)
       if (!cell) continue
       for (let level = 1; level <= 11; level += 1) {
-        pushCellVoxel(voxels, cell, matrix.size, level, level === 11 ? projectedCapKind(cell) : 'primary', 0.08)
+        pushCellVoxel(
+          voxels,
+          cell,
+          matrix.size,
+          level,
+          'primary',
+          0.08,
+          level === 11 ? projectionToneForCell(cell) : undefined,
+        )
       }
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
 
-  for (let col = center - safeHalfWidth + 1; col <= center + safeHalfWidth - 1; col += 1) {
-    const cell = getCell(matrix, toriiRow, col)
+  // A shorter nuki beam sits clearly below the roof beam, preserving a band of open
+  // air above it. This negative space is what makes the structure read as a torii
+  // rather than a generic rectangular gate from the default isometric camera.
+  const nukiHalfWidth = Math.max(3, postOffset - 1)
+  for (let col = center - nukiHalfWidth; col <= center + nukiHalfWidth; col += 1) {
+    const cell = getCell(matrix, toriiRow + 1, col)
     if (!cell) continue
     pushCellVoxel(voxels, cell, matrix.size, 9, 'primary', 0.08)
+    pushCellVoxel(
+      voxels,
+      cell,
+      matrix.size,
+      10,
+      'primary',
+      0.08,
+      projectionToneForCell(cell),
+    )
     lifted.add(cellKey(cell.row, cell.col))
   }
 
+  // The upper kasagi is no longer perfectly horizontal. The center stays low while
+  // both ends rise by two voxel levels, yielding the characteristic upturned torii
+  // silhouette. A slightly shorter lower lip keeps the roof beam visually layered.
   for (const row of toriiRows) {
     for (let col = center - safeHalfWidth; col <= center + safeHalfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
       if (!cell) continue
-      pushCellVoxel(voxels, cell, matrix.size, 12, 'primary', 0.08)
-      pushCellVoxel(voxels, cell, matrix.size, 13, projectedCapKind(cell), 0.08)
+      const normalized = Math.abs(col - center) / Math.max(1, safeHalfWidth)
+      const lift = normalized > 0.84 ? 2 : normalized > 0.62 ? 1 : 0
+      const topLevel = 13 + lift
+
+      pushCellVoxel(voxels, cell, matrix.size, topLevel - 1, 'primary', 0.08)
+      pushCellVoxel(
+        voxels,
+        cell,
+        matrix.size,
+        topLevel,
+        'primary',
+        0.08,
+        projectionToneForCell(cell),
+      )
       lifted.add(cellKey(cell.row, cell.col))
     }
+  }
+
+  const lowerLipHalfWidth = Math.max(4, safeHalfWidth - 1)
+  for (let col = center - lowerLipHalfWidth; col <= center + lowerLipHalfWidth; col += 1) {
+    const cell = getCell(matrix, toriiRow, col)
+    if (!cell) continue
+    pushCellVoxel(voxels, cell, matrix.size, 12, 'primary', 0.08)
+    lifted.add(cellKey(cell.row, cell.col))
   }
 }
 
@@ -271,7 +318,7 @@ export function generateTemple(matrix: QRMatrixData, seedText: string): Sculptur
     'temple',
     'Temple',
     lifted,
-    'OVERSIZED TORII / DEEP-EAVED RIDGE HALL / TIMBER FACADE / BROAD STONE APPROACH',
+    'UPTURNED KASAGI TORII / DEEP-EAVED RIDGE HALL / TIMBER FACADE / BROAD STONE APPROACH',
     'courtyard-pad',
   )
 }
