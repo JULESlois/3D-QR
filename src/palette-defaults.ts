@@ -9,6 +9,17 @@ type MutablePaletteTable = Record<PaletteSceneId, Record<PaletteKey, ScenePalett
 
 const palettes = STYLE_PALETTES as unknown as MutablePaletteTable
 
+const PAIRED_MATERIAL_KEYS = [
+  'colors',
+  'foundation',
+  'wood',
+  'stone',
+  'plaster',
+  'glass',
+  'water',
+  'crystal',
+] as const satisfies readonly (keyof ScenePaletteDefinition)[]
+
 function setDefaultPalette(
   scene: PaletteSceneId,
   key: PaletteKey,
@@ -16,6 +27,63 @@ function setDefaultPalette(
 ): void {
   palettes[scene][key] = palette
 }
+
+function parseHex(hex: string): [number, number, number] {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!match) throw new Error(`Unsupported palette color ${hex}; expected #RRGGBB.`)
+  const value = Number.parseInt(match[1], 16)
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
+}
+
+function toHex(red: number, green: number, blue: number): string {
+  const channel = (value: number) => Math.round(Math.max(0, Math.min(255, value)))
+    .toString(16)
+    .padStart(2, '0')
+  return `#${channel(red)}${channel(green)}${channel(blue)}`
+}
+
+function mixHex(source: string, target: string, amount: number): string {
+  const [sr, sg, sb] = parseHex(source)
+  const [tr, tg, tb] = parseHex(target)
+  return toHex(
+    sr + (tr - sr) * amount,
+    sg + (tg - sg) * amount,
+    sb + (tb - sb) * amount,
+  )
+}
+
+function polarityRamp(colors: readonly string[]): readonly string[] {
+  // Keep every authored hue as an anchor. The first half becomes a richer/shadowed
+  // version and the second half a sunlit version of the same sequence, matching
+  // sculpture.ts' projectionTone colorPhase mapping without collapsing to black/white.
+  const dark = colors.map((color) => mixHex(color, '#101820', 0.24))
+  const light = colors.map((color) => mixHex(color, '#f2f0e7', 0.16))
+  return [...dark, ...light]
+}
+
+function normalizeAlternatePalettes(): void {
+  // The original palette table predates material/polarity decoupling. Normalize every
+  // authored option first; curated defaults below then replace their active entries.
+  // This makes palette switching projection-safe instead of relying on accidental array order.
+  for (const scenePalettes of Object.values(palettes)) {
+    for (const palette of Object.values(scenePalettes)) {
+      for (const material of PAIRED_MATERIAL_KEYS) {
+        const colors = palette[material]
+        if (!Array.isArray(colors) || colors.length === 0) continue
+        ;(palette as unknown as Record<string, unknown>)[material] = polarityRamp(colors)
+      }
+
+      if (palette.baseDark?.length) {
+        palette.baseDark = palette.baseDark.map((color) => mixHex(color, '#101820', 0.18))
+      }
+      if (palette.baseLight) {
+        palette.baseLight = mixHex(palette.baseLight, '#f2f0e7', 0.1)
+      }
+    }
+  }
+}
+
+normalizeAlternatePalettes()
 
 // Paired material arrays are ordered as [dark variants..., matching light variants...].
 // sculpture.ts maps projectionTone into the lower or upper half while preserving the
