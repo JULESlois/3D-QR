@@ -54,9 +54,37 @@ const FONT_5X7: Record<string, readonly string[]> = {
 }
 
 const GLYPH_TOKEN = /[A-Z0-9@#?!+&]/
+const URL_SCHEME = /^[A-Z][A-Z0-9+.-]*:\/\//i
+const GENERIC_HOST_PREFIX = /^(?:WWW\d*|MOBILE|M)\./i
+
+function firstGlyphToken(value: string): string | null {
+  return value.toUpperCase().match(GLYPH_TOKEN)?.[0] ?? null
+}
 
 function glyphFromSeed(seedText: string): string {
-  return seedText.toUpperCase().match(GLYPH_TOKEN)?.[0] ?? 'Q'
+  const trimmed = seedText.trim()
+
+  // Raw URL payloads used to almost always become "H" because the first token came
+  // from "https". For URLs, derive the sculpture identity from the destination host
+  // instead, stripping generic www/mobile prefixes. The QR payload itself is untouched.
+  if (URL_SCHEME.test(trimmed)) {
+    try {
+      const url = new URL(trimmed)
+      const meaningfulHost = url.hostname.replace(GENERIC_HOST_PREFIX, '')
+      const fromHost = firstGlyphToken(meaningfulHost)
+      if (fromHost) return fromHost
+
+      // Hostless/custom schemes still get a deterministic fallback from their path.
+      const fromPath = firstGlyphToken(url.pathname)
+      if (fromPath) return fromPath
+    } catch {
+      // Malformed URLs fall through to normal text token selection.
+    }
+  }
+
+  // Protocol-less www.example.com should identify as E rather than W.
+  const withoutGenericHostPrefix = trimmed.replace(GENERIC_HOST_PREFIX, '')
+  return firstGlyphToken(withoutGenericHostPrefix) ?? 'Q'
 }
 
 type GlyphBand = 'face' | 'inner-bevel' | 'outer-bevel' | 'field'
@@ -147,7 +175,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `GLYPH ${glyph} / FREE-STANDING QR BODY / SYMBOL SET A-Z 0-9 @ # ? ! + & / EMPTY LIGHT FIELD`,
-    'display-plaque',
+    `GLYPH ${glyph} / PAYLOAD-AWARE IDENTITY / FREE-STANDING QR BODY / SYMBOL SET A-Z 0-9 @ # ? ! + &`,
+    'free-standing-glyph',
   )
 }
