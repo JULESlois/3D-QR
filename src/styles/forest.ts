@@ -5,7 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
-  projectedCapKind,
+  projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
   type SculptureBuild,
@@ -187,10 +187,16 @@ function registerCanopy(
       let fromLevel: number
 
       if (tree.species === 'pine') {
-        const cone = Math.max(0, 1 - radial)
-        const angular = Math.cos(Math.atan2(dr, dc) * 3 + tree.index * 0.9) * 0.8
-        topLevel = tree.trunkHeight + 2 + Math.round(cone * tree.crownHeight + angular + noise * 1.6)
-        fromLevel = Math.max(3, tree.trunkHeight - 2 + Math.round(radial * 3))
+        // Quantize the crown into four increasingly wide bough shelves instead of
+        // using one smooth cone. In the isometric camera this creates the familiar
+        // spruce/fir cadence: needle tip, narrow upper tier, broad middle tier and
+        // a heavy lower skirt, with exposed trunk between the shelves.
+        const tier = radial <= 0.18 ? 0 : radial <= 0.42 ? 1 : radial <= 0.68 ? 2 : 3
+        const tierDrop = [0, 3, 6, 9][tier]
+        const branchLift = noise > 0.76 ? 1 : 0
+        topLevel = tree.trunkHeight + 2 + tree.crownHeight - tierDrop + branchLift
+        const shelfDepth = tier === 0 ? 5 : 2 + ((tree.index + tier) % 2)
+        fromLevel = Math.max(3, topLevel - shelfDepth)
       } else {
         const lobe = broadleafLobe(dr, dc, tree.radius, seedText, tree)
         if (lobe <= 0.02) continue
@@ -259,10 +265,11 @@ function shouldKeepLeafLayer(column: CanopyColumn, level: number): boolean {
 
   const distanceFromTop = column.topLevel - level
   if (column.species === 'pine') {
-    // Alternating one- and two-layer bough shelves expose the trunk between tiers.
-    // The central cone remains denser so the silhouette still converges to a spire.
-    if (column.radial < 0.36) return true
-    return distanceFromTop % 3 !== 1
+    // The narrow core stays connected vertically while outer branch shelves remain
+    // intentionally thin. This prevents the stepped crown from reading as four solid
+    // cylinders and exposes dark trunk gaps between successive tiers.
+    if (column.radial < 0.24) return true
+    return distanceFromTop <= 2
   }
 
   if (column.species === 'ancient') {
@@ -292,8 +299,9 @@ function buildCanopy(
         column.cell,
         matrix.size,
         level,
-        level === column.topLevel ? projectedCapKind(column.cell) : 'primary',
+        'primary',
         (localNoise(seedText, column.cell.row, column.cell.col, `leaf-${column.treeIndex}-${level}`) * 0.72 + level * 0.033) % 1,
+        level === column.topLevel ? projectionToneForCell(column.cell) : undefined,
       )
     }
     lifted.add(cellKey(column.cell.row, column.cell.col))
@@ -381,7 +389,7 @@ export function generateForest(matrix: QRMatrixData, seedText: string): Sculptur
     'forest',
     'Forest',
     lifted,
-    `${trees.length} TREES / LOBED BROADLEAF + TIERED PINE + HOLLOW ANCIENT CROWNS / WINDING GLADE`,
+    `${trees.length} TREES / LOBED BROADLEAF + STEPPED SPRUCE TIERS + HOLLOW ANCIENT CROWNS / WINDING GLADE`,
     'full-pad',
   )
 }
