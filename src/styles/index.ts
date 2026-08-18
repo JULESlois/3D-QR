@@ -100,7 +100,7 @@ export const STYLES: readonly StyleDefinition[] = [
   {
     id: 'lighthouse', label: 'Lighthouse', eyebrow: 'VOXEL QR SCULPTURE / LIGHTHOUSE', headline: 'Shape the tide.',
     description: 'Scanner-light QR cells become a shallow blue wave field with deterministic height variation. Finder regions rise into reef-like breakwaters while the dark island and beacon remain the visual anchor.',
-    specimen: 'SEA + REEFS + BEACON = QR', projectionLabel: 'TIDAL HARBOR', defaultPalette: 'ginkgo',
+    specimen: 'SEA + REEFS + BEACON = QR', projectionLabel: 'TIDAL HARBOR', defaultPalette: 'blossom',
     appearance: { baseLight: '#b9dce4', baseDark: ['#245663', '#2e6870', '#174a54', '#376f77'], foundation: ['#55787a', '#466769', '#678486'], qrTop: '#163d47', lightTop: '#b8dfe8', water: ['#9bcbd8', '#acd7e1', '#b9e0e7', '#8fc3d1'], voxelFill: 0.93 },
     generate: generateLighthouse,
   },
@@ -114,7 +114,7 @@ export const STYLES: readonly StyleDefinition[] = [
   {
     id: 'temple', label: 'Temple', eyebrow: 'VOXEL QR SCULPTURE / TEMPLE', headline: 'Pass through the code.',
     description: 'A large foreground torii frames a central stone approach and a broad rear shrine hall. Finder regions stay subordinate as low gardens, water and lantern fragments instead of becoming three towers, giving the scene a strong front-to-back shrine axis.',
-    specimen: 'TORII + APPROACH + MAIN HALL = QR', projectionLabel: 'SHRINE AXIS', defaultPalette: 'spectrum',
+    specimen: 'TORII + APPROACH + MAIN HALL = QR', projectionLabel: 'SHRINE AXIS', defaultPalette: 'blossom',
     appearance: { baseLight: '#eee8dc', baseDark: ['#4b433a', '#58493f', '#3d4740', '#645143'], foundation: ['#8d8172', '#756b60', '#a09686'], qrTop: '#342f2a', lightTop: '#f3eee4', water: ['#9fbfbd', '#b2cdc7', '#91b3b3', '#c2d7d0'], voxelFill: 0.95 },
     generate: generateTemple,
   },

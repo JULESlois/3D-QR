@@ -12,20 +12,38 @@ const exportButton = footerActions?.querySelector<HTMLButtonElement>('.style-chi
 const eyebrow = document.querySelector<HTMLElement>('#style-eyebrow')
 const headline = document.querySelector<HTMLElement>('#style-headline')
 const lede = document.querySelector<HTMLElement>('#style-lede')
+const masthead = document.querySelector<HTMLElement>('.masthead')
+const styleControl = styleRow?.closest<HTMLElement>('.style-control') ?? null
 
 // Canvas click already owns the sculpture / QR reveal. Keep main.ts' reference alive,
 // but remove the duplicate visible button from the control surface.
 modeToggle?.remove()
 footerActions?.classList.add('footer-actions')
+// The corner identity/source labels compete with the artwork and the persistent scene nav.
+// main.ts already holds the hidden mode readout reference, so removing the masthead here is safe.
+masthead?.remove()
 
-// Treat the visible sculpture and its controls as one carousel page. The masthead stays
-// fixed so navigation identity is stable while the scene itself leaves the viewport.
+// Treat the visible sculpture and its controls as one carousel page. The persistent scene
+// dock is detached below, so only artwork and its explanation leave the viewport.
 let sceneWindow = appShell?.querySelector<HTMLElement>('.scene-window') ?? null
 if (!sceneWindow && appShell && stage && controlPanel) {
   sceneWindow = document.createElement('div')
   sceneWindow.className = 'scene-window'
   appShell.insertBefore(sceneWindow, stage)
   sceneWindow.append(stage, controlPanel)
+}
+
+// Scene navigation belongs to the viewport, not to the sliding scene page. Detaching the
+// original row keeps main.ts' button references intact while preventing scene changes from
+// carrying the selector off-screen.
+let sceneDock: HTMLElement | null = appShell?.querySelector<HTMLElement>('.scene-dock') ?? null
+if (!sceneDock && appShell && styleRow) {
+  sceneDock = document.createElement('nav')
+  sceneDock.className = 'scene-dock'
+  sceneDock.setAttribute('aria-label', 'Scene selector')
+  appShell.append(sceneDock)
+  sceneDock.append(styleRow)
+  styleControl?.remove()
 }
 
 // Rebuild the scene copy as a plain information block. Dynamic text is no longer bound
@@ -46,11 +64,47 @@ if (controlCopy && eyebrow && headline && lede) {
   controlCopy.replaceChildren(sceneCopy, panelToggle)
 }
 
+let panelRestoreToggle: HTMLButtonElement | null = null
+if (appShell) {
+  panelRestoreToggle = document.createElement('button')
+  panelRestoreToggle.type = 'button'
+  panelRestoreToggle.className = 'panel-restore-toggle'
+  panelRestoreToggle.setAttribute('aria-label', 'Show QR controls')
+  panelRestoreToggle.setAttribute('aria-hidden', 'true')
+  panelRestoreToggle.tabIndex = -1
+  appShell.append(panelRestoreToggle)
+}
+
 const transitionStyle = document.createElement('style')
 transitionStyle.textContent = `
   /* Palette experiments stay dormant; every scene continues using its default palette. */
   .palette-control {
     display: none !important;
+  }
+
+  .scene-dock {
+    position: fixed;
+    z-index: 40;
+    top: max(14px, env(safe-area-inset-top));
+    left: 50%;
+    width: min(360px, calc(100vw - 120px));
+    padding: 3px 5px;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--paper-clean) 78%, transparent);
+    backdrop-filter: blur(12px) saturate(.86);
+    -webkit-backdrop-filter: blur(12px) saturate(.86);
+    pointer-events: auto;
+  }
+
+  .scene-dock button {
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .scene-dock button:focus-visible {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
   /* One full viewport page owns both the artwork and the explanation card. */
@@ -204,8 +258,9 @@ transitionStyle.textContent = `
     overflow: hidden;
     transform-origin: left bottom;
     transition:
-      width 320ms cubic-bezier(.22,.72,.22,1),
-      max-height 320ms cubic-bezier(.22,.72,.22,1),
+      width 300ms cubic-bezier(.22,.72,.22,1),
+      height 240ms cubic-bezier(.22,.72,.22,1),
+      max-height 240ms cubic-bezier(.22,.72,.22,1),
       padding 300ms cubic-bezier(.22,.72,.22,1),
       background-color 220ms ease,
       box-shadow 220ms ease,
@@ -288,6 +343,72 @@ transitionStyle.textContent = `
   body[data-controls='collapsed'] .panel-collapse-toggle::before,
   body[data-controls-phase='opening'] .panel-collapse-toggle::before {
     content: '+' !important;
+  }
+
+  /* Two-axis immersive fold: full card -> left vertical line -> bottom-left point.
+     Because left/bottom stay fixed, width loss travels right-to-left and height loss
+     travels top-to-bottom. Expansion uses the exact reverse sequence. */
+  body[data-controls-shape='full'] .control-panel {
+    width: var(--controls-expanded-width, min(455px, calc(100vw - 56px))) !important;
+    height: var(--controls-expanded-height, auto) !important;
+    max-height: none !important;
+  }
+
+  body[data-controls-shape='line'] .control-panel,
+  body[data-controls-shape='point'] .control-panel {
+    padding: 0 !important;
+    background: color-mix(in srgb, var(--ink) 46%, transparent) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  body[data-controls-shape='line'] .control-panel {
+    width: 5px !important;
+    height: var(--controls-expanded-height, 300px) !important;
+    max-height: none !important;
+  }
+
+  body[data-controls-shape='point'] .control-panel {
+    width: 5px !important;
+    height: 5px !important;
+    max-height: 5px !important;
+  }
+
+  body[data-controls-phase='closing-x'] .control-panel > *,
+  body[data-controls-phase='closing-y'] .control-panel > *,
+  body[data-controls-phase='collapsed'] .control-panel > *,
+  body[data-controls-phase='opening-y'] .control-panel > *,
+  body[data-controls-phase='opening-x'] .control-panel > * {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .panel-restore-toggle {
+    position: fixed;
+    z-index: 45;
+    left: 8px;
+    bottom: 8px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body[data-controls-phase='collapsed'] .panel-restore-toggle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .panel-restore-toggle:focus-visible {
+    outline: 1px solid color-mix(in srgb, var(--ink) 42%, transparent);
+    outline-offset: -8px;
   }
 
   /* Compact, borderless scene stepper. The scene count has intentionally been removed. */
@@ -470,6 +591,19 @@ transitionStyle.textContent = `
   }
 
   @media (max-width: 760px) {
+    .scene-dock {
+      top: max(8px, env(safe-area-inset-top));
+      width: calc(100vw - 24px);
+      padding-inline: 2px;
+    }
+
+    .panel-restore-toggle {
+      left: 0;
+      bottom: max(0px, env(safe-area-inset-bottom));
+      width: 48px;
+      height: 48px;
+    }
+
     .scene-copy .control-copy-heading {
       max-width: 18ch;
       font-size: clamp(25px, 8vw, 32px);
@@ -511,11 +645,13 @@ transitionStyle.textContent = `
 
   @media (prefers-reduced-motion: reduce) {
     .scene-window,
+    .scene-dock,
     .control-panel,
     .scene-copy,
     .control-panel > :not(.control-copy),
     .masthead,
     .panel-collapse-toggle,
+    .panel-restore-toggle,
     .scene-arrow,
     .export-overlay,
     .export-dialog,
@@ -527,15 +663,17 @@ transitionStyle.textContent = `
 document.head.appendChild(transitionStyle)
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-const contentSlideMs = 200
-const panelMorphMs = 340
+const panelFoldXMs = 300
+const panelFoldYMs = 240
 const sceneOutMs = 360
 const sceneInMs = 460
 
-type ControlPhase = 'expanded' | 'closing' | 'collapsed' | 'opening'
+type ControlPhase = 'expanded' | 'closing-x' | 'closing-y' | 'collapsed' | 'opening-y' | 'opening-x'
+type ControlShape = 'full' | 'line' | 'point'
 type SceneDirection = 'prev' | 'next'
 
 let phase: ControlPhase = document.body.dataset.controls === 'collapsed' ? 'collapsed' : 'expanded'
+let controlShape: ControlShape = phase === 'collapsed' ? 'point' : 'full'
 let phaseTimer = 0
 let sceneTimer = 0
 let arrowTimer = 0
@@ -547,71 +685,110 @@ function clearPhaseTimer(): void {
   phaseTimer = 0
 }
 
+function captureExpandedPanelSize(): void {
+  if (!controlPanel) return
+  const rect = controlPanel.getBoundingClientRect()
+  if (rect.width > 0) controlPanel.style.setProperty('--controls-expanded-width', `${rect.width}px`)
+  if (rect.height > 0) controlPanel.style.setProperty('--controls-expanded-height', `${rect.height}px`)
+}
+
+function releaseExpandedPanelSize(): void {
+  if (!controlPanel) return
+  controlPanel.style.removeProperty('--controls-expanded-width')
+  controlPanel.style.removeProperty('--controls-expanded-height')
+}
+
 function syncControlPanelState(): void {
   document.body.dataset.controlsPhase = phase
-  if (!controlPanel || !panelToggle) return
+  document.body.dataset.controlsShape = controlShape
 
-  const collapsedIntent = phase === 'collapsed' || phase === 'closing'
-  controlPanel.setAttribute(
-    'aria-label',
-    collapsedIntent ? 'QR controls, collapsed' : 'QR controls',
-  )
-  panelToggle.setAttribute(
-    'aria-label',
-    collapsedIntent ? 'Show QR controls' : 'Hide QR controls for immersive view',
-  )
-  panelToggle.setAttribute('aria-expanded', String(!collapsedIntent))
+  const collapsedIntent = phase !== 'expanded'
+  if (controlPanel && panelToggle) {
+    controlPanel.setAttribute(
+      'aria-label',
+      collapsedIntent ? 'QR controls, collapsing or collapsed' : 'QR controls',
+    )
+    panelToggle.setAttribute(
+      'aria-label',
+      collapsedIntent ? 'QR controls are folding' : 'Hide QR controls for immersive view',
+    )
+    panelToggle.setAttribute('aria-expanded', String(!collapsedIntent))
+  }
+
+  if (panelRestoreToggle) {
+    const available = phase === 'collapsed'
+    panelRestoreToggle.setAttribute('aria-hidden', String(!available))
+    panelRestoreToggle.tabIndex = available ? 0 : -1
+  }
 }
 
 function finishCollapsed(): void {
+  document.body.dataset.controls = 'collapsed'
+  controlShape = 'point'
   phase = 'collapsed'
   syncControlPanelState()
 }
 
 function finishExpanded(): void {
+  document.body.dataset.controls = 'expanded'
+  controlShape = 'full'
   phase = 'expanded'
   syncControlPanelState()
+  releaseExpandedPanelSize()
 }
 
 function collapseControls(): void {
   clearPhaseTimer()
+  captureExpandedPanelSize()
 
   if (reducedMotion) {
-    document.body.dataset.controls = 'collapsed'
+    controlShape = 'point'
     finishCollapsed()
     return
   }
 
   document.body.dataset.controls = 'expanded'
-  phase = 'closing'
+  controlShape = 'line'
+  phase = 'closing-x'
   syncControlPanelState()
 
   phaseTimer = window.setTimeout(() => {
-    document.body.dataset.controls = 'collapsed'
+    controlShape = 'point'
+    phase = 'closing-y'
     syncControlPanelState()
-    phaseTimer = window.setTimeout(finishCollapsed, panelMorphMs)
-  }, contentSlideMs)
+    phaseTimer = window.setTimeout(finishCollapsed, panelFoldYMs)
+  }, panelFoldXMs)
 }
 
 function expandControls(): void {
   clearPhaseTimer()
 
   if (reducedMotion) {
-    document.body.dataset.controls = 'expanded'
+    controlShape = 'full'
     finishExpanded()
     return
   }
 
   document.body.dataset.controls = 'expanded'
-  phase = 'opening'
+  controlShape = 'line'
+  phase = 'opening-y'
   syncControlPanelState()
-  phaseTimer = window.setTimeout(finishExpanded, panelMorphMs)
+
+  phaseTimer = window.setTimeout(() => {
+    controlShape = 'full'
+    phase = 'opening-x'
+    syncControlPanelState()
+    phaseTimer = window.setTimeout(finishExpanded, panelFoldXMs)
+  }, panelFoldYMs)
 }
 
 panelToggle?.addEventListener('click', () => {
-  if (phase === 'opening' || phase === 'closing') return
-  if (phase === 'expanded') collapseControls()
-  else expandControls()
+  if (phase !== 'expanded') return
+  collapseControls()
+})
+panelRestoreToggle?.addEventListener('click', () => {
+  if (phase !== 'collapsed') return
+  expandControls()
 })
 syncControlPanelState()
 
