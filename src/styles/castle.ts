@@ -14,6 +14,11 @@ function localNoise(seedText: string, row: number, col: number, salt: string): n
   return (hashString(`${seedText}::castle-v2::${salt}::${row}:${col}`) % 10000) / 10000
 }
 
+function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
+  if (row < 0 || row >= matrix.size || col < 0 || col >= matrix.size) return undefined
+  return matrix.cells[row * matrix.size + col]
+}
+
 function finderProfile(cell: QRCell, size: number): { row: number; col: number; severity: number; bias: number } | null {
   if (cell.row <= 7 && cell.col <= 7) return { row: 3, col: 3, severity: 0.18, bias: 1 }
   if (cell.row <= 7 && cell.col >= size - 8) return { row: 3, col: size - 4, severity: 0.42, bias: 0 }
@@ -74,6 +79,51 @@ function buildBrokenTimingWalls(
     } else if (survival > 0.83) {
       pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
+    }
+  }
+}
+
+function buildDrawbridgeApproach(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  random: () => number,
+  lifted: Set<string>,
+): void {
+  const center = Math.round((matrix.size - 1) / 2)
+  const startRow = center + Math.max(2, Math.round(matrix.size * 0.1))
+  const bridgeEnd = center + Math.max(5, Math.round(matrix.size * 0.24))
+  const approachEnd = Math.min(matrix.size - 2, center + Math.max(8, Math.round(matrix.size * 0.36)))
+
+  for (let row = startRow; row <= approachEnd; row += 1) {
+    const onBridge = row <= bridgeEnd
+    for (let dc = -1; dc <= 1; dc += 1) {
+      const cell = getCell(matrix, row, center + dc)
+      if (!cell || cell.zone !== 'data') continue
+
+      // A three-module timber deck projects straight out of the recessed gatehouse.
+      // It hands off to a lower stone causeway, giving the fortress a strong front axis
+      // in isometric view without changing the QR column footprint.
+      pushProjectedColumn(
+        voxels,
+        cell,
+        matrix.size,
+        1,
+        onBridge ? 2 : 1,
+        onBridge ? 'wood' : 'stone',
+        random,
+      )
+      lifted.add(cellKey(cell.row, cell.col))
+    }
+
+    // Broken side rails make the near half read as a drawbridge rather than a generic path.
+    // The alternating gaps keep the ruin language and avoid creating two solid parallel walls.
+    if (onBridge && (row - startRow) % 3 !== 1) {
+      for (const dc of [-2, 2]) {
+        const rail = getCell(matrix, row, center + dc)
+        if (!rail || rail.zone !== 'data') continue
+        pushProjectedColumn(voxels, rail, matrix.size, 1, 3, 'wood', random)
+        lifted.add(cellKey(rail.row, rail.col))
+      }
     }
   }
 }
@@ -163,13 +213,15 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     }
   }
 
+  buildDrawbridgeApproach(voxels, matrix, random, lifted)
+
   return finalizeSculpture(
     matrix,
     voxels,
     'castle',
     'Castle',
     lifted,
-    'RECESSED GATEHOUSE / 4 CORNER TURRETS / CRENELLATED KEEP / 3 RUINED BASTIONS / RUBBLE COURT',
+    'RECESSED GATEHOUSE / TIMBER DRAWBRIDGE / BROKEN RAILS / 4 CORNER TURRETS / 3 RUINED BASTIONS / RUBBLE COURT',
     'stone-plinth',
   )
 }
