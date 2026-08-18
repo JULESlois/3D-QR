@@ -4,6 +4,7 @@ import {
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
+  projectionToneForCell,
   pushVoxel,
   type SculptureBuild,
 } from '../sculpture'
@@ -65,6 +66,25 @@ function pickTrunkModules(modules: DarkModule[], center: number): DarkModule[] {
   }
 
   return picked
+}
+
+function rootStrength(module: DarkModule, trunks: DarkModule[]): number {
+  let best = 0
+
+  for (const trunk of trunks) {
+    const dr = module.row - trunk.row
+    const dc = module.col - trunk.col
+    const distance = Math.hypot(dr, dc)
+    if (distance > 4.2) continue
+
+    const axisBias = distance <= 0.001
+      ? 1
+      : 0.68 + (Math.max(Math.abs(dr), Math.abs(dc)) / distance) * 0.32
+    const falloff = Math.max(0, 1 - distance / 4.2)
+    best = Math.max(best, falloff * axisBias)
+  }
+
+  return best
 }
 
 function branchStrength(
@@ -135,17 +155,34 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
     const crownThickness = 3 + Math.floor(random() * 3)
     const crownStart = Math.max(7, topLevel - crownThickness + 1)
     const branch = branchStrength(module, trunks, sample, center, matrix.size)
+    const root = rootStrength(module, trunks)
     const isTrunk = trunkKeys.has(key)
 
     if (isTrunk) {
       for (let level = 1; level < crownStart; level += 1) {
         pushVoxel(voxels, module, matrix.size, level, 'wood', level / Math.max(1, crownStart))
       }
-    } else if (branch > 0.42) {
-      const branchTop = Math.min(crownStart - 1, Math.round(4 + branch * Math.max(3, crownStart - 5)))
-      const branchBase = Math.max(4, branchTop - (branch > 0.7 ? 3 : 2))
-      for (let level = branchBase; level <= branchTop; level += 1) {
-        pushVoxel(voxels, module, matrix.size, level, 'wood', (branch + level * 0.07) % 1)
+    } else {
+      if (root > 0.18) {
+        const rootTop = Math.min(crownStart - 1, Math.max(1, Math.round(1 + root * 5)))
+        for (let level = 1; level <= rootTop; level += 1) {
+          pushVoxel(
+            voxels,
+            module,
+            matrix.size,
+            level,
+            'wood',
+            (root * 0.63 + level * 0.081) % 1,
+          )
+        }
+      }
+
+      if (branch > 0.42) {
+        const branchTop = Math.min(crownStart - 1, Math.round(4 + branch * Math.max(3, crownStart - 5)))
+        const branchBase = Math.max(4, branchTop - (branch > 0.7 ? 3 : 2))
+        for (let level = branchBase; level <= branchTop; level += 1) {
+          pushVoxel(voxels, module, matrix.size, level, 'wood', (branch + level * 0.07) % 1)
+        }
       }
     }
 
@@ -155,8 +192,9 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : 'primary',
+        'primary',
         (random() * 0.52 + dome * 0.34 + sample.lobe * 0.11 + level * 0.031) % 1,
+        level === topLevel ? projectionToneForCell(module) : undefined,
       )
     }
   }
@@ -167,7 +205,7 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
     'tree',
     'Tree',
     lifted,
-    'CLUSTERED CROWN / BRANCHING TRUNK / FULL GRASS PAD',
+    'CLUSTERED CROWN / BUTTRESSED ROOT FLARE / BRANCHING TRUNK / FULL GRASS PAD',
     'full-pad',
   )
 }
