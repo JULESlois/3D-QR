@@ -132,22 +132,49 @@ function buildWaitingTrain(
   halfSpan: number,
 ): void {
   const trainRow = center + 2
-  const carLength = Math.max(5, Math.min(9, Math.floor(matrix.size * 0.2)))
-  const trainStart = center - Math.min(halfSpan - 2, Math.round(matrix.size * 0.19))
+  const trainLength = Math.max(13, Math.min(21, Math.floor(matrix.size * 0.44)))
+  const trainStart = center - Math.min(halfSpan - 3, Math.floor(trainLength * 0.48))
+  const trainEnd = trainStart + trainLength - 1
 
-  // Two compact cars with a one-module articulation gap. Their tapered ends and
-  // window band make the lower horizontal mass read as rolling stock, not a wall.
-  for (let car = 0; car < 2; car += 1) {
-    const start = trainStart + car * (carLength + 1)
-    const end = start + carLength - 1
+  // Build one coherent EMU silhouette instead of two rectangular cars. The cab ends
+  // taper in both plan and height, the middle keeps a continuous three-cell body, and
+  // shallow roof humps break the otherwise flat top line. This makes the parked train
+  // legible from the default isometric camera without adding any off-grid geometry.
+  for (let col = trainStart; col <= trainEnd; col += 1) {
+    const distanceFromStart = col - trainStart
+    const distanceFromEnd = trainEnd - col
+    const noseDistance = Math.min(distanceFromStart, distanceFromEnd)
+    const cab = noseDistance <= 2
+    const extremeNose = noseDistance === 0
+    const shoulder = noseDistance === 1
+    const roofHump = !cab && ((col - trainStart) % 7 === 3 || (col - trainStart) % 7 === 4)
 
-    for (let col = start; col <= end; col += 1) {
-      const endDistance = Math.min(col - start, end - col)
-      for (let row = trainRow - 1; row <= trainRow + 1; row += 1) {
-        const edgeRow = Math.abs(row - trainRow) === 1
-        const topLevel = endDistance === 0 ? 4 : edgeRow ? 5 : 6
-        register(columns, getCell(matrix, row, col), 2, topLevel, 'train', 7)
-      }
+    for (let row = trainRow - 1; row <= trainRow + 1; row += 1) {
+      const side = Math.abs(row - trainRow) === 1
+
+      // The very tip occupies only the centre row, then widens over one module before
+      // reaching the full three-cell carriage width. Cab roof height also rises toward
+      // the body, creating a stepped wedge rather than a blunt vertical end.
+      if (extremeNose && side) continue
+      if (shoulder && side && row > trainRow) continue
+
+      let topLevel = side ? 5 : 6
+      if (extremeNose) topLevel = 3
+      else if (shoulder) topLevel = side ? 4 : 5
+      else if (cab) topLevel = side ? 5 : 6
+      else if (roofHump && !side) topLevel = 7
+
+      register(columns, getCell(matrix, row, col), 2, topLevel, 'train', 7)
+    }
+  }
+
+  // Two narrow articulation notches interrupt the roof/body rhythm while leaving the
+  // rail below intact. They read as door/coupler gaps rather than splitting the train
+  // into unrelated blocks because the centre spine remains continuous at low height.
+  for (const fraction of [0.34, 0.67]) {
+    const articulationCol = trainStart + Math.round((trainLength - 1) * fraction)
+    for (const row of [trainRow - 1, trainRow + 1]) {
+      register(columns, getCell(matrix, row, articulationCol), 2, 3, 'train', 8)
     }
   }
 }
@@ -316,7 +343,7 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     'station',
     'Station',
     lifted,
-    `GABLED TERMINAL / CLOCK LANTERN / SUSPENDED FOOTBRIDGE + STAIRS / OPEN CANOPIES / TWIN TRACKS / WAITING TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
+    `GABLED TERMINAL / CLOCK LANTERN / SUSPENDED FOOTBRIDGE + STAIRS / OPEN CANOPIES / TWIN TRACKS / TAPERED EMU TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
     'display-plaque',
   )
 }
