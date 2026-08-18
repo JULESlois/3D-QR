@@ -1,6 +1,6 @@
 import QRCode from 'qrcode'
 
-export type ModuleZone = 'finder' | 'timing' | 'data'
+export type ModuleZone = 'finder' | 'timing' | 'alignment' | 'data'
 export type ModuleRole = ModuleZone | 'light'
 export type DarkModuleRole = ModuleZone
 
@@ -28,7 +28,58 @@ export interface QRMatrixData {
   darkModules: DarkModule[]
 }
 
-function classifyModuleZone(row: number, col: number, size: number): ModuleZone {
+function getAlignmentPatternCenters(version: number, size: number): number[] {
+  if (version === 1) return []
+
+  // Mirrors the alignment-pattern placement used by node-qrcode. Keeping the
+  // calculation local lets scene generators reason about structural QR zones
+  // without importing private package internals.
+  const positionCount = Math.floor(version / 7) + 2
+  const interval = size === 145
+    ? 26
+    : Math.ceil((size - 13) / (2 * positionCount - 2)) * 2
+  const positions = [size - 7]
+
+  for (let index = 1; index < positionCount - 1; index += 1) {
+    positions[index] = positions[index - 1] - interval
+  }
+
+  positions.push(6)
+  return positions.reverse()
+}
+
+function createAlignmentCellSet(version: number, size: number): Set<string> {
+  const centers = getAlignmentPatternCenters(version, size)
+  const cells = new Set<string>()
+
+  for (let rowIndex = 0; rowIndex < centers.length; rowIndex += 1) {
+    for (let colIndex = 0; colIndex < centers.length; colIndex += 1) {
+      const overlapsFinder = (
+        (rowIndex === 0 && colIndex === 0)
+        || (rowIndex === 0 && colIndex === centers.length - 1)
+        || (rowIndex === centers.length - 1 && colIndex === 0)
+      )
+      if (overlapsFinder) continue
+
+      const centerRow = centers[rowIndex]
+      const centerCol = centers[colIndex]
+      for (let rowOffset = -2; rowOffset <= 2; rowOffset += 1) {
+        for (let colOffset = -2; colOffset <= 2; colOffset += 1) {
+          cells.add(`${centerRow + rowOffset}:${centerCol + colOffset}`)
+        }
+      }
+    }
+  }
+
+  return cells
+}
+
+function classifyModuleZone(
+  row: number,
+  col: number,
+  size: number,
+  alignmentCells: ReadonlySet<string>,
+): ModuleZone {
   // Include the one-cell separator around each 7x7 finder so light cells in the
   // recognition structures can participate in scene generation as well.
   const inTopLeftFinder = row <= 7 && col <= 7
@@ -41,6 +92,7 @@ function classifyModuleZone(row: number, col: number, size: number): ModuleZone 
   const inVerticalTiming = col === 6 && row >= 8 && row <= size - 9
 
   if (inHorizontalTiming || inVerticalTiming) return 'timing'
+  if (alignmentCells.has(`${row}:${col}`)) return 'alignment'
   return 'data'
 }
 
@@ -53,12 +105,13 @@ export function createQRMatrix(value: string): QRMatrixData {
   const cells: QRCell[] = []
   const darkModules: DarkModule[] = []
   const size = symbol.modules.size
+  const alignmentCells = createAlignmentCellSet(symbol.version, size)
 
   for (let row = 0; row < size; row += 1) {
     for (let col = 0; col < size; col += 1) {
       const index = row * size + col
       const dark = Boolean(symbol.modules.get(row, col))
-      const zone = classifyModuleZone(row, col, size)
+      const zone = classifyModuleZone(row, col, size, alignmentCells)
 
       if (dark) {
         const cell: DarkModule = {
