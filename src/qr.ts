@@ -45,7 +45,11 @@ function classifyModuleZone(row: number, col: number, size: number): ModuleZone 
 }
 
 export function createQRMatrix(value: string): QRMatrixData {
-  const symbol = QRCode.create(value, { errorCorrectionLevel: 'M' })
+  // Artistic 3D projection adds perspective, material variation and partial occlusion
+  // that ordinary flat QR codes do not have to tolerate. Use Q-level redundancy as
+  // the baseline so the same sculpture has more recovery margin without changing any
+  // scene generator or projection invariant.
+  const symbol = QRCode.create(value, { errorCorrectionLevel: 'Q' })
   const cells: QRCell[] = []
   const darkModules: DarkModule[] = []
   const size = symbol.modules.size
