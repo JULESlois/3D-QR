@@ -1,28 +1,206 @@
+const appShell = document.querySelector<HTMLElement>('.app-shell')
+const stage = document.querySelector<HTMLElement>('#stage')
 const controlPanel = document.querySelector<HTMLElement>('.control-panel')
 const controlCopy = document.querySelector<HTMLElement>('.control-copy')
-const disclosure = document.querySelector<HTMLDetailsElement>('.description-disclosure')
-const summary = disclosure?.querySelector<HTMLElement>('summary') ?? null
 const styleRow = document.querySelector<HTMLElement>('.style-row')
 const sceneButtons = styleRow
   ? Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
   : []
 const modeToggle = document.querySelector<HTMLButtonElement>('#mode-toggle')
 const footerActions = modeToggle?.parentElement ?? null
+const exportButton = footerActions?.querySelector<HTMLButtonElement>('.style-chip') ?? null
+const eyebrow = document.querySelector<HTMLElement>('#style-eyebrow')
+const headline = document.querySelector<HTMLElement>('#style-headline')
+const lede = document.querySelector<HTMLElement>('#style-lede')
 
-// Canvas click already owns the art/QR toggle. Keep the detached button reference alive
-// for main.ts, but remove the duplicate visible control from the panel.
+// Canvas click already owns the sculpture / QR reveal. Keep main.ts' reference alive,
+// but remove the duplicate visible button from the control surface.
 modeToggle?.remove()
 footerActions?.classList.add('footer-actions')
 
+// Treat the visible sculpture and its controls as one carousel page. The masthead stays
+// fixed so navigation identity is stable while the scene itself leaves the viewport.
+let sceneWindow = appShell?.querySelector<HTMLElement>('.scene-window') ?? null
+if (!sceneWindow && appShell && stage && controlPanel) {
+  sceneWindow = document.createElement('div')
+  sceneWindow.className = 'scene-window'
+  appShell.insertBefore(sceneWindow, stage)
+  sceneWindow.append(stage, controlPanel)
+}
+
+// Rebuild the scene copy as a plain information block. Dynamic text is no longer bound
+// to a <details> summary; collapse is its own control and scene swaps move the whole page.
+let panelToggle: HTMLButtonElement | null = null
+if (controlCopy && eyebrow && headline && lede) {
+  const sceneCopy = document.createElement('div')
+  sceneCopy.className = 'scene-copy'
+  sceneCopy.setAttribute('aria-live', 'polite')
+  sceneCopy.append(eyebrow, headline, lede)
+
+  panelToggle = document.createElement('button')
+  panelToggle.type = 'button'
+  panelToggle.className = 'description-toggle panel-collapse-toggle'
+  panelToggle.setAttribute('aria-label', 'Hide QR controls for immersive view')
+  panelToggle.setAttribute('aria-expanded', 'true')
+
+  controlCopy.replaceChildren(sceneCopy, panelToggle)
+}
+
 const transitionStyle = document.createElement('style')
 transitionStyle.textContent = `
-  /* Palette tuning remains dormant; every scene still applies its own default palette. */
+  /* Palette experiments stay dormant; every scene continues using its default palette. */
   .palette-control {
     display: none !important;
   }
 
+  /* One full viewport page owns both the artwork and the explanation card. */
+  .scene-window {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    overflow: hidden;
+    background: var(--paper);
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    transition:
+      transform 460ms cubic-bezier(.16, 1, .3, 1),
+      background-color 420ms ease;
+  }
+
+  body[data-mode='qr'] .scene-window {
+    background: var(--paper-clean);
+  }
+
+  .scene-window[data-scene-phase='out'] {
+    transition-duration: 360ms, 420ms;
+    transition-timing-function: cubic-bezier(.55, .08, .35, 1), ease;
+    pointer-events: none;
+  }
+
+  .scene-window[data-scene-direction='next'][data-scene-phase='out'] {
+    transform: translate3d(-100%, 0, 0);
+  }
+
+  .scene-window[data-scene-direction='prev'][data-scene-phase='out'] {
+    transform: translate3d(100%, 0, 0);
+  }
+
+  .scene-window[data-scene-direction='next'][data-scene-phase='pre-in'] {
+    transform: translate3d(100%, 0, 0);
+    transition: none !important;
+    pointer-events: none;
+  }
+
+  .scene-window[data-scene-direction='prev'][data-scene-phase='pre-in'] {
+    transform: translate3d(-100%, 0, 0);
+    transition: none !important;
+    pointer-events: none;
+  }
+
+  .scene-window[data-scene-phase='in'] {
+    transform: translate3d(0, 0, 0);
+    transition-duration: 460ms, 420ms;
+    transition-timing-function: cubic-bezier(.16, 1, .3, 1), ease;
+    pointer-events: none;
+  }
+
+  /* Scene copy is now a compact specimen caption rather than a giant disclosure title. */
+  .control-copy {
+    position: relative;
+    min-width: 0;
+    padding-right: 42px;
+  }
+
+  .scene-copy {
+    position: relative;
+    min-width: 0;
+    padding-left: 12px;
+  }
+
+  .scene-copy::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 3px;
+    width: 2px;
+    height: 34px;
+    background: var(--accent);
+  }
+
+  .scene-copy .eyebrow {
+    display: block !important;
+    margin: 0 0 6px;
+    color: rgba(32, 35, 31, .42);
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    line-height: 1.2;
+  }
+
+  .scene-copy .control-copy-heading {
+    display: block;
+    max-width: 22ch;
+    margin: 0;
+    font-size: clamp(29px, 3.25vw, 43px);
+    font-weight: 570;
+    letter-spacing: -.045em;
+    line-height: .98;
+  }
+
+  .scene-copy .lede {
+    display: block !important;
+    max-width: 36rem;
+    margin: 10px 0 0;
+    color: rgba(32, 35, 31, .55);
+    font-size: 10px;
+    line-height: 1.55;
+  }
+
+  /* No control uses a framed button treatment. Focus / hover rely on motion and tone. */
+  .control-panel button {
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .control-panel button:focus-visible {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .panel-collapse-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: rgba(32, 35, 31, .46);
+    background: transparent;
+    cursor: pointer;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 18px;
+    line-height: 1;
+    transition: color 150ms ease, transform 180ms cubic-bezier(.22,.72,.22,1);
+  }
+
+  .panel-collapse-toggle::before {
+    content: '−' !important;
+  }
+
+  .panel-collapse-toggle:hover,
+  .panel-collapse-toggle:focus-visible {
+    color: var(--ink);
+    transform: translateY(-1px);
+    background: transparent;
+  }
+
+  /* Panel disclosure keeps the old immersive semantics but with deterministic staging. */
   .control-panel {
-    max-height: 720px;
+    max-height: 760px;
     overflow: hidden;
     transform-origin: left bottom;
     transition:
@@ -34,37 +212,42 @@ transitionStyle.textContent = `
       backdrop-filter 260ms ease;
   }
 
-  /*
-   * Panel content uses one directional motion language. Geometry never changes
-   * while text is visible: close slides content out first; open morphs first.
-   */
+  .scene-copy,
   .control-panel > :not(.control-copy),
-  .control-copy-heading,
-  .description-body {
+  .masthead {
     transition:
-      opacity 170ms ease,
-      transform 180ms cubic-bezier(.22,.72,.22,1);
+      opacity 180ms ease,
+      transform 200ms cubic-bezier(.22,.72,.22,1);
   }
 
+  body[data-controls-phase='closing'] .scene-copy,
+  body[data-controls-phase='opening'] .scene-copy,
+  body[data-controls-phase='collapsed'] .scene-copy,
   body[data-controls-phase='closing'] .control-panel > :not(.control-copy),
   body[data-controls-phase='opening'] .control-panel > :not(.control-copy),
-  body[data-controls-phase='collapsed'] .control-panel > :not(.control-copy),
-  body[data-controls-phase='closing'] .control-copy-heading,
-  body[data-controls-phase='opening'] .control-copy-heading,
-  body[data-controls-phase='collapsed'] .control-copy-heading,
-  body[data-controls-phase='closing'] .description-body,
-  body[data-controls-phase='opening'] .description-body,
-  body[data-controls-phase='collapsed'] .description-body {
+  body[data-controls-phase='collapsed'] .control-panel > :not(.control-copy) {
     opacity: 0;
-    transform: translateX(-14px);
+    transform: translateX(-18px);
     pointer-events: none;
   }
 
-  body[data-controls-phase='expanded'] .control-panel > :not(.control-copy),
-  body[data-controls-phase='expanded'] .control-copy-heading,
-  body[data-controls-phase='expanded'] .description-body {
+  body[data-controls-phase='expanded'] .scene-copy,
+  body[data-controls-phase='expanded'] .control-panel > :not(.control-copy) {
     opacity: 1;
     transform: translateX(0);
+  }
+
+  body[data-controls-phase='closing'] .masthead,
+  body[data-controls-phase='opening'] .masthead,
+  body[data-controls-phase='collapsed'] .masthead {
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
+  }
+
+  body[data-controls-phase='expanded'] .masthead {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   body[data-controls='collapsed'] .control-panel {
@@ -85,167 +268,34 @@ transitionStyle.textContent = `
     box-shadow: none;
   }
 
-  body[data-controls='collapsed'] .description-disclosure,
   body[data-controls='collapsed'] .control-copy {
     width: 44px;
     height: 44px;
-    margin: 0;
+    padding: 0;
   }
 
-  body[data-controls='collapsed'] .description-disclosure > summary {
+  body[data-controls='collapsed'] .panel-collapse-toggle {
+    position: absolute;
+    inset: 0;
     width: 44px;
     height: 44px;
-    grid-template-columns: 0 44px;
-    gap: 0;
-    overflow: hidden;
-    place-items: center;
+    color: rgba(32, 35, 31, .68);
     background: color-mix(in srgb, var(--paper-clean) 90%, transparent);
-    box-shadow: 0 10px 28px rgba(32, 35, 31, .09);
     backdrop-filter: blur(14px) saturate(.9);
     -webkit-backdrop-filter: blur(14px) saturate(.9);
   }
 
-  body[data-controls='collapsed'] .description-disclosure > summary > span:first-child {
-    min-width: 0;
-    overflow: hidden;
-    pointer-events: none;
+  body[data-controls='collapsed'] .panel-collapse-toggle::before,
+  body[data-controls-phase='opening'] .panel-collapse-toggle::before {
+    content: '+' !important;
   }
 
-  body[data-controls='collapsed'] .description-toggle {
-    width: 44px;
-    height: 44px;
-    margin: 0;
-    border-color: rgba(32, 35, 31, .28);
-    color: rgba(32, 35, 31, .72);
-    background: transparent;
-  }
-
-  body[data-controls='collapsed'] .description-toggle::before,
-  body[data-controls-phase='opening'] .description-toggle::before {
-    content: '+';
-  }
-
-  body[data-controls-phase='expanded'] .description-toggle::before,
-  body[data-controls-phase='closing'] .description-toggle::before {
-    content: '−';
-  }
-
-  .masthead {
-    transition:
-      opacity 170ms ease !important,
-      transform 180ms cubic-bezier(.22,.72,.22,1) !important;
-  }
-
-  body[data-controls-phase='closing'] .masthead,
-  body[data-controls-phase='opening'] .masthead,
-  body[data-controls-phase='collapsed'] .masthead {
-    opacity: 0;
-    transform: translateX(-12px) !important;
-    pointer-events: none;
-  }
-
-  body[data-controls-phase='expanded'] .masthead {
-    opacity: 1;
-    transform: translateX(0) !important;
-  }
-
-  /* Scene copy slides out, changes while hidden, morphs height, then slides in. */
-  .control-copy {
-    overflow: hidden;
-    transition: height 240ms cubic-bezier(.22,.72,.22,1);
-  }
-
-  .description-disclosure > summary > span:first-child,
-  .control-copy .description-body {
-    transition:
-      opacity 160ms ease,
-      transform 180ms cubic-bezier(.22,.72,.22,1);
-  }
-
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='next'][data-scene-phase='out']
-    .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='next'][data-scene-phase='out'] .description-body {
-    opacity: 0;
-    transform: translateX(-18px);
-  }
-
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='prev'][data-scene-phase='out']
-    .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='prev'][data-scene-phase='out'] .description-body {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='next'][data-scene-phase='height']
-    .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='next'][data-scene-phase='height'] .description-body {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='prev'][data-scene-phase='height']
-    .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded']
-    .control-copy[data-scene-direction='prev'][data-scene-phase='height'] .description-body {
-    opacity: 0;
-    transform: translateX(-18px);
-  }
-
-  body[data-controls-phase='expanded'] .control-copy[data-scene-phase='in']
-    .description-disclosure > summary > span:first-child,
-  body[data-controls-phase='expanded'] .control-copy[data-scene-phase='in'] .description-body {
-    opacity: 1;
-    transform: translateX(0);
-  }
-
-  /* The WebGL view itself follows the same left/right scene direction. */
-  #stage canvas {
-    transition:
-      transform 180ms cubic-bezier(.22,.72,.22,1),
-      opacity 160ms ease;
-    will-change: transform, opacity;
-  }
-
-  #stage canvas[data-scene-direction='next'][data-scene-slide='out'] {
-    transform: translateX(-6vw);
-    opacity: 0;
-  }
-
-  #stage canvas[data-scene-direction='prev'][data-scene-slide='out'] {
-    transform: translateX(6vw);
-    opacity: 0;
-  }
-
-  #stage canvas[data-scene-direction='next'][data-scene-slide='pre-in'] {
-    transform: translateX(6vw);
-    opacity: 0;
-    transition: none !important;
-  }
-
-  #stage canvas[data-scene-direction='prev'][data-scene-slide='pre-in'] {
-    transform: translateX(-6vw);
-    opacity: 0;
-    transition: none !important;
-  }
-
-  #stage canvas[data-scene-slide='in'] {
-    transform: translateX(0);
-    opacity: 1;
-  }
-
-  /* Replace the twelve-chip grid with a compact cyclic scene stepper. */
+  /* Compact, borderless scene stepper. The scene count has intentionally been removed. */
   .style-row.scene-stepper {
     display: grid !important;
-    grid-template-columns: 42px minmax(0, 1fr) 42px !important;
-    align-items: stretch !important;
-    gap: 7px !important;
+    grid-template-columns: 38px minmax(0, 1fr) 38px !important;
+    align-items: center !important;
+    gap: 4px !important;
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -261,105 +311,53 @@ transitionStyle.textContent = `
     min-width: 0;
     min-height: 38px;
     padding: 0;
-    border: 1px solid rgba(32,35,31,.2);
     background: transparent;
-    color: rgba(32,35,31,.64);
+    color: rgba(32,35,31,.44);
     cursor: pointer;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-    font-size: 15px;
+    font-size: 17px;
     line-height: 1;
-    transition:
-      border-color 150ms ease,
-      color 150ms ease,
-      background-color 150ms ease,
-      transform 120ms cubic-bezier(.22,.72,.22,1);
+    transition: color 150ms ease, transform 130ms cubic-bezier(.22,.72,.22,1);
     touch-action: manipulation;
   }
 
   .scene-arrow:hover,
   .scene-arrow:focus-visible {
-    border-color: rgba(32,35,31,.58);
     color: var(--ink);
-    background: color-mix(in srgb, var(--accent) 7%, transparent);
-    outline: 0;
+    background: transparent !important;
   }
 
   .scene-arrow-prev[data-pressed='true'] {
-    transform: translateX(-4px);
+    transform: translateX(-5px);
   }
 
   .scene-arrow-next[data-pressed='true'] {
-    transform: translateX(4px);
+    transform: translateX(5px);
   }
 
   .scene-arrow:disabled {
     cursor: default;
-    opacity: .34;
+    opacity: .26;
   }
 
   .scene-current {
     min-width: 0;
     min-height: 38px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px;
-    padding: 0 12px;
-    border-top: 1px solid rgba(32,35,31,.18);
-    border-bottom: 1px solid rgba(32,35,31,.18);
+    place-items: center;
     overflow: hidden;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  }
-
-  .scene-current-label,
-  .scene-current-count {
-    transition:
-      opacity 160ms ease,
-      transform 180ms cubic-bezier(.22,.72,.22,1);
   }
 
   .scene-current-label {
     min-width: 0;
     overflow: hidden;
-    color: var(--ink);
+    color: rgba(32, 35, 31, .78);
     font-size: 9px;
     font-weight: 700;
-    letter-spacing: .12em;
+    letter-spacing: .15em;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .scene-current-count {
-    color: rgba(32,35,31,.38);
-    font-size: 7.5px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    white-space: nowrap;
-  }
-
-  .scene-current[data-scene-direction='next'][data-scene-phase='out'] > * {
-    opacity: 0;
-    transform: translateX(-16px);
-  }
-
-  .scene-current[data-scene-direction='prev'][data-scene-phase='out'] > * {
-    opacity: 0;
-    transform: translateX(16px);
-  }
-
-  .scene-current[data-scene-direction='next'][data-scene-phase='height'] > * {
-    opacity: 0;
-    transform: translateX(16px);
-  }
-
-  .scene-current[data-scene-direction='prev'][data-scene-phase='height'] > * {
-    opacity: 0;
-    transform: translateX(-16px);
-  }
-
-  .scene-current[data-scene-phase='in'] > * {
-    opacity: 1;
-    transform: translateX(0);
   }
 
   .footer-actions {
@@ -368,9 +366,121 @@ transitionStyle.textContent = `
 
   .footer-actions > .style-chip {
     width: 100%;
+    min-height: 38px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    color: rgba(32, 35, 31, .72);
+    border: 0 !important;
+  }
+
+  .footer-actions > .style-chip:hover,
+  .footer-actions > .style-chip:focus-visible {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 11%, transparent) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Blocking export dialog: progress belongs to the task, not to a mutating button label. */
+  .export-overlay {
+    position: fixed;
+    z-index: 100;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    visibility: hidden;
+    opacity: 0;
+    background: rgba(242, 240, 231, .72);
+    backdrop-filter: blur(18px) saturate(.82);
+    -webkit-backdrop-filter: blur(18px) saturate(.82);
+    transition: opacity 180ms ease, visibility 0s linear 180ms;
+  }
+
+  .export-overlay[data-open='true'] {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 180ms ease;
+  }
+
+  .export-dialog {
+    width: min(420px, calc(100vw - 40px));
+    padding: 26px 28px 24px;
+    background: rgba(248, 248, 245, .96);
+    box-shadow: 0 24px 72px rgba(32, 35, 31, .12);
+    transform: translateY(14px);
+    transition: transform 240ms cubic-bezier(.16, 1, .3, 1);
+  }
+
+  .export-overlay[data-open='true'] .export-dialog {
+    transform: translateY(0);
+  }
+
+  .export-kicker,
+  .export-detail,
+  .export-percent {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+
+  .export-kicker {
+    margin: 0 0 9px;
+    color: rgba(32, 35, 31, .42);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .14em;
+  }
+
+  .export-title {
+    margin: 0;
+    font-size: clamp(27px, 4vw, 38px);
+    font-weight: 570;
+    letter-spacing: -.045em;
+    line-height: 1;
+  }
+
+  .export-detail {
+    min-height: 1.5em;
+    margin: 12px 0 20px;
+    color: rgba(32, 35, 31, .52);
+    font-size: 9px;
+    line-height: 1.5;
+  }
+
+  .export-progress-track {
+    position: relative;
+    height: 2px;
+    overflow: hidden;
+    background: rgba(32, 35, 31, .12);
+  }
+
+  .export-progress-bar {
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform: scaleX(var(--export-progress, 0));
+    transform-origin: left center;
+    transition: transform 160ms linear;
+  }
+
+  .export-percent {
+    margin-top: 9px;
+    color: rgba(32, 35, 31, .44);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-align: right;
   }
 
   @media (max-width: 760px) {
+    .scene-copy .control-copy-heading {
+      max-width: 18ch;
+      font-size: clamp(25px, 8vw, 32px);
+    }
+
+    .scene-copy .lede {
+      margin-top: 8px;
+      font-size: 9.5px;
+      line-height: 1.48;
+    }
+
     body[data-controls='collapsed'] .control-panel {
       left: 12px;
       right: auto;
@@ -379,16 +489,10 @@ transitionStyle.textContent = `
       max-height: 48px;
     }
 
-    body[data-controls='collapsed'] .description-disclosure,
     body[data-controls='collapsed'] .control-copy,
-    body[data-controls='collapsed'] .description-disclosure > summary,
-    body[data-controls='collapsed'] .description-toggle {
+    body[data-controls='collapsed'] .panel-collapse-toggle {
       width: 48px;
       height: 48px;
-    }
-
-    body[data-controls='collapsed'] .description-disclosure > summary {
-      grid-template-columns: 0 48px;
     }
 
     .style-row.scene-stepper {
@@ -400,36 +504,22 @@ transitionStyle.textContent = `
       min-height: 42px;
     }
 
-    #stage canvas[data-scene-direction='next'][data-scene-slide='out'] {
-      transform: translateX(-11vw);
-    }
-
-    #stage canvas[data-scene-direction='prev'][data-scene-slide='out'] {
-      transform: translateX(11vw);
-    }
-
-    #stage canvas[data-scene-direction='next'][data-scene-slide='pre-in'] {
-      transform: translateX(11vw);
-    }
-
-    #stage canvas[data-scene-direction='prev'][data-scene-slide='pre-in'] {
-      transform: translateX(-11vw);
+    .export-dialog {
+      padding: 23px 22px 21px;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .scene-window,
     .control-panel,
+    .scene-copy,
     .control-panel > :not(.control-copy),
-    .control-copy,
-    .control-copy-heading,
-    .description-body,
-    .description-disclosure > summary,
-    .description-disclosure > summary > span:first-child,
     .masthead,
+    .panel-collapse-toggle,
     .scene-arrow,
-    .scene-current-label,
-    .scene-current-count,
-    #stage canvas {
+    .export-overlay,
+    .export-dialog,
+    .export-progress-bar {
       transition: none !important;
     }
   }
@@ -437,10 +527,10 @@ transitionStyle.textContent = `
 document.head.appendChild(transitionStyle)
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-const contentSlideMs = 180
+const contentSlideMs = 200
 const panelMorphMs = 340
-const sceneSlideMs = 180
-const sceneHeightMs = 240
+const sceneOutMs = 360
+const sceneInMs = 460
 
 type ControlPhase = 'expanded' | 'closing' | 'collapsed' | 'opening'
 type SceneDirection = 'prev' | 'next'
@@ -448,9 +538,8 @@ type SceneDirection = 'prev' | 'next'
 let phase: ControlPhase = document.body.dataset.controls === 'collapsed' ? 'collapsed' : 'expanded'
 let phaseTimer = 0
 let sceneTimer = 0
-let sceneHeightTimer = 0
-let sceneInTimer = 0
 let arrowTimer = 0
+let exportOverlayTimer = 0
 let sceneChanging = false
 
 function clearPhaseTimer(): void {
@@ -458,32 +547,20 @@ function clearPhaseTimer(): void {
   phaseTimer = 0
 }
 
-function clearSceneTimers(): void {
-  window.clearTimeout(sceneTimer)
-  window.clearTimeout(sceneHeightTimer)
-  window.clearTimeout(sceneInTimer)
-  sceneTimer = 0
-  sceneHeightTimer = 0
-  sceneInTimer = 0
-}
-
 function syncControlPanelState(): void {
-  if (!controlPanel || !disclosure || !summary) return
-
-  // Keep details open so content remains measurable while the card itself morphs.
-  disclosure.open = true
   document.body.dataset.controlsPhase = phase
+  if (!controlPanel || !panelToggle) return
 
   const collapsedIntent = phase === 'collapsed' || phase === 'closing'
   controlPanel.setAttribute(
     'aria-label',
     collapsedIntent ? 'QR controls, collapsed' : 'QR controls',
   )
-  summary.setAttribute(
+  panelToggle.setAttribute(
     'aria-label',
     collapsedIntent ? 'Show QR controls' : 'Hide QR controls for immersive view',
   )
-  summary.setAttribute('aria-expanded', String(!collapsedIntent))
+  panelToggle.setAttribute('aria-expanded', String(!collapsedIntent))
 }
 
 function finishCollapsed(): void {
@@ -505,19 +582,14 @@ function collapseControls(): void {
     return
   }
 
-  // 1. Slide every piece of content out while the panel geometry is still fixed.
   document.body.dataset.controls = 'expanded'
   phase = 'closing'
   syncControlPanelState()
 
-  // 2. Only once content is fully outside do we start shrinking the card.
   phaseTimer = window.setTimeout(() => {
     document.body.dataset.controls = 'collapsed'
     syncControlPanelState()
-
-    phaseTimer = window.setTimeout(() => {
-      finishCollapsed()
-    }, panelMorphMs)
+    phaseTimer = window.setTimeout(finishCollapsed, panelMorphMs)
   }, contentSlideMs)
 }
 
@@ -530,40 +602,22 @@ function expandControls(): void {
     return
   }
 
-  // 1. Expand an empty card. No text is visible while available width changes.
   document.body.dataset.controls = 'expanded'
   phase = 'opening'
   syncControlPanelState()
-
-  // 2. Only after geometry is settled do all controls slide into place.
-  phaseTimer = window.setTimeout(() => {
-    finishExpanded()
-  }, panelMorphMs)
+  phaseTimer = window.setTimeout(finishExpanded, panelMorphMs)
 }
 
-if (disclosure && summary) {
-  disclosure.open = true
-  syncControlPanelState()
-
-  summary.addEventListener('click', (event) => {
-    event.preventDefault()
-
-    // Keep one deterministic animation timeline instead of reversing mid-layout.
-    if (phase === 'opening' || phase === 'closing') return
-
-    if (phase === 'expanded') {
-      collapseControls()
-    } else {
-      expandControls()
-    }
-  })
-}
+panelToggle?.addEventListener('click', () => {
+  if (phase === 'opening' || phase === 'closing') return
+  if (phase === 'expanded') collapseControls()
+  else expandControls()
+})
+syncControlPanelState()
 
 let scenePrevButton: HTMLButtonElement | null = null
 let sceneNextButton: HTMLButtonElement | null = null
-let sceneCurrent: HTMLElement | null = null
 let sceneCurrentLabel: HTMLElement | null = null
-let sceneCurrentCount: HTMLElement | null = null
 
 function currentSceneIndex(): number {
   const styleId = document.body.dataset.style
@@ -572,7 +626,7 @@ function currentSceneIndex(): number {
 }
 
 function syncSceneStepper(): void {
-  if (!sceneCurrentLabel || !sceneCurrentCount || sceneButtons.length === 0) return
+  if (!sceneCurrentLabel || sceneButtons.length === 0) return
 
   const index = currentSceneIndex()
   const current = sceneButtons[index]
@@ -580,7 +634,6 @@ function syncSceneStepper(): void {
   const next = sceneButtons[(index + 1) % sceneButtons.length]
 
   sceneCurrentLabel.textContent = current.textContent?.trim() || current.dataset.style?.toUpperCase() || 'SCENE'
-  sceneCurrentCount.textContent = `${String(index + 1).padStart(2, '0')} / ${String(sceneButtons.length).padStart(2, '0')}`
   scenePrevButton?.setAttribute('aria-label', `Previous scene: ${previous.textContent?.trim() || 'previous'}`)
   sceneNextButton?.setAttribute('aria-label', `Next scene: ${next.textContent?.trim() || 'next'}`)
 }
@@ -600,44 +653,17 @@ function pulseArrow(direction: SceneDirection): void {
   button.dataset.pressed = 'true'
   arrowTimer = window.setTimeout(() => {
     delete button.dataset.pressed
-  }, 120)
+  }, 130)
 }
 
-function sceneCanvas(): HTMLCanvasElement | null {
-  return document.querySelector<HTMLCanvasElement>('#stage canvas')
-}
-
-function setScenePhase(direction: SceneDirection, scenePhase: 'out' | 'height' | 'in'): void {
-  if (controlCopy) {
-    controlCopy.dataset.sceneDirection = direction
-    controlCopy.dataset.scenePhase = scenePhase
-  }
-  if (sceneCurrent) {
-    sceneCurrent.dataset.sceneDirection = direction
-    sceneCurrent.dataset.scenePhase = scenePhase
-  }
-}
-
-function settleSceneCopy(): void {
-  clearSceneTimers()
+function settleSceneWindow(): void {
+  window.clearTimeout(sceneTimer)
+  sceneTimer = 0
   sceneChanging = false
 
-  if (controlCopy) {
-    controlCopy.style.height = ''
-    controlCopy.style.transition = ''
-    delete controlCopy.dataset.scenePhase
-    delete controlCopy.dataset.sceneDirection
-  }
-
-  if (sceneCurrent) {
-    delete sceneCurrent.dataset.scenePhase
-    delete sceneCurrent.dataset.sceneDirection
-  }
-
-  const canvas = sceneCanvas()
-  if (canvas) {
-    delete canvas.dataset.sceneSlide
-    delete canvas.dataset.sceneDirection
+  if (sceneWindow) {
+    delete sceneWindow.dataset.scenePhase
+    delete sceneWindow.dataset.sceneDirection
   }
 
   syncSceneStepper()
@@ -645,7 +671,7 @@ function settleSceneCopy(): void {
 }
 
 function changeSceneBy(delta: number): void {
-  if (!controlCopy || sceneButtons.length < 2 || sceneChanging) return
+  if (sceneButtons.length < 2 || sceneChanging) return
   if (sceneButtons.some((button) => button.disabled)) return
 
   const fromIndex = currentSceneIndex()
@@ -656,7 +682,7 @@ function changeSceneBy(delta: number): void {
   const direction: SceneDirection = delta > 0 ? 'next' : 'prev'
   pulseArrow(direction)
 
-  if (reducedMotion || phase !== 'expanded') {
+  if (reducedMotion || !sceneWindow) {
     target.click()
     syncSceneStepper()
     return
@@ -664,56 +690,28 @@ function changeSceneBy(delta: number): void {
 
   sceneChanging = true
   syncSceneDisabledState()
+  sceneWindow.dataset.sceneDirection = direction
+  sceneWindow.dataset.scenePhase = 'out'
 
-  const canvas = sceneCanvas()
-  const oldHeight = controlCopy.getBoundingClientRect().height
-  controlCopy.style.height = `${oldHeight}px`
-  setScenePhase(direction, 'out')
-
-  if (canvas) {
-    canvas.dataset.sceneDirection = direction
-    canvas.dataset.sceneSlide = 'out'
-  }
-
-  // 1. Model, current scene label, title and description all leave together.
+  // The complete visible page leaves first. Scene text, model and panel geometry therefore
+  // never rebind or reflow in front of the user.
   sceneTimer = window.setTimeout(() => {
-    // 2. Replace the real scene only after everything visible has left the frame.
     target.click()
     syncSceneStepper()
 
-    // Measure the new natural copy height while the new glyphs remain off-canvas.
-    controlCopy.style.transition = 'none'
-    controlCopy.style.height = 'auto'
-    const newHeight = controlCopy.getBoundingClientRect().height
-    controlCopy.style.height = `${oldHeight}px`
-    void controlCopy.offsetHeight
-    controlCopy.style.transition = ''
-    setScenePhase(direction, 'height')
+    // Reposition the newly bound page to the opposite side without animation.
+    if (!sceneWindow) return
+    sceneWindow.dataset.scenePhase = 'pre-in'
+    void sceneWindow.offsetWidth
 
-    // Teleport the invisible new WebGL view to the opposite edge without animation.
-    if (canvas) {
-      canvas.dataset.sceneSlide = 'pre-in'
-      void canvas.offsetHeight
-      requestAnimationFrame(() => {
-        canvas.dataset.sceneSlide = 'in'
-      })
-    }
-
-    // 3. Morph only the copy container height while its text remains offscreen.
     requestAnimationFrame(() => {
-      controlCopy.style.height = `${newHeight}px`
+      requestAnimationFrame(() => {
+        if (!sceneWindow) return
+        sceneWindow.dataset.scenePhase = 'in'
+        sceneTimer = window.setTimeout(settleSceneWindow, sceneInMs)
+      })
     })
-
-    sceneHeightTimer = window.setTimeout(() => {
-      controlCopy.style.height = ''
-      setScenePhase(direction, 'in')
-
-      // 4. The new text slides in only after its final layout has settled.
-      sceneInTimer = window.setTimeout(() => {
-        settleSceneCopy()
-      }, sceneSlideMs)
-    }, sceneHeightMs)
-  }, sceneSlideMs)
+  }, sceneOutMs)
 }
 
 if (styleRow && sceneButtons.length > 0) {
@@ -732,16 +730,14 @@ if (styleRow && sceneButtons.length > 0) {
   sceneNextButton.className = 'scene-arrow scene-arrow-next'
   sceneNextButton.textContent = '→'
 
-  sceneCurrent = document.createElement('div')
+  const sceneCurrent = document.createElement('div')
   sceneCurrent.className = 'scene-current'
   sceneCurrent.setAttribute('role', 'status')
   sceneCurrent.setAttribute('aria-live', 'polite')
 
   sceneCurrentLabel = document.createElement('span')
   sceneCurrentLabel.className = 'scene-current-label'
-  sceneCurrentCount = document.createElement('span')
-  sceneCurrentCount.className = 'scene-current-count'
-  sceneCurrent.append(sceneCurrentLabel, sceneCurrentCount)
+  sceneCurrent.append(sceneCurrentLabel)
 
   styleRow.classList.add('scene-stepper')
   styleRow.replaceChildren(scenePrevButton, sceneCurrent, sceneNextButton, options)
@@ -756,4 +752,122 @@ if (styleRow && sceneButtons.length > 0) {
 
   syncSceneStepper()
   syncSceneDisabledState()
+}
+
+// Export progress uses a blocking modal layer. main.ts remains the encoder owner; this UI
+// observes its existing button state so the export pipeline itself stays untouched.
+const exportOverlay = document.createElement('div')
+exportOverlay.className = 'export-overlay'
+exportOverlay.setAttribute('role', 'dialog')
+exportOverlay.setAttribute('aria-modal', 'true')
+exportOverlay.setAttribute('aria-labelledby', 'export-overlay-title')
+exportOverlay.setAttribute('aria-describedby', 'export-overlay-detail')
+exportOverlay.setAttribute('aria-hidden', 'true')
+exportOverlay.tabIndex = -1
+
+const exportDialog = document.createElement('div')
+exportDialog.className = 'export-dialog'
+
+const exportKicker = document.createElement('p')
+exportKicker.className = 'export-kicker'
+exportKicker.textContent = 'GIF EXPORT'
+
+const exportTitle = document.createElement('h2')
+exportTitle.className = 'export-title'
+exportTitle.id = 'export-overlay-title'
+exportTitle.textContent = 'Preparing reveal.'
+
+const exportDetail = document.createElement('p')
+exportDetail.className = 'export-detail'
+exportDetail.id = 'export-overlay-detail'
+exportDetail.textContent = 'Building the animation frames.'
+
+const exportProgressTrack = document.createElement('div')
+exportProgressTrack.className = 'export-progress-track'
+exportProgressTrack.setAttribute('aria-hidden', 'true')
+const exportProgressBar = document.createElement('div')
+exportProgressBar.className = 'export-progress-bar'
+exportProgressTrack.append(exportProgressBar)
+
+const exportPercent = document.createElement('div')
+exportPercent.className = 'export-percent'
+exportPercent.textContent = '0%'
+
+exportDialog.append(exportKicker, exportTitle, exportDetail, exportProgressTrack, exportPercent)
+exportOverlay.append(exportDialog)
+document.body.append(exportOverlay)
+
+function setExportProgress(progress: number): void {
+  const normalized = Math.max(0, Math.min(1, progress))
+  exportProgressBar.style.setProperty('--export-progress', String(normalized))
+  exportPercent.textContent = `${Math.round(normalized * 100)}%`
+}
+
+function showExportOverlay(): void {
+  window.clearTimeout(exportOverlayTimer)
+  exportTitle.textContent = 'Preparing reveal.'
+  exportDetail.textContent = 'Building the animation frames.'
+  setExportProgress(0)
+  exportOverlay.dataset.open = 'true'
+  exportOverlay.setAttribute('aria-hidden', 'false')
+  requestAnimationFrame(() => exportOverlay.focus({ preventScroll: true }))
+}
+
+function hideExportOverlay(delay = 0): void {
+  window.clearTimeout(exportOverlayTimer)
+  exportOverlayTimer = window.setTimeout(() => {
+    delete exportOverlay.dataset.open
+    exportOverlay.setAttribute('aria-hidden', 'true')
+    exportButton?.focus({ preventScroll: true })
+  }, delay)
+}
+
+function syncExportOverlayFromButton(): void {
+  if (!exportButton) return
+  const label = exportButton.textContent?.trim() ?? ''
+
+  if (label.startsWith('PREPARING')) {
+    showExportOverlay()
+    return
+  }
+
+  const progressMatch = label.match(/^GIF\s+(\d+)%$/)
+  if (progressMatch) {
+    exportTitle.textContent = 'Rendering reveal.'
+    exportDetail.textContent = 'Encoding the sculpture-to-QR loop.'
+    setExportProgress(Number(progressMatch[1]) / 100)
+    return
+  }
+
+  if (label.startsWith('EXPORTED')) {
+    exportTitle.textContent = 'GIF ready.'
+    exportDetail.textContent = 'The download has started.'
+    setExportProgress(1)
+    hideExportOverlay(850)
+    return
+  }
+
+  if (label.startsWith('EXPORT FAILED')) {
+    exportTitle.textContent = 'Export failed.'
+    exportDetail.textContent = exportButton.title || 'The GIF encoder could not finish this export.'
+    setExportProgress(0)
+    hideExportOverlay(1700)
+    return
+  }
+
+  if (label === 'EXPORT GIF' && !exportButton.disabled && exportOverlay.dataset.open === 'true') {
+    hideExportOverlay(120)
+  }
+}
+
+if (exportButton) {
+  exportButton.addEventListener('click', showExportOverlay)
+  const exportObserver = new MutationObserver(syncExportOverlayFromButton)
+  exportObserver.observe(exportButton, {
+    attributes: true,
+    attributeFilter: ['disabled', 'title'],
+    childList: true,
+    characterData: true,
+    subtree: true,
+  })
 }
