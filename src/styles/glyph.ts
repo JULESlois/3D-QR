@@ -45,10 +45,18 @@ const FONT_5X7: Record<string, readonly string[]> = {
   '7': ['11111','00001','00010','00100','01000','01000','01000'],
   '8': ['01110','10001','10001','01110','10001','10001','01110'],
   '9': ['01110','10001','10001','01111','00001','00001','01110'],
+  '@': ['01110','10001','10111','10101','10111','10000','01111'],
+  '#': ['01010','11111','01010','01010','11111','01010','01010'],
+  '?': ['01110','10001','00001','00010','00100','00000','00100'],
+  '!': ['00100','00100','00100','00100','00100','00000','00100'],
+  '+': ['00000','00100','00100','11111','00100','00100','00000'],
+  '&': ['01100','10010','10100','01000','10101','10010','01101'],
 }
 
+const GLYPH_TOKEN = /[A-Z0-9@#?!+&]/
+
 function glyphFromSeed(seedText: string): string {
-  return seedText.toUpperCase().match(/[A-Z0-9]/)?.[0] ?? 'Q'
+  return seedText.toUpperCase().match(GLYPH_TOKEN)?.[0] ?? 'Q'
 }
 
 type GlyphBand = 'face' | 'inner-bevel' | 'outer-bevel' | 'field'
@@ -95,7 +103,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     const glyphY = nz * 6
     const sample = sampleGlyph(bitmap, glyphY, glyphX)
 
-    // The continuous distance field gives the letter a broad readable face and two
+    // The continuous distance field gives the glyph a broad readable face and two
     // stepped bevel bands instead of snapping every QR column to a coarse 5x7 cell.
     // Only column height/material changes; the scanner-facing top remains qr-top.
     let topLevel: number
@@ -116,9 +124,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
         ? 'primary'
         : sample.band === 'inner-bevel'
           ? 'plaster'
-          : sample.band === 'outer-bevel'
-            ? 'stone'
-            : 'stone'
+          : 'stone'
 
       const distancePhase = Number.isFinite(sample.distance)
         ? Math.min(1, sample.distance / 1.55)
@@ -141,7 +147,7 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     'glyph',
     'Glyph',
     lifted,
-    `GLYPH ${glyph} / FREE-STANDING QR BODY / CONTINUOUS BEVEL FIELD / EMPTY LIGHT FIELD`,
+    `GLYPH ${glyph} / FREE-STANDING QR BODY / SYMBOL SET A-Z 0-9 @ # ? ! + & / EMPTY LIGHT FIELD`,
     'display-plaque',
   )
 }
