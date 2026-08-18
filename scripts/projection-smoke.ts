@@ -1,5 +1,6 @@
 import { CELL_SIZE, QUIET_ZONE, cellKey, positionForCell } from '../src/sculpture'
 import { createQRMatrix, type QRMatrixData } from '../src/qr'
+import { getPalette, type ScenePaletteDefinition } from '../src/palettes'
 import { STYLES } from '../src/styles'
 
 interface ProjectionCase {
@@ -16,9 +17,109 @@ const cases: readonly ProjectionCase[] = [
 ]
 
 const EPSILON = 1e-7
+const MIN_PAIR_LUMINANCE_GAP = 0.025
+const MIN_MEAN_LUMINANCE_GAP = 0.06
+const MIN_BASE_LUMINANCE_GAP = 0.06
+
+const PAIRED_MATERIAL_KEYS = [
+  'colors',
+  'foundation',
+  'wood',
+  'stone',
+  'plaster',
+  'glass',
+  'water',
+  'crystal',
+] as const satisfies readonly (keyof ScenePaletteDefinition)[]
 
 type GeneratedBuild = ReturnType<(typeof STYLES)[number]['generate']>
 type GeneratedVoxel = GeneratedBuild['voxels'][number]
+
+function channelToLinear(channel: number): number {
+  const value = channel / 255
+  return value <= 0.04045
+    ? value / 12.92
+    : ((value + 0.055) / 1.055) ** 2.4
+}
+
+function relativeLuminance(hex: string): number {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!match) throw new Error(`Unsupported palette color ${hex}; expected #RRGGBB.`)
+
+  const value = Number.parseInt(match[1], 16)
+  const red = channelToLinear((value >> 16) & 0xff)
+  const green = channelToLinear((value >> 8) & 0xff)
+  const blue = channelToLinear(value & 0xff)
+  return red * 0.2126 + green * 0.7152 + blue * 0.0722
+}
+
+function mean(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length)
+}
+
+function assertPairedMaterialContrast(
+  styleId: string,
+  paletteLabel: string,
+  material: string,
+  colors: readonly string[],
+): void {
+  if (colors.length < 4 || colors.length % 2 !== 0) {
+    throw new Error(
+      `${styleId}/${paletteLabel} ${material} must contain equally-sized dark/light halves; received ${colors.length} colors.`,
+    )
+  }
+
+  const half = colors.length / 2
+  const dark = colors.slice(0, half).map(relativeLuminance)
+  const light = colors.slice(half).map(relativeLuminance)
+
+  for (let index = 0; index < half; index += 1) {
+    const gap = light[index] - dark[index]
+    if (gap < MIN_PAIR_LUMINANCE_GAP) {
+      throw new Error(
+        `${styleId}/${paletteLabel} ${material} pair ${index} has luminance gap ${gap.toFixed(4)}; `
+        + `expected at least ${MIN_PAIR_LUMINANCE_GAP}.`,
+      )
+    }
+  }
+
+  const meanGap = mean(light) - mean(dark)
+  if (meanGap < MIN_MEAN_LUMINANCE_GAP) {
+    throw new Error(
+      `${styleId}/${paletteLabel} ${material} mean luminance gap ${meanGap.toFixed(4)} is below ${MIN_MEAN_LUMINANCE_GAP}.`,
+    )
+  }
+}
+
+function assertDefaultPaletteContrast(): number {
+  let pairedMaterialCount = 0
+
+  for (const style of STYLES) {
+    const palette = getPalette(style.id, style.defaultPalette)
+
+    if (!palette.baseLight || !palette.baseDark?.length) {
+      throw new Error(`${style.id}/${palette.label} must define both baseLight and baseDark for projection polarity.`)
+    }
+
+    const baseLight = relativeLuminance(palette.baseLight)
+    const brightestBaseDark = Math.max(...palette.baseDark.map(relativeLuminance))
+    const baseGap = baseLight - brightestBaseDark
+    if (baseGap < MIN_BASE_LUMINANCE_GAP) {
+      throw new Error(
+        `${style.id}/${palette.label} base field luminance gap ${baseGap.toFixed(4)} is below ${MIN_BASE_LUMINANCE_GAP}.`,
+      )
+    }
+
+    for (const material of PAIRED_MATERIAL_KEYS) {
+      const colors = palette[material]
+      if (!Array.isArray(colors)) continue
+      assertPairedMaterialContrast(style.id, palette.label, material, colors)
+      pairedMaterialCount += 1
+    }
+  }
+
+  return pairedMaterialCount
+}
 
 function assertVoxelStructure(styleId: string, matrixSize: number, voxels: GeneratedVoxel[]): void {
   const occupied = new Set<string>()
@@ -191,6 +292,8 @@ function assertDeterministic(styleId: string, first: GeneratedBuild, second: Gen
   }
 }
 
+const pairedMaterialCount = assertDefaultPaletteContrast()
+
 for (const testCase of cases) {
   const matrix = createQRMatrix(testCase.payload)
   if (matrix.version < testCase.minVersion) {
@@ -209,4 +312,7 @@ for (const testCase of cases) {
   }
 }
 
-console.log(`projection smoke passed for ${STYLES.length} styles across ${cases.length} QR sizes`)
+console.log(
+  `projection smoke passed for ${STYLES.length} styles across ${cases.length} QR sizes; `
+  + `${pairedMaterialCount} default paired material ramps preserve luminance polarity`,
+)
