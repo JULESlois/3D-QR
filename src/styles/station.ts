@@ -4,7 +4,7 @@ import {
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
-  projectedCapKind,
+  projectionToneForCell,
   pushCellVoxel,
   type SculptureBuild,
   type VoxelKind,
@@ -111,16 +111,16 @@ function buildColumn(
   for (const level of levels) {
     const segment = occupied.get(level)
     if (!segment) continue
+    const visibleMaterial = bodyKind(segment.role, level, segment.topLevel)
 
     pushCellVoxel(
       voxels,
       column.cell,
       matrixSize,
       level,
-      level === visibleTop
-        ? projectedCapKind(column.cell)
-        : bodyKind(segment.role, level, segment.topLevel),
+      visibleMaterial,
       (column.cell.row * 0.071 + column.cell.col * 0.043 + level * 0.057) % 1,
+      level === visibleTop ? projectionToneForCell(column.cell) : undefined,
     )
   }
 }
