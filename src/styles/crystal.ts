@@ -18,6 +18,37 @@ function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undef
   return matrix.cells[row * matrix.size + col]
 }
 
+function getNearestDataCell(
+  matrix: QRMatrixData,
+  row: number,
+  col: number,
+  reserved: ReadonlySet<string>,
+  maxRadius = 2,
+): QRCell | undefined {
+  for (let radius = 0; radius <= maxRadius; radius += 1) {
+    let best: QRCell | undefined
+    let bestDistance = Number.POSITIVE_INFINITY
+
+    for (let dr = -radius; dr <= radius; dr += 1) {
+      for (let dc = -radius; dc <= radius; dc += 1) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== radius) continue
+        const cell = getCell(matrix, row + dr, col + dc)
+        if (!cell || cell.zone !== 'data' || reserved.has(cellKey(cell.row, cell.col))) continue
+
+        const distance = dr * dr + dc * dc
+        if (distance < bestDistance) {
+          best = cell
+          bestDistance = distance
+        }
+      }
+    }
+
+    if (best) return best
+  }
+
+  return undefined
+}
+
 function buildSanctumFrame(
   voxels: ReturnType<typeof createBaseVoxels>,
   matrix: QRMatrixData,
@@ -46,7 +77,11 @@ function buildSanctumFrame(
           ? 3
           : 2
 
-      pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
+      // Functional QR zones stay deliberately low. The frame remains continuous at
+      // slab height, but alignment / format / version / timing / finder modules are
+      // never promoted into the taller rear wall or outer parapet.
+      const safeTopLevel = cell.zone === 'data' ? topLevel : Math.min(topLevel, 2)
+      pushProjectedColumn(voxels, cell, matrix.size, 1, safeTopLevel, 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
@@ -92,8 +127,8 @@ function buildFloatingCore(
 ): void {
   // Give the hero crystal a deliberately broad faceted silhouette instead of a bundle
   // of narrow towers. The upper crown spreads left/right, the middle contracts, and a
-  // long lower point hangs over the basin. Every shard still occupies only its own QR
-  // column, so the sculpture remains projection-safe when viewed from the QR camera.
+  // long lower point hangs over the basin. High crystal columns are remapped onto the
+  // nearest ordinary data cell when a target lands on a protected QR function zone.
   const heroShards = [
     // Central spine and hanging point.
     [0, 0, 4, 22],
@@ -121,16 +156,19 @@ function buildFloatingCore(
     [2, 1, 9, 12],
   ] as const
 
+  const reserved = new Set<string>()
+
   for (const [dr, dc, fromLevel, topLevel] of heroShards) {
-    const cell = getCell(matrix, center + dr, center + dc)
+    const cell = getNearestDataCell(matrix, center + dr, center + dc, reserved, 2)
     if (!cell) continue
+    reserved.add(cellKey(cell.row, cell.col))
     pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
     lifted.add(cellKey(cell.row, cell.col))
   }
 
   // Detached crown splinters exaggerate the broken mineral outline without competing
-  // with the central mass. They sit closer to the hero than the old satellites, so the
-  // eye reads one large fractured crystal instead of three unrelated monuments.
+  // with the central mass. The same data-cell remap keeps small alignment patterns from
+  // turning into isolated high crystal towers on larger QR versions.
   const splinters = [
     [-2, -5, 10, 15],
     [-1, 5, 11, 14],
@@ -139,8 +177,9 @@ function buildFloatingCore(
   ] as const
 
   for (const [dr, dc, fromLevel, topLevel] of splinters) {
-    const cell = getCell(matrix, center + dr, center + dc)
+    const cell = getNearestDataCell(matrix, center + dr, center + dc, reserved, 2)
     if (!cell) continue
+    reserved.add(cellKey(cell.row, cell.col))
     pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
     lifted.add(cellKey(cell.row, cell.col))
   }
@@ -161,10 +200,12 @@ function buildPeripheralPylons(
     [center + halfRows - 1, center - halfCols + 1],
     [center + halfRows - 1, center + halfCols - 1],
   ] as const
+  const reserved = new Set<string>()
 
   for (const [row, col] of points) {
-    const cell = getCell(matrix, row, col)
+    const cell = getNearestDataCell(matrix, row, col, reserved, 2)
     if (!cell) continue
+    reserved.add(cellKey(cell.row, cell.col))
     pushProjectedColumn(voxels, cell, matrix.size, 1, 4, 'stone', random)
     lifted.add(cellKey(cell.row, cell.col))
   }
@@ -212,7 +253,7 @@ export function generateCrystal(matrix: QRMatrixData, seedText: string): Sculptu
     'crystal',
     'Crystal',
     lifted,
-    'BROAD FRACTURED HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / LOW SANCTUM FRAME',
+    'FUNCTION-ZONE-SAFE HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / LOW SANCTUM FRAME',
     'mineral-slab',
   )
 }
