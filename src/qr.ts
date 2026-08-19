@@ -1,6 +1,6 @@
 import QRCode from 'qrcode'
 
-export type ModuleZone = 'finder' | 'timing' | 'alignment' | 'data'
+export type ModuleZone = 'finder' | 'timing' | 'alignment' | 'format' | 'version' | 'data'
 export type ModuleRole = ModuleZone | 'light'
 export type DarkModuleRole = ModuleZone
 
@@ -74,10 +74,37 @@ function createAlignmentCellSet(version: number, size: number): Set<string> {
   return cells
 }
 
+function isFormatInformationCell(row: number, col: number, size: number): boolean {
+  // The first 15-bit copy wraps around the top-left finder without crossing the
+  // timing row/column at index 6. The redundant copy lives beside the other two
+  // finders; include the fixed dark module at (size - 8, 8) in the same protected
+  // structural band because it must never become ordinary scene geometry.
+  const aroundTopLeft = (
+    (row === 8 && (col <= 5 || col === 7 || col === 8))
+    || (col === 8 && (row <= 5 || row === 7))
+  )
+  const redundantHorizontal = row === 8 && col >= size - 8
+  const redundantVerticalAndDarkModule = col === 8 && row >= size - 8
+
+  return aroundTopLeft || redundantHorizontal || redundantVerticalAndDarkModule
+}
+
+function isVersionInformationCell(row: number, col: number, size: number, version: number): boolean {
+  if (version < 7) return false
+
+  // QR v7+ adds two mirrored 3x6 version-information blocks immediately beside
+  // the top-right and bottom-left finder structures. Keeping these cells low and
+  // structurally distinct improves perspective tolerance for the 3D projection.
+  const besideTopRight = row <= 5 && col >= size - 11 && col <= size - 9
+  const aboveBottomLeft = col <= 5 && row >= size - 11 && row <= size - 9
+  return besideTopRight || aboveBottomLeft
+}
+
 function classifyModuleZone(
   row: number,
   col: number,
   size: number,
+  version: number,
   alignmentCells: ReadonlySet<string>,
 ): ModuleZone {
   // Include the one-cell separator around each 7x7 finder so light cells in the
@@ -87,6 +114,8 @@ function classifyModuleZone(
   const inBottomLeftFinder = row >= size - 8 && col <= 7
 
   if (inTopLeftFinder || inTopRightFinder || inBottomLeftFinder) return 'finder'
+  if (isFormatInformationCell(row, col, size)) return 'format'
+  if (isVersionInformationCell(row, col, size, version)) return 'version'
 
   const inHorizontalTiming = row === 6 && col >= 8 && col <= size - 9
   const inVerticalTiming = col === 6 && row >= 8 && row <= size - 9
@@ -111,7 +140,7 @@ export function createQRMatrix(value: string): QRMatrixData {
     for (let col = 0; col < size; col += 1) {
       const index = row * size + col
       const dark = Boolean(symbol.modules.get(row, col))
-      const zone = classifyModuleZone(row, col, size, alignmentCells)
+      const zone = classifyModuleZone(row, col, size, symbol.version, alignmentCells)
 
       if (dark) {
         const cell: DarkModule = {
