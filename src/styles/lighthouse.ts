@@ -28,8 +28,11 @@ function adjacencyScore(module: DarkModule, modules: readonly DarkModule[]): num
 }
 
 function waveHeight(cell: QRCell, seedText: string): number {
-  if (cell.zone === 'finder') return 1
-  if (cell.zone === 'timing') return 1
+  // QR function zones must stay visually shallow even when their light modules are
+  // interpreted as water. Finder/timing cells were already conservative; extend the
+  // same rule to alignment/format/version so later QR versions cannot grow a two-level
+  // wave directly across the synchronization metadata.
+  if (cell.zone !== 'data') return 1
 
   const seed = (hashString(`${seedText}::wave::${cell.row}:${cell.col}`) % 1000) / 1000
   const wave = Math.sin(cell.row * 0.83 + cell.col * 0.31)
