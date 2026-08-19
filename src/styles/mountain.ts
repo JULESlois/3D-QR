@@ -81,6 +81,25 @@ function meltwaterInfluence(cell: Pick<QRCell, 'row' | 'col'>, matrix: QRMatrixD
   return clamp01(1 - Math.min(upperDistance, lowerDistance) / width)
 }
 
+function protectedZoneHeightCap(cell: QRCell): number | null {
+  switch (cell.zone) {
+    case 'data':
+      return null
+    case 'finder':
+      return 3
+    case 'timing':
+    case 'alignment':
+      return 2
+    case 'format':
+    case 'version':
+      return 1
+    default:
+      // Future QR function zones should fail conservative rather than silently
+      // becoming part of a tall summit before the scene has explicit treatment.
+      return 1
+  }
+}
+
 function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): number {
   const center = (matrix.size - 1) / 2
   const span = Math.max(1, matrix.size - 1)
@@ -194,10 +213,12 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
 
   let height = Math.max(1, Math.min(14, 1 + Math.round(relief)))
 
-  // Finder regions remain low foothills so they never become three competing
-  // corner monuments. Timing cells also stay subordinate to the mountain ridge.
-  if (cell.zone === 'finder') height = Math.min(height, 3)
-  if (cell.zone === 'timing') height = Math.min(height, 4)
+  // Function modules still participate in the continuous ground surface, but they
+  // may not become cliffs or summit columns. Alignment/timing stay low foothills;
+  // format/version bands remain essentially planar so perspective distortion does
+  // not erase the synchronization information they carry on larger QR versions.
+  const functionCap = protectedZoneHeightCap(cell)
+  if (functionCap !== null) height = Math.min(height, functionCap)
 
   return height
 }
