@@ -5,6 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
+  maxProjectionLevelForCell,
   pushProjectedColumn,
   type SculptureBuild,
   type VoxelKind,
@@ -79,25 +80,6 @@ function meltwaterInfluence(cell: Pick<QRCell, 'row' | 'col'>, matrix: QRMatrixD
   )
 
   return clamp01(1 - Math.min(upperDistance, lowerDistance) / width)
-}
-
-function protectedZoneHeightCap(cell: QRCell): number | null {
-  switch (cell.zone) {
-    case 'data':
-      return null
-    case 'finder':
-      return 3
-    case 'timing':
-    case 'alignment':
-      return 2
-    case 'format':
-    case 'version':
-      return 1
-    default:
-      // Future QR function zones should fail conservative rather than silently
-      // becoming part of a tall summit before the scene has explicit treatment.
-      return 1
-  }
 }
 
 function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): number {
@@ -213,12 +195,13 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
 
   let height = Math.max(1, Math.min(14, 1 + Math.round(relief)))
 
-  // Function modules still participate in the continuous ground surface, but they
-  // may not become cliffs or summit columns. Alignment/timing stay low foothills;
-  // format/version bands remain essentially planar so perspective distortion does
-  // not erase the synchronization information they carry on larger QR versions.
-  const functionCap = protectedZoneHeightCap(cell)
-  if (functionCap !== null) height = Math.min(height, functionCap)
+  // Mountain keeps finder/timing cells as low foothills for silhouette continuity,
+  // while alignment/format/version limits come from the shared projection contract.
+  // This prevents the scene from drifting if the global QR safety policy changes.
+  if (cell.zone === 'finder') height = Math.min(height, 3)
+  if (cell.zone === 'timing') height = Math.min(height, 2)
+  const protectedMax = maxProjectionLevelForCell(cell)
+  if (protectedMax !== undefined) height = Math.min(height, protectedMax)
 
   return height
 }
