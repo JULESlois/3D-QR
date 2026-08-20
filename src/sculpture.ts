@@ -136,6 +136,23 @@ export function projectionToneForCell(cell: Pick<QRCell, 'dark'>): ProjectionTon
   return cell.dark ? 'dark' : 'light'
 }
 
+/**
+ * Structural QR zones that carry alignment / format / version information must stay
+ * close to the projection plane. Finder and timing zones remain scene-addressable on
+ * purpose: several compositions use them as low bastions, reefs, or corridors.
+ */
+export function maxProjectionLevelForCell(cell: Pick<QRCell, 'zone'>): number | undefined {
+  switch (cell.zone) {
+    case 'alignment':
+      return 2
+    case 'format':
+    case 'version':
+      return 1
+    default:
+      return undefined
+  }
+}
+
 function toneBiasedColorPhase(colorPhase: number, tone: ProjectionTone): number {
   const phase = Math.max(0, Math.min(0.999999, colorPhase))
   return tone === 'dark'
@@ -279,8 +296,13 @@ export function pushProjectedColumn(
   bodyKind: VoxelKind,
   random: () => number,
 ): void {
-  const start = Math.max(1, Math.floor(fromLevel))
-  const end = Math.max(start, Math.floor(toLevel))
+  const requestedStart = Math.max(1, Math.floor(fromLevel))
+  const requestedEnd = Math.max(requestedStart, Math.floor(toLevel))
+  const protectedMax = maxProjectionLevelForCell(cell)
+  const end = protectedMax === undefined
+    ? requestedEnd
+    : Math.min(requestedEnd, protectedMax)
+  const start = Math.min(requestedStart, end)
   const tone = projectionToneForCell(cell)
 
   for (let level = start; level <= end; level += 1) {
@@ -429,6 +451,14 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
         throw new Error(`Style generator omitted dark QR module ${cell.row}:${cell.col}.`)
       }
       continue
+    }
+
+    const protectedMax = maxProjectionLevelForCell(cell)
+    const topLevel = Math.round(top.y / CELL_SIZE)
+    if (protectedMax !== undefined && topLevel > protectedMax) {
+      throw new Error(
+        `QR ${cell.zone} zone ${cell.row}:${cell.col} rises to level ${topLevel}; maximum is ${protectedMax}.`,
+      )
     }
 
     const expectedTone = projectionToneForCell(cell)
