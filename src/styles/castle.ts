@@ -202,13 +202,15 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
     for (let level = 1; level <= topLevel; level += 1) {
       const crownBand = level >= topLevel - 1
       const towerAccent = isCornerTurret || isGateTower || (isKeepEdge && crownBand)
+      const materialKind = towerAccent ? 'primary' : 'stone'
       pushVoxel(
         voxels,
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : towerAccent ? 'primary' : 'stone',
+        materialKind,
         (random() * 0.68 + level * 0.041 + damage * 0.15) % 1,
+        level === topLevel ? 'dark' : undefined,
       )
     }
   }
