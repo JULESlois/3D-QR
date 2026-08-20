@@ -23,7 +23,7 @@ function getNearestDataCell(
   row: number,
   col: number,
   reserved: ReadonlySet<string>,
-  maxRadius = 2,
+  maxRadius = 4,
 ): QRCell | undefined {
   for (let radius = 0; radius <= maxRadius; radius += 1) {
     let best: QRCell | undefined
@@ -129,6 +129,9 @@ function buildFloatingCore(
   // of narrow towers. The upper crown spreads left/right, the middle contracts, and a
   // long lower point hangs over the basin. High crystal columns are remapped onto the
   // nearest ordinary data cell when a target lands on a protected QR function zone.
+  // A radius of four is intentional: a 5×5 alignment pattern can occupy the exact
+  // matrix center on high-version QR codes, so radius two would search only protected
+  // cells and silently drop the central spine that makes the silhouette recognizable.
   const heroShards = [
     // Central spine and hanging point.
     [0, 0, 4, 22],
@@ -159,7 +162,7 @@ function buildFloatingCore(
   const reserved = new Set<string>()
 
   for (const [dr, dc, fromLevel, topLevel] of heroShards) {
-    const cell = getNearestDataCell(matrix, center + dr, center + dc, reserved, 2)
+    const cell = getNearestDataCell(matrix, center + dr, center + dc, reserved, 4)
     if (!cell) continue
     reserved.add(cellKey(cell.row, cell.col))
     pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
@@ -177,7 +180,7 @@ function buildFloatingCore(
   ] as const
 
   for (const [dr, dc, fromLevel, topLevel] of splinters) {
-    const cell = getNearestDataCell(matrix, center + dr, center + dc, reserved, 2)
+    const cell = getNearestDataCell(matrix, center + dr, center + dc, reserved, 4)
     if (!cell) continue
     reserved.add(cellKey(cell.row, cell.col))
     pushProjectedColumn(voxels, cell, matrix.size, fromLevel, topLevel, 'crystal', random)
@@ -203,7 +206,7 @@ function buildPeripheralPylons(
   const reserved = new Set<string>()
 
   for (const [row, col] of points) {
-    const cell = getNearestDataCell(matrix, row, col, reserved, 2)
+    const cell = getNearestDataCell(matrix, row, col, reserved, 4)
     if (!cell) continue
     reserved.add(cellKey(cell.row, cell.col))
     pushProjectedColumn(voxels, cell, matrix.size, 1, 4, 'stone', random)
