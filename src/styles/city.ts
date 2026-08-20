@@ -5,7 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
-  projectedCapKind,
+  projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
   type SculptureBuild,
@@ -245,7 +245,16 @@ function bodyKind(archetype: UrbanArchetype, level: number, topLevel: number): V
 function buildUrbanColumn(voxels: ReturnType<typeof createBaseVoxels>, column: UrbanColumn, matrixSize: number, seedText: string): void {
   const { cell, fromLevel, topLevel, archetype } = column
   for (let level = fromLevel; level <= topLevel; level += 1) {
-    pushCellVoxel(voxels, cell, matrixSize, level, level === topLevel ? projectedCapKind(cell) : bodyKind(archetype, level, topLevel), (localNoise(seedText, cell.row, cell.col, `${archetype}-${level}`) * 0.7 + level * 0.033) % 1)
+    const kind = bodyKind(archetype, level, topLevel)
+    pushCellVoxel(
+      voxels,
+      cell,
+      matrixSize,
+      level,
+      kind,
+      (localNoise(seedText, cell.row, cell.col, `${archetype}-${level}`) * 0.7 + level * 0.033) % 1,
+      level === topLevel ? projectionToneForCell(cell) : undefined,
+    )
   }
 }
 
