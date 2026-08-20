@@ -4,6 +4,7 @@ import {
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
+  maxProjectionLevelForCell,
   projectionToneForCell,
   pushCellVoxel,
   type SculptureBuild,
@@ -37,7 +38,7 @@ function register(
   role: StationRole,
   priority: number,
 ): void {
-  if (!cell || cell.zone === 'finder') return
+  if (!cell || cell.zone === 'finder' || maxProjectionLevelForCell(cell) !== undefined) return
 
   const key = cellKey(cell.row, cell.col)
   let column = columns.get(key)
@@ -152,9 +153,6 @@ function buildWaitingTrain(
     for (let row = trainRow - 1; row <= trainRow + 1; row += 1) {
       const side = Math.abs(row - trainRow) === 1
 
-      // The very tip occupies only the centre row, then widens over one module before
-      // reaching the full three-cell carriage width. Cab roof height also rises toward
-      // the body, creating a stepped wedge rather than a blunt vertical end.
       if (extremeNose && side) continue
       if (shoulder && side && row > trainRow) continue
 
@@ -168,9 +166,6 @@ function buildWaitingTrain(
     }
   }
 
-  // Two narrow articulation notches interrupt the roof/body rhythm while leaving the
-  // rail below intact. They read as door/coupler gaps rather than splitting the train
-  // into unrelated blocks because the centre spine remains continuous at low height.
   for (const fraction of [0.34, 0.67]) {
     const articulationCol = trainStart + Math.round((trainLength - 1) * fraction)
     for (const row of [trainRow - 1, trainRow + 1]) {
@@ -185,9 +180,6 @@ function buildFootbridge(
   center: number,
   halfSpan: number,
 ): void {
-  // Place the bridge away from the terminal and waiting train so its transverse
-  // silhouette remains legible. The deck is genuinely suspended above both tracks:
-  // only the two platform-side towers connect it to ground level.
   const bridgeCol = center + Math.max(4, Math.round(halfSpan * 0.42))
   const deckHalfSpan = 6
 
@@ -197,9 +189,6 @@ function buildFootbridge(
     }
   }
 
-  // Two narrow lift/stair towers make the suspended strip read as a passenger
-  // footbridge rather than another canopy. The stepped outer runs descend toward
-  // the platform surface while preserving open air over the rails themselves.
   for (const direction of [-1, 1]) {
     const towerRow = center + direction * 5
     for (let row = towerRow - 1; row <= towerRow + 1; row += 1) {
@@ -224,15 +213,9 @@ function buildGrandTerminal(
   center: number,
   halfSpan: number,
 ): number {
-  // Put the head-house close enough to the platforms to read as one station, but
-  // far enough from the symbol corners that finder reservations do not shear off
-  // most of the facade on compact QR versions.
   const concourseCol = center - Math.round(halfSpan * 0.36)
   const halfWidth = Math.max(7, Math.min(10, Math.round(matrix.size * 0.3)))
 
-  // A stepped gable replaces the previous flat rectangular concourse. Height rises
-  // towards the centre line, producing a clear terminal roof silhouette from the
-  // default isometric camera while the rear depth steps down slightly like roof bays.
   for (let row = center - halfWidth; row <= center + halfWidth; row += 1) {
     const rowDistance = Math.abs(row - center)
     const normalized = 1 - rowDistance / Math.max(1, halfWidth)
@@ -247,8 +230,6 @@ function buildGrandTerminal(
     }
   }
 
-  // Low side wings anchor the tall gable into the platforms. Their shorter roofs
-  // make the main hall read as a deliberate civic building rather than one tower.
   for (const direction of [-1, 1]) {
     const wingCenter = center + direction * Math.max(6, halfWidth - 1)
     for (let row = wingCenter - 2; row <= wingCenter + 2; row += 1) {
@@ -259,8 +240,6 @@ function buildGrandTerminal(
     }
   }
 
-  // A compact clock lantern rises directly from the gable ridge. Keeping its
-  // footprint narrow avoids turning Station into another generic skyline scene.
   for (let row = center - 1; row <= center + 1; row += 1) {
     for (let col = concourseCol - 1; col <= concourseCol + 1; col += 1) {
       const distance = Math.max(Math.abs(row - center), Math.abs(col - concourseCol))
@@ -286,24 +265,18 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
   const trackRows = [center - 2, center + 2]
   const platformRows = [center - 5, center - 4, center + 4, center + 5]
 
-  // Two long rails create the scene's strongest horizontal read.
   for (const row of trackRows) {
     for (let col = center - halfSpan; col <= center + halfSpan; col += 1) {
       register(columns, getCell(matrix, row, col), 1, 1, 'rail', 1)
     }
   }
 
-  // Raised parallel passenger platforms flank the tracks.
   for (const row of platformRows) {
     for (let col = center - halfSpan; col <= center + halfSpan; col += 1) {
       register(columns, getCell(matrix, row, col), 1, 2, 'platform', 2)
     }
   }
 
-  // These are now truly layered suspended roofs: the platform segment remains at
-  // levels 1-2 while the canopy occupies only 6-7, with narrow posts joining them
-  // at regular bays. The open vertical gap is real geometry, not just an intention
-  // in the generator comments.
   const canopyCenters = [center - 5, center + 5]
   for (const row of canopyCenters) {
     for (let col = center - halfSpan + 3; col <= center + halfSpan - 3; col += 1) {
@@ -316,17 +289,8 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     }
   }
 
-  // A visible train on one track supplies an immediate rail-station cue while the
-  // opposite track stays open. Its level-2+ body now layers over the level-1 rail
-  // instead of deleting that rail segment from the same QR column.
   buildWaitingTrain(matrix, columns, center, halfSpan)
-
-  // The transverse bridge adds a second, unmistakably railway-specific silhouette:
-  // an elevated passenger crossing over both tracks with stairs landing on platforms.
   buildFootbridge(matrix, columns, center, halfSpan)
-
-  // The head-house carries the dominant station identity: a broad stepped gable,
-  // two low wings and a clock lantern frame the linear rail elements.
   buildGrandTerminal(matrix, columns, center, halfSpan)
 
   for (const column of columns.values()) {

@@ -3,6 +3,7 @@ import {
   cellKey,
   createGenerationContext,
   finalizeSculpture,
+  maxProjectionLevelForCell,
   projectionToneForCell,
   pushVoxel,
   type SculptureBuild,
@@ -69,8 +70,6 @@ function glyphTokens(value: string): string[] {
 function glyphsFromSeed(seedText: string): string[] {
   const trimmed = seedText.trim()
 
-  // URL payloads identify from the destination rather than the protocol. Keeping two
-  // tokens gives the sculpture a stronger monogram identity without changing QR data.
   if (URL_SCHEME.test(trimmed)) {
     try {
       const url = new URL(trimmed)
@@ -93,16 +92,11 @@ function glyphsFromSeed(seedText: string): string[] {
 function buildMonogramBitmap(glyphs: readonly string[]): readonly string[] {
   const bitmaps = glyphs.map((glyph) => FONT_5X7[glyph] ?? FONT_5X7.Q)
   if (bitmaps.length <= 1) return bitmaps[0]
-
   return bitmaps[0].map((row, index) => `${row}0${bitmaps[1][index]}`)
 }
 
 type GlyphBand = 'face' | 'inner-bevel' | 'outer-bevel' | 'field'
-
-type GlyphSample = {
-  band: GlyphBand
-  distance: number
-}
+type GlyphSample = { band: GlyphBand; distance: number }
 
 function sampleGlyph(bitmap: readonly string[], row: number, col: number): GlyphSample {
   let nearest = Number.POSITIVE_INFINITY
@@ -124,9 +118,6 @@ function sampleGlyph(bitmap: readonly string[], row: number, col: number): Glyph
 export function generateGlyph(matrix: QRMatrixData, seedText: string): SculptureBuild {
   const context = createGenerationContext(matrix, seedText, 'glyph')
   const { random, center } = context
-  // No plaque or light floor: the QR-dark columns are the entire physical object.
-  // Light modules and the quiet zone remain literal empty space, so the page/background
-  // supplies scanner-light contrast while the sculpture reads as a floating monolith.
   const voxels: SculptureVoxel[] = []
   const glyphs = glyphsFromSeed(seedText)
   const bitmap = buildMonogramBitmap(glyphs)
@@ -143,11 +134,6 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
 
     const nx = (module.col - center) / Math.max(1, matrix.size - 1) + 0.5
     const nz = (module.row - center) / Math.max(1, matrix.size - 1) + 0.5
-
-    // Map both bitmap axes through the same physical pitch. Previously width and height
-    // were independently stretched to fill the square QR footprint, which compressed
-    // 11x7 monograms and widened 5x7 glyphs. A shared pitch preserves the font's intended
-    // proportions and keeps single/double identities centered in the same sculpture field.
     const glyphX = (nx - 0.5) / glyphPitch + glyphCenterX
     const glyphY = (nz - 0.5) / glyphPitch + glyphCenterY
     const sample = sampleGlyph(bitmap, glyphY, glyphX)
@@ -156,11 +142,6 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
       glyphY + EXTRUSION_ROW_OFFSET,
       glyphX + EXTRUSION_COL_OFFSET,
     )
-
-    // A diagonal secondary sample creates a short rearward extrusion visible from the
-    // default isometric camera. It only changes the height/material of existing dark QR
-    // columns, so the physical projection remains identical while the monogram gains a
-    // readable side wall instead of looking like a flat height-map stamped into the code.
     const extrusionBand = sample.band === 'field' && extrusionSample.band !== 'field'
 
     let topLevel: number
@@ -178,16 +159,18 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
       topLevel = (module.row * 3 + module.col * 5) % 19 === 0 ? 2 : 1
     }
 
+    // Glyph is intentionally a dark-only free-standing body and therefore cannot skip
+    // protected dark modules altogether. Clamp those columns to the same structural
+    // ceiling as the shared projection core while leaving the monogram relief intact on data cells.
+    const protectedMax = maxProjectionLevelForCell(module)
+    if (protectedMax !== undefined) topLevel = Math.min(topLevel, protectedMax)
+
     for (let level = 1; level <= topLevel; level += 1) {
       const interiorKind = sample.band === 'face'
         ? 'primary'
         : sample.band === 'inner-bevel'
           ? 'plaster'
-          : sample.band === 'outer-bevel'
-            ? 'stone'
-            : extrusionBand
-              ? 'stone'
-              : 'stone'
+          : 'stone'
 
       const relevantDistance = sample.band === 'field' && extrusionBand
         ? extrusionSample.distance

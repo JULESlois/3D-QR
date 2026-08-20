@@ -5,6 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
+  maxProjectionLevelForCell,
   projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
@@ -169,6 +170,11 @@ function registerCanopy(
     for (let dc = -extent; dc <= extent; dc += 1) {
       const cell = getCell(matrix, tree.cell.row + dr, tree.cell.col + dc)
       if (!cell) continue
+
+      // Tree anchors already live on ordinary data cells, but broad crowns can spread
+      // across alignment / format / version structures. Keep those protected columns
+      // at their projection-plane treatment instead of punching tall foliage through them.
+      if (maxProjectionLevelForCell(cell) !== undefined) continue
 
       const radial = Math.hypot(dr / tree.radius, dc / tree.radius)
       if (radial > 1) continue

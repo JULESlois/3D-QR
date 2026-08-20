@@ -5,6 +5,7 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
+  maxProjectionLevelForCell,
   projectedCapKind,
   projectionToneForCell,
   pushCellVoxel,
@@ -19,6 +20,10 @@ function localNoise(seedText: string, row: number, col: number, salt: string): n
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
   if (row < 0 || row >= matrix.size || col < 0 || col >= matrix.size) return undefined
   return matrix.cells[row * matrix.size + col]
+}
+
+function isProtected(cell: QRCell): boolean {
+  return maxProjectionLevelForCell(cell) !== undefined
 }
 
 function buildFinderGardens(
@@ -72,13 +77,10 @@ function buildMainHall(
   const bodyHalfDepth = Math.max(1, halfDepth - 1)
   const frontRow = hallRow + bodyHalfDepth
 
-  // Split the shrine into a low timber/plaster body and a detached oversized roof.
-  // The shadow gap below the eaves makes the hall read as architecture rather than
-  // one solid stepped voxel block when viewed isometrically.
   for (let row = hallRow - halfDepth; row <= hallRow + halfDepth; row += 1) {
     for (let col = center - halfWidth; col <= center + halfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
-      if (!cell) continue
+      if (!cell || isProtected(cell)) continue
 
       const rowDistance = Math.abs(row - hallRow)
       const colDistance = Math.abs(col - center)
@@ -109,9 +111,6 @@ function buildMainHall(
       const clippedCorner = rowDistance === halfDepth && colDistance >= halfWidth - 1
       if (clippedCorner) continue
 
-      // Deep perimeter eaves climb toward a long central ridge, while the ridge ends
-      // taper down. This produces a hipped-gable/irimoya-like silhouette without
-      // adding any geometry outside the QR column footprint.
       const inwardFromEave = Math.min(halfDepth - rowDistance, halfWidth - colDistance)
       const ridgeSpan = Math.max(2, halfWidth - 3)
       const ridge = rowDistance === 0 && colDistance <= ridgeSpan
@@ -208,12 +207,10 @@ function buildTorii(
     center + postOffset + 1,
   ]
 
-  // Four two-cell posts produce a broad ceremonial frame without filling the opening.
-  // Their visible tops retain the vermilion material instead of becoming scanner caps.
   for (const row of toriiRows) {
     for (const col of postColumns) {
       const cell = getCell(matrix, row, col)
-      if (!cell) continue
+      if (!cell || isProtected(cell)) continue
       for (let level = 1; level <= 11; level += 1) {
         pushCellVoxel(
           voxels,
@@ -229,13 +226,10 @@ function buildTorii(
     }
   }
 
-  // A shorter nuki beam sits clearly below the roof beam, preserving a band of open
-  // air above it. This negative space is what makes the structure read as a torii
-  // rather than a generic rectangular gate from the default isometric camera.
   const nukiHalfWidth = Math.max(3, postOffset - 1)
   for (let col = center - nukiHalfWidth; col <= center + nukiHalfWidth; col += 1) {
     const cell = getCell(matrix, toriiRow + 1, col)
-    if (!cell) continue
+    if (!cell || isProtected(cell)) continue
     pushCellVoxel(voxels, cell, matrix.size, 9, 'primary', 0.08)
     pushCellVoxel(
       voxels,
@@ -249,13 +243,10 @@ function buildTorii(
     lifted.add(cellKey(cell.row, cell.col))
   }
 
-  // The upper kasagi is no longer perfectly horizontal. The center stays low while
-  // both ends rise by two voxel levels, yielding the characteristic upturned torii
-  // silhouette. A slightly shorter lower lip keeps the roof beam visually layered.
   for (const row of toriiRows) {
     for (let col = center - safeHalfWidth; col <= center + safeHalfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
-      if (!cell) continue
+      if (!cell || isProtected(cell)) continue
       const normalized = Math.abs(col - center) / Math.max(1, safeHalfWidth)
       const lift = normalized > 0.84 ? 2 : normalized > 0.62 ? 1 : 0
       const topLevel = 13 + lift
@@ -277,7 +268,7 @@ function buildTorii(
   const lowerLipHalfWidth = Math.max(4, safeHalfWidth - 1)
   for (let col = center - lowerLipHalfWidth; col <= center + lowerLipHalfWidth; col += 1) {
     const cell = getCell(matrix, toriiRow, col)
-    if (!cell) continue
+    if (!cell || isProtected(cell)) continue
     pushCellVoxel(voxels, cell, matrix.size, 12, 'primary', 0.08)
     lifted.add(cellKey(cell.row, cell.col))
   }
