@@ -6,7 +6,6 @@ import {
   finalizeSculpture,
   hashString,
   maxProjectionLevelForCell,
-  projectedCapKind,
   projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
@@ -128,11 +127,7 @@ function buildMainHall(
 
       for (let level = roofBottom; level <= roofTop; level += 1) {
         const top = level === roofTop
-        const kind = top
-          ? projectedCapKind(cell)
-          : level === roofBottom
-            ? 'wood'
-            : 'primary'
+        const kind = level === roofBottom ? 'wood' : 'primary'
         pushCellVoxel(
           voxels,
           cell,
@@ -142,6 +137,7 @@ function buildMainHall(
           kind === 'primary'
             ? 0.08
             : (localNoise(seedText, row, col, `hall-roof-${level}`) * 0.42 + level * 0.047) % 1,
+          top ? projectionToneForCell(cell) : undefined,
         )
       }
 
