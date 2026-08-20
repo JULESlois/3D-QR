@@ -7,11 +7,11 @@ export const QUIET_ZONE = 4
 export type VoxelKind =
   | 'floor-light'
   | 'floor-dark'
-  /** @deprecated Scanner polarity is now stored in projectionTone. */
+  /** @deprecated Scanner polarity belongs in projectionTone; generated builds reject this tag. */
   | 'light-top'
   | 'foundation'
   | 'primary'
-  /** @deprecated Scanner polarity is now stored in projectionTone. */
+  /** @deprecated Scanner polarity belongs in projectionTone; generated builds reject this tag. */
   | 'qr-top'
   | 'wood'
   | 'stone'
@@ -282,11 +282,6 @@ export function pushVoxel(
   pushCellVoxel(voxels, module, matrixSize, level, kind, colorPhase, projectionTone)
 }
 
-/** @deprecated Use projectionToneForCell and preserve the material kind on the top voxel. */
-export function projectedCapKind(cell: Pick<QRCell, 'dark'>): 'qr-top' | 'light-top' {
-  return cell.dark ? 'qr-top' : 'light-top'
-}
-
 export function pushProjectedColumn(
   voxels: SculptureVoxel[],
   cell: QRCell,
@@ -326,11 +321,10 @@ export function pushSolidColumn(
   toLevel: number,
   bodyKind: VoxelKind,
   random: () => number,
-  capKind: VoxelKind = 'qr-top',
+  capKind: VoxelKind = bodyKind,
 ): void {
   const start = Math.max(1, Math.floor(fromLevel))
   const end = Math.max(start, Math.floor(toLevel))
-  const semanticCapKind = capKind === 'qr-top' || capKind === 'light-top' ? bodyKind : capKind
 
   for (let level = start; level <= end; level += 1) {
     pushVoxel(
@@ -338,7 +332,7 @@ export function pushSolidColumn(
       module,
       matrixSize,
       level,
-      level === end ? semanticCapKind : bodyKind,
+      level === end ? capKind : bodyKind,
       (random() * 0.72 + level * 0.041) % 1,
       level === end ? 'dark' : undefined,
     )
@@ -347,46 +341,6 @@ export function pushSolidColumn(
 
 function isLegacyScannerCap(kind: VoxelKind): kind is 'qr-top' | 'light-top' {
   return kind === 'qr-top' || kind === 'light-top'
-}
-
-function normalizeLegacyProjectionCaps(voxels: SculptureVoxel[]): SculptureVoxel[] {
-  const materialByColumn = new Map<string, SculptureVoxel[]>()
-
-  for (const voxel of voxels) {
-    if (isLegacyScannerCap(voxel.kind)) continue
-    const key = cellKey(voxel.row, voxel.col)
-    const column = materialByColumn.get(key)
-    if (column) column.push(voxel)
-    else materialByColumn.set(key, [voxel])
-  }
-
-  for (const column of materialByColumn.values()) {
-    column.sort((a, b) => a.y - b.y)
-  }
-
-  return voxels.map((voxel) => {
-    if (!isLegacyScannerCap(voxel.kind)) return voxel
-
-    const tone: ProjectionTone = voxel.kind === 'qr-top' ? 'dark' : 'light'
-    const column = materialByColumn.get(cellKey(voxel.row, voxel.col)) ?? []
-    let materialKind: VoxelKind = 'primary'
-
-    for (let index = column.length - 1; index >= 0; index -= 1) {
-      const candidate = column[index]
-      if (candidate.y >= voxel.y) continue
-      if (candidate.y > 0 || (candidate.kind !== 'floor-light' && candidate.kind !== 'floor-dark')) {
-        materialKind = candidate.kind
-        break
-      }
-    }
-
-    return {
-      ...voxel,
-      kind: materialKind,
-      colorPhase: toneBiasedColorPhase(voxel.colorPhase, tone),
-      projectionTone: tone,
-    }
-  })
 }
 
 function canonicalizeVoxelOccupancy(voxels: SculptureVoxel[]): SculptureVoxel[] {
@@ -424,7 +378,9 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
 
   for (const voxel of voxels) {
     if (isLegacyScannerCap(voxel.kind)) {
-      throw new Error('Legacy qr-top/light-top material tags must be normalized before validation.')
+      throw new Error(
+        `Legacy scanner-cap material ${voxel.kind} reached final geometry at ${voxel.row}:${voxel.col}; preserve the semantic material and set projectionTone instead.`,
+      )
     }
 
     const inside = voxel.row >= 0
@@ -490,8 +446,7 @@ export function finalizeSculpture(
   detail?: string,
   projection: ProjectionStrategy = 'full-pad',
 ): SculptureBuild {
-  const normalizedVoxels = normalizeLegacyProjectionCaps(voxels)
-  const canonicalVoxels = canonicalizeVoxelOccupancy(normalizedVoxels)
+  const canonicalVoxels = canonicalizeVoxelOccupancy(voxels)
   validateProjectionInvariant(canonicalVoxels, matrix)
 
   let maxHeight = CELL_SIZE
