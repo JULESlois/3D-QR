@@ -207,8 +207,9 @@ export function generateCastle(matrix: QRMatrixData, seedText: string): Sculptur
         module,
         matrix.size,
         level,
-        level === topLevel ? 'qr-top' : towerAccent ? 'primary' : 'stone',
+        towerAccent ? 'primary' : 'stone',
         (random() * 0.68 + level * 0.041 + damage * 0.15) % 1,
+        level === topLevel ? 'dark' : undefined,
       )
     }
   }
