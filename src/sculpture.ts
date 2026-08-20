@@ -7,8 +7,12 @@ export const QUIET_ZONE = 4
 export type VoxelKind =
   | 'floor-light'
   | 'floor-dark'
+  /** @deprecated Scanner polarity belongs in projectionTone; generated builds reject this tag. */
+  | 'light-top'
   | 'foundation'
   | 'primary'
+  /** @deprecated Scanner polarity belongs in projectionTone; generated builds reject this tag. */
+  | 'qr-top'
   | 'wood'
   | 'stone'
   | 'plaster'
@@ -335,6 +339,10 @@ export function pushSolidColumn(
   }
 }
 
+function isLegacyScannerCap(kind: VoxelKind): kind is 'qr-top' | 'light-top' {
+  return kind === 'qr-top' || kind === 'light-top'
+}
+
 function canonicalizeVoxelOccupancy(voxels: SculptureVoxel[]): SculptureVoxel[] {
   const occupied = new Map<string, SculptureVoxel>()
 
@@ -369,6 +377,12 @@ function validateProjectionInvariant(voxels: SculptureVoxel[], matrix: QRMatrixD
   const topByColumn = new Map<string, SculptureVoxel>()
 
   for (const voxel of voxels) {
+    if (isLegacyScannerCap(voxel.kind)) {
+      throw new Error(
+        `Legacy scanner-cap material ${voxel.kind} reached final geometry at ${voxel.row}:${voxel.col}; preserve the semantic material and set projectionTone instead.`,
+      )
+    }
+
     const inside = voxel.row >= 0
       && voxel.row < matrix.size
       && voxel.col >= 0
