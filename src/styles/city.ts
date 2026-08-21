@@ -33,6 +33,20 @@ interface UrbanColumn {
   priority: number
 }
 
+const ARCHETYPE_COLOR_PHASE: Readonly<Record<UrbanArchetype, number>> = {
+  podium: 0.18,
+  landmark: 0.72,
+  setback: 0.56,
+  tower: 0.86,
+  twin: 0.08,
+  slab: 0.38,
+  terrace: 0.32,
+  crown: 0.68,
+  needle: 0.92,
+  ziggurat: 0.14,
+  bridge: 0.54,
+}
+
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
   return (hashString(`${seedText}::city-v6::${salt}::${row}:${col}`) % 10000) / 10000
 }
@@ -242,6 +256,18 @@ function bodyKind(archetype: UrbanArchetype, level: number, topLevel: number): V
   }
 }
 
+function archetypeColorPhase(
+  archetype: UrbanArchetype,
+  cell: Pick<QRCell, 'row' | 'col'>,
+  level: number,
+  seedText: string,
+): number {
+  const base = ARCHETYPE_COLOR_PHASE[archetype]
+  const texture = (localNoise(seedText, cell.row, cell.col, `${archetype}-material`) - 0.5) * 0.08
+  const verticalBand = ((level % 5) - 2) * 0.006
+  return Math.max(0.02, Math.min(0.98, base + texture + verticalBand))
+}
+
 function buildUrbanColumn(voxels: ReturnType<typeof createBaseVoxels>, column: UrbanColumn, matrixSize: number, seedText: string): void {
   const { cell, fromLevel, topLevel, archetype } = column
   for (let level = fromLevel; level <= topLevel; level += 1) {
@@ -252,7 +278,7 @@ function buildUrbanColumn(voxels: ReturnType<typeof createBaseVoxels>, column: U
       matrixSize,
       level,
       kind,
-      (localNoise(seedText, cell.row, cell.col, `${archetype}-${level}`) * 0.7 + level * 0.033) % 1,
+      archetypeColorPhase(archetype, cell, level, seedText),
       level === topLevel ? projectionToneForCell(cell) : undefined,
     )
   }
