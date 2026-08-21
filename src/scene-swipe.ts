@@ -10,10 +10,14 @@ function installSceneSwipe(): boolean {
   if (!dock || !current || !previous || !next) return false
   if (current.dataset.swipeReady === 'true') return true
 
-  current.dataset.swipeReady = 'true'
-  current.style.touchAction = 'pan-y'
-  current.style.cursor = 'grab'
-  current.setAttribute('aria-label', 'Current scene. Swipe left or right to change scene.')
+  const sceneCurrent = current
+  const previousButton = previous
+  const nextButton = next
+
+  sceneCurrent.dataset.swipeReady = 'true'
+  sceneCurrent.style.touchAction = 'pan-y'
+  sceneCurrent.style.cursor = 'grab'
+  sceneCurrent.setAttribute('aria-label', 'Current scene. Swipe left or right to change scene.')
 
   let pointerId: number | null = null
   let startX = 0
@@ -22,7 +26,7 @@ function installSceneSwipe(): boolean {
   let deltaY = 0
   let axis: 'horizontal' | 'vertical' | null = null
 
-  const label = current.querySelector<HTMLElement>('.scene-current-label')
+  const label = sceneCurrent.querySelector<HTMLElement>('.scene-current-label')
 
   function renderDrag(): void {
     if (!label) return
@@ -43,16 +47,16 @@ function installSceneSwipe(): boolean {
         label.style.removeProperty('opacity')
       }, 170)
     }
-    current.style.cursor = 'grab'
+    sceneCurrent.style.cursor = 'grab'
     pointerId = null
     axis = null
     deltaX = 0
     deltaY = 0
   }
 
-  current.addEventListener('pointerdown', (event) => {
+  sceneCurrent.addEventListener('pointerdown', (event) => {
     if (!event.isPrimary || event.pointerType === 'mouse') return
-    if (previous.disabled || next.disabled) return
+    if (previousButton.disabled || nextButton.disabled) return
 
     pointerId = event.pointerId
     startX = event.clientX
@@ -60,11 +64,11 @@ function installSceneSwipe(): boolean {
     deltaX = 0
     deltaY = 0
     axis = null
-    current.style.cursor = 'grabbing'
-    current.setPointerCapture(event.pointerId)
+    sceneCurrent.style.cursor = 'grabbing'
+    sceneCurrent.setPointerCapture(event.pointerId)
   })
 
-  current.addEventListener('pointermove', (event) => {
+  sceneCurrent.addEventListener('pointermove', (event) => {
     if (event.pointerId !== pointerId) return
 
     deltaX = event.clientX - startX
@@ -82,10 +86,10 @@ function installSceneSwipe(): boolean {
     }
   }, { passive: false })
 
-  current.addEventListener('pointerup', (event) => {
+  sceneCurrent.addEventListener('pointerup', (event) => {
     if (event.pointerId !== pointerId) return
 
-    const widthThreshold = Math.min(82, current.clientWidth * 0.22)
+    const widthThreshold = Math.min(82, sceneCurrent.clientWidth * 0.22)
     const threshold = Math.max(SWIPE_MIN_DISTANCE, widthThreshold)
     const horizontalEnough = axis === 'horizontal'
       && Math.abs(deltaX) >= threshold
@@ -93,15 +97,15 @@ function installSceneSwipe(): boolean {
       && Math.abs(deltaX) > Math.abs(deltaY) * 1.2
 
     if (horizontalEnough) {
-      if (deltaX < 0 && !next.disabled) next.click()
-      if (deltaX > 0 && !previous.disabled) previous.click()
+      if (deltaX < 0 && !nextButton.disabled) nextButton.click()
+      if (deltaX > 0 && !previousButton.disabled) previousButton.click()
     }
 
     resetDrag()
   })
 
-  current.addEventListener('pointercancel', resetDrag)
-  current.addEventListener('lostpointercapture', () => {
+  sceneCurrent.addEventListener('pointercancel', resetDrag)
+  sceneCurrent.addEventListener('lostpointercapture', () => {
     if (pointerId !== null) resetDrag()
   })
 
