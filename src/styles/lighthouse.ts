@@ -42,6 +42,43 @@ function waveHeight(cell: QRCell, seedText: string): number {
   return wave > 0.55 ? 2 : 1
 }
 
+function quadraticPoint(
+  t: number,
+  start: Pick<QRCell, 'row' | 'col'>,
+  controlRow: number,
+  controlCol: number,
+  endRow: number,
+  endCol: number,
+): { row: number; col: number } {
+  const inverse = 1 - t
+  return {
+    row: inverse * inverse * start.row + 2 * inverse * t * controlRow + t * t * endRow,
+    col: inverse * inverse * start.col + 2 * inverse * t * controlCol + t * t * endCol,
+  }
+}
+
+function distanceToBreakwater(
+  cell: Pick<QRCell, 'row' | 'col'>,
+  anchor: Pick<QRCell, 'row' | 'col'>,
+  matrixSize: number,
+): number {
+  const endRow = matrixSize - 2
+  const bend = anchor.col <= (matrixSize - 1) / 2 ? 1 : -1
+  const endCol = Math.max(2, Math.min(matrixSize - 3, anchor.col + bend * matrixSize * 0.16))
+  const controlRow = anchor.row + (endRow - anchor.row) * 0.55
+  const controlCol = anchor.col + bend * matrixSize * 0.2
+  let nearest = Number.POSITIVE_INFINITY
+
+  // Sampling is deterministic and cheap at QR scale. The stepped curve reads as a
+  // masonry harbor arm instead of a straight printed stripe when viewed isometrically.
+  for (let step = 0; step <= 18; step += 1) {
+    const point = quadraticPoint(step / 18, anchor, controlRow, controlCol, endRow, endCol)
+    nearest = Math.min(nearest, Math.hypot(cell.row - point.row, cell.col - point.col))
+  }
+
+  return nearest
+}
+
 function towerBodyKind(level: number, role: 'apron' | 'gallery' | 'shaft' | 'lantern'): VoxelKind {
   if (role === 'apron') return level <= 2 ? 'stone' : 'plaster'
 
@@ -106,6 +143,23 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
       'WAVE FIELD / FINDER REEFS / HARBOR PAD',
       'courtyard-pad',
     )
+  }
+
+  // A curved masonry breakwater gives the scene a readable foreground approach and
+  // visually connects the beacon island to the harbor edge. It intentionally crosses
+  // both light and dark data cells: pushProjectedColumn preserves each cell's QR tone,
+  // so the path remains one stone material without turning scanner-light cells white.
+  const breakwaterStart = Math.max(anchor.row + 2, Math.round(matrix.size * 0.56))
+  for (const cell of matrix.cells) {
+    if (cell.zone !== 'data' || cell.row < breakwaterStart) continue
+    if (distance(cell, anchor) <= Math.max(3.1, matrix.size * 0.12)) continue
+
+    const pathDistance = distanceToBreakwater(cell, anchor, matrix.size)
+    if (pathDistance > 1.15) continue
+
+    const topLevel = pathDistance <= 0.58 ? 3 : 2
+    pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
+    lifted.add(cellKey(cell.row, cell.col))
   }
 
   const nearby = [...dataModules]
@@ -189,7 +243,7 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     'lighthouse',
     'Lighthouse',
     lifted,
-    'SCANNER-LIGHT WAVES / FINDER REEFS / STONE APRON / FLARED GALLERY / GLASS LANTERN / ROOF CAP',
+    'SCANNER-LIGHT WAVES / FINDER REEFS / CURVED BREAKWATER / STONE APRON / FLARED GALLERY / GLASS LANTERN / ROOF CAP',
     'courtyard-pad',
   )
 }
