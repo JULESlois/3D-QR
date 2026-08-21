@@ -440,9 +440,9 @@
           </div>
         </div>
 
-        <div class="palette-control">
-          <span class="palette-label">PALETTE</span>
-          <div class="palette-row" aria-label="Sculpture palette">
+        <div class="palette-control" style="display: grid !important; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 10px 0 12px; border-top: 1px solid rgba(32, 35, 31, .1);">
+          <span class="palette-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">PALETTE</span>
+          <div class="palette-row" aria-label="Sculpture palette" style="justify-content: flex-end; flex-wrap: nowrap; gap: 10px;">
             <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
             <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
             <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
