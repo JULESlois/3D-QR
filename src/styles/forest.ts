@@ -108,17 +108,17 @@ function createTrees(matrix: QRMatrixData, seedText: string, center: number): Fo
     used.push(cell)
     const noise = localNoise(seedText, cell.row, cell.col, `${slot.species}-${index}`)
     const radius = slot.species === 'ancient'
-      ? 3.45 + noise * 0.55
+      ? 3.8 + noise * 0.65
       : slot.species === 'broadleaf'
         ? 2.75 + noise * 0.5
         : 2.25 + noise * 0.4
     const trunkHeight = slot.species === 'ancient'
-      ? 8 + Math.floor(noise * 2)
+      ? 7 + Math.floor(noise * 2)
       : slot.species === 'broadleaf'
         ? 6 + Math.floor(noise * 2)
         : 7 + Math.floor(noise * 2)
     const crownHeight = slot.species === 'ancient'
-      ? 9 + Math.floor(noise * 3)
+      ? 7 + Math.floor(noise * 2)
       : slot.species === 'broadleaf'
         ? 7 + Math.floor(noise * 3)
         : 11 + Math.floor(noise * 3)
@@ -206,11 +206,18 @@ function registerCanopy(
       } else {
         const lobe = broadleafLobe(dr, dc, tree.radius, seedText, tree)
         if (lobe <= 0.02) continue
-        const ancientBoost = tree.species === 'ancient' ? 3 : 0
         const asymmetry = Math.sin((dr + tree.index) * 0.85) * 0.8 + Math.cos((dc - tree.index) * 0.7) * 0.55
-        topLevel = tree.trunkHeight + 2 + ancientBoost + Math.round(lobe * tree.crownHeight + asymmetry + noise * 1.5)
-        const crownDepth = tree.species === 'ancient' ? 6 : 4
-        fromLevel = Math.max(3, topLevel - crownDepth - Math.round(lobe * 1.8))
+
+        if (tree.species === 'ancient') {
+          // Ancient trees read as old spreading oaks rather than oversized broadleaf
+          // blobs: widen the crown, flatten its dome and lift the foliage above a
+          // visible branching framework. This creates a broad umbrella silhouette.
+          topLevel = tree.trunkHeight + 4 + Math.round(lobe * tree.crownHeight * 0.72 + asymmetry * 0.6 + noise)
+          fromLevel = Math.max(tree.trunkHeight + 2, topLevel - 4 - Math.round(lobe * 1.2))
+        } else {
+          topLevel = tree.trunkHeight + 2 + Math.round(lobe * tree.crownHeight + asymmetry + noise * 1.5)
+          fromLevel = Math.max(3, topLevel - 4 - Math.round(lobe * 1.8))
+        }
       }
 
       const key = cellKey(cell.row, cell.col)
@@ -266,6 +273,88 @@ function buildTrunks(
   }
 }
 
+function buildAncientFramework(
+  voxels: ReturnType<typeof createBaseVoxels>,
+  matrix: QRMatrixData,
+  seedText: string,
+  random: () => number,
+  trees: readonly ForestTree[],
+  canopy: ReadonlyMap<string, CanopyColumn>,
+  lifted: Set<string>,
+  center: number,
+): void {
+  const rootDirections = [
+    [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1],
+  ] as const
+
+  for (const tree of trees) {
+    if (tree.species !== 'ancient') continue
+
+    // Buttress roots spread as low wooden ridges. They stay on ordinary data cells,
+    // avoid the walking glade, and use projected columns so an exposed root still
+    // carries the correct QR polarity rather than becoming an unclassified top face.
+    for (const [dr, dc] of rootDirections) {
+      for (let distance = 1; distance <= 2; distance += 1) {
+        const cell = getCell(matrix, tree.cell.row + dr * distance, tree.cell.col + dc * distance)
+        if (!cell || cell.zone !== 'data' || maxProjectionLevelForCell(cell) !== undefined) continue
+        if (isClearingCell(cell, center, matrix.size)) continue
+
+        pushProjectedColumn(voxels, cell, matrix.size, 1, distance === 1 ? 3 : 2, 'wood', random)
+        lifted.add(cellKey(cell.row, cell.col))
+      }
+    }
+
+    // Three asymmetric scaffold limbs expose the tree's age and scale beneath the
+    // umbrella crown. Each limb rises gently away from the trunk, then forks upward
+    // near the crown edge. Keeping limbs inside registered canopy cells ensures that
+    // foliage remains the dominant projected surface whenever it exists above them.
+    const branchDirections = tree.index % 2 === 0
+      ? [[-1, -1], [0, 1], [1, 0]] as const
+      : [[-1, 0], [0, -1], [1, 1]] as const
+    const branchBase = Math.max(4, tree.trunkHeight - 2)
+
+    for (const [dr, dc] of branchDirections) {
+      let forkCell: QRCell | undefined
+
+      for (let distance = 1; distance <= 2; distance += 1) {
+        const cell = getCell(matrix, tree.cell.row + dr * distance, tree.cell.col + dc * distance)
+        if (!cell || cell.zone !== 'data' || maxProjectionLevelForCell(cell) !== undefined) continue
+        if (!canopy.has(cellKey(cell.row, cell.col))) continue
+
+        const bottom = branchBase + distance - 1
+        const top = bottom + 1
+        for (let level = bottom; level <= top; level += 1) {
+          pushCellVoxel(
+            voxels,
+            cell,
+            matrix.size,
+            level,
+            'wood',
+            (localNoise(seedText, cell.row, cell.col, `ancient-limb-${tree.index}-${distance}-${level}`) * 0.48 + level * 0.047) % 1,
+            level === top ? projectionToneForCell(cell) : undefined,
+          )
+        }
+        lifted.add(cellKey(cell.row, cell.col))
+        forkCell = cell
+      }
+
+      if (!forkCell) continue
+      const forkTop = tree.trunkHeight + 2
+      for (let level = branchBase + 2; level <= forkTop; level += 1) {
+        pushCellVoxel(
+          voxels,
+          forkCell,
+          matrix.size,
+          level,
+          'wood',
+          (localNoise(seedText, forkCell.row, forkCell.col, `ancient-fork-${tree.index}-${level}`) * 0.46 + level * 0.051) % 1,
+          level === forkTop ? projectionToneForCell(forkCell) : undefined,
+        )
+      }
+    }
+  }
+}
+
 function shouldKeepLeafLayer(column: CanopyColumn, level: number): boolean {
   if (level === column.topLevel) return true
 
@@ -280,8 +369,8 @@ function shouldKeepLeafLayer(column: CanopyColumn, level: number): boolean {
 
   if (column.species === 'ancient') {
     // Ancient crowns keep a heavy upper mass but open a few windows in the lower
-    // canopy, revealing their oversized trunks from the default camera.
-    return distanceFromTop < 4 || distanceFromTop % 3 !== 1
+    // canopy, revealing their oversized trunks and new lateral branch framework.
+    return distanceFromTop < 3 || distanceFromTop % 3 === 0
   }
 
   // Broadleaf trees are compact clusters rather than solid cylinders: keep the top
@@ -377,6 +466,7 @@ export function generateForest(matrix: QRMatrixData, seedText: string): Sculptur
   for (const tree of trees) registerCanopy(matrix, seedText, center, tree, canopy)
 
   buildTrunks(voxels, matrix, seedText, trees, canopy, lifted)
+  buildAncientFramework(voxels, matrix, seedText, random, trees, canopy, lifted, center)
   buildCanopy(voxels, matrix, seedText, canopy, lifted)
   buildForestPath(voxels, matrix, random, canopy, lifted, center)
   buildUnderstory(voxels, matrix, seedText, random, canopy, lifted, center)
@@ -395,7 +485,7 @@ export function generateForest(matrix: QRMatrixData, seedText: string): Sculptur
     'forest',
     'Forest',
     lifted,
-    `${trees.length} TREES / LOBED BROADLEAF + STEPPED SPRUCE TIERS + HOLLOW ANCIENT CROWNS / WINDING GLADE`,
+    `${trees.length} TREES / LOBED BROADLEAF + STEPPED SPRUCE TIERS + BUTTRESSED ANCIENT OAKS / WINDING GLADE`,
     'full-pad',
   )
 }
