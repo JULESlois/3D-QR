@@ -70,46 +70,69 @@ function pagodaFootprint(matrix: QRMatrixData, anchor: QRCell): QRCell[] {
 
     if (ring <= 2) return true
 
-    // The two lowest eaves extend as cross-shaped cardinal wings. A fourth-ring
-    // lip makes the first roof visibly wider than the tower body in isometric view,
-    // while clipped corners prevent the footprint from becoming a square pyramid.
+    // The lowest eave extends farthest along the cardinal axes, with clipped
+    // corners so the footprint reads as a hip roof instead of a square pyramid.
     if (ring === 3) return dr <= 1 || dc <= 1
     if (ring === 4) return dr === 0 || dc === 0
     return false
   })
 }
 
-function pagodaHeight(cell: QRCell, anchor: QRCell, seedText: string): number {
+interface PagodaLayer {
+  level: number
+  kind: VoxelKind
+}
+
+function pagodaColumnLayers(cell: QRCell, anchor: QRCell): PagodaLayer[] {
   const dr = Math.abs(cell.row - anchor.row)
   const dc = Math.abs(cell.col - anchor.col)
   const ring = Math.max(dr, dc)
-  const noise = localNoise(seedText, cell.row, cell.col, 'height')
+  const cardinal = dr === 0 || dc === 0
+  const layers = new Map<number, VoxelKind>()
 
-  // A tall central mast plus successively broader lower roofs produces a much more
-  // recognizable pagoda silhouette than a smooth stepped pyramid. The height gaps
-  // are intentionally large enough that each eave remains legible from the art camera.
-  if (ring === 0) return 22
-  if (ring === 1) return 17 + Math.round(noise)
-
-  if (ring === 2) {
-    const face = dr <= 1 || dc <= 1
-    return face ? 13 : 11
+  const fill = (from: number, to: number, kind: VoxelKind | ((level: number) => VoxelKind)): void => {
+    for (let level = from; level <= to; level += 1) {
+      layers.set(level, typeof kind === 'function' ? kind(level) : kind)
+    }
   }
 
-  if (ring === 3) return 8
-  return 5
-}
+  const timberStorey = (level: number): VoxelKind => level % 3 === 1 ? 'wood' : 'plaster'
 
-function pagodaBodyKind(level: number, topLevel: number, ring: number): VoxelKind {
-  const nearTop = level >= topLevel - 1
+  if (ring === 0) {
+    // The central spine remains continuous: it visually supports every roof and
+    // becomes the narrow timber finial above the fourth storey.
+    fill(1, 4, timberStorey)
+    fill(5, 6, 'primary')
+    fill(7, 8, timberStorey)
+    fill(9, 10, 'primary')
+    fill(11, 12, timberStorey)
+    fill(13, 14, 'primary')
+    fill(15, 16, timberStorey)
+    fill(17, 17, 'primary')
+    fill(18, 20, 'wood')
+    fill(21, 22, 'primary')
+  } else {
+    // Lower posts exist only where they contribute to a believable structural
+    // rhythm. The roof slabs themselves are deliberately separated by open air,
+    // preventing the old stepped-pyramid mass from returning in isometric view.
+    if (ring === 1 || (ring === 2 && cardinal)) fill(1, 4, timberStorey)
+    if (ring <= 3 || (ring === 4 && cardinal)) fill(5, ring === 4 ? 5 : 6, 'primary')
 
-  // Four repeated dark roof bands visually separate the storeys. The central mast
-  // remains timber, while pale plaster infill keeps the tower from reading as one
-  // monolithic dark block.
-  const eaveBand = level === 5 || level === 9 || level === 13 || level === 17 || nearTop
-  if (eaveBand) return 'primary'
-  if (ring === 0 || level % 4 === 1) return 'wood'
-  return 'plaster'
+    if (ring === 1 || (ring === 2 && cardinal)) fill(7, 8, timberStorey)
+    if (ring <= 2) fill(9, 10, 'primary')
+
+    if (ring === 1 || (ring === 2 && cardinal)) fill(11, 12, timberStorey)
+    if (ring <= 2) fill(13, 14, 'primary')
+
+    if (ring === 1) {
+      fill(15, 16, timberStorey)
+      fill(17, 17, 'primary')
+    }
+  }
+
+  return [...layers.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([level, kind]) => ({ level, kind }))
 }
 
 function pushPagodaColumn(
@@ -119,20 +142,11 @@ function pushPagodaColumn(
   anchor: QRCell,
   seedText: string,
 ): number {
-  const topLevel = pagodaHeight(cell, anchor, seedText)
-  const ring = Math.max(Math.abs(cell.row - anchor.row), Math.abs(cell.col - anchor.col))
+  const layers = pagodaColumnLayers(cell, anchor)
+  const topLevel = layers.at(-1)?.level ?? 0
   const tone = projectionToneForCell(cell)
 
-  for (let level = 1; level <= topLevel; level += 1) {
-    let kind = pagodaBodyKind(level, topLevel, ring)
-
-    // The central column becomes a narrow timber finial above the upper roof. This
-    // creates the characteristic vertical needle/so-rin silhouette without adding
-    // any geometry outside the QR column or changing its projected polarity.
-    if (ring === 0 && level >= 18) {
-      kind = level >= 21 ? 'primary' : 'wood'
-    }
-
+  for (const { level, kind } of layers) {
     pushCellVoxel(
       voxels,
       cell,
@@ -206,9 +220,9 @@ export function generatePagoda(matrix: QRMatrixData, seedText: string): Sculptur
   const footprint = pagodaFootprint(matrix, anchor)
   const footprintKeys = new Set(footprint.map((cell) => cellKey(cell.row, cell.col)))
 
-  // The hero tower now has four clearly separated eave bands, a wide cross-shaped
-  // first roof, progressively tighter upper storeys and a tall central finial.
-  // Every visible top remains on its original QR column with the original polarity.
+  // The hero tower uses real separated eave slabs: a wide clipped lower hip roof,
+  // progressively tighter upper roofs, timber/plaster storeys and a central finial.
+  // The open bands between roofs preserve the pagoda silhouette from oblique views.
   for (const cell of footprint) {
     pushPagodaColumn(voxels, cell, matrix.size, anchor, seedText)
     lifted.add(cellKey(cell.row, cell.col))
@@ -257,7 +271,7 @@ export function generatePagoda(matrix: QRMatrixData, seedText: string): Sculptur
     'pagoda',
     'Pagoda',
     lifted,
-    'FOUR-EAVE HERO PAGODA / CENTRAL FINIAL / LOW FINDER PAVILIONS / TIMING CORRIDORS',
+    'SEPARATED FOUR-EAVE PAGODA / OPEN STOREY BANDS / CENTRAL FINIAL / LOW FINDER PAVILIONS',
     'courtyard-pad',
   )
 }
