@@ -69,7 +69,9 @@ function bodyKind(role: StationRole, level: number, topLevel: number): VoxelKind
       if (level >= topLevel - 2) return 'wood'
       return level % 3 === 0 ? 'glass' : 'plaster'
     case 'clock':
-      return level >= topLevel - 2 ? 'primary' : level % 4 === 0 ? 'glass' : 'stone'
+      if (level >= topLevel - 1) return 'primary'
+      if (level >= 11 && level <= 13) return 'glass'
+      return 'stone'
     case 'train':
       if (level === 2) return 'stone'
       if (level >= 4 && level < topLevel) return 'glass'
@@ -240,13 +242,48 @@ function buildGrandTerminal(
     }
   }
 
-  for (let row = center - 1; row <= center + 1; row += 1) {
-    for (let col = concourseCol - 1; col <= concourseCol + 1; col += 1) {
-      const distance = Math.max(Math.abs(row - center), Math.abs(col - concourseCol))
-      const topLevel = distance === 0 ? 17 : distance === 1 ? 14 : 12
-      register(columns, getCell(matrix, row, col), 1, topLevel, 'clock', 10)
+  // Give the terminal a railway-station silhouette rather than a generic 3x3 tower:
+  // a clipped five-cell masonry pedestal supports a glazed three-cell clock chamber,
+  // then four stepped roof shoulders converge on a tall one-cell lantern/spire. The
+  // structure stays on QR data columns, so the extra profile remains projection-safe.
+  for (let row = center - 2; row <= center + 2; row += 1) {
+    for (let col = concourseCol - 2; col <= concourseCol + 2; col += 1) {
+      const dr = Math.abs(row - center)
+      const dc = Math.abs(col - concourseCol)
+      if (dr === 2 && dc === 2) continue
+      register(columns, getCell(matrix, row, col), 1, 10, 'concourse', 9)
     }
   }
+
+  for (let row = center - 1; row <= center + 1; row += 1) {
+    for (let col = concourseCol - 1; col <= concourseCol + 1; col += 1) {
+      register(columns, getCell(matrix, row, col), 10, 15, 'clock', 10)
+    }
+  }
+
+  const roofShoulders = [
+    [-1, 0, 17],
+    [1, 0, 17],
+    [0, -1, 17],
+    [0, 1, 17],
+    [-1, -1, 16],
+    [-1, 1, 16],
+    [1, -1, 16],
+    [1, 1, 16],
+  ] as const
+
+  for (const [dr, dc, topLevel] of roofShoulders) {
+    register(
+      columns,
+      getCell(matrix, center + dr, concourseCol + dc),
+      15,
+      topLevel,
+      'clock',
+      11,
+    )
+  }
+
+  register(columns, getCell(matrix, center, concourseCol), 15, 22, 'clock', 12)
 
   return concourseCol
 }
@@ -307,7 +344,7 @@ export function generateStation(matrix: QRMatrixData, seedText: string): Sculptu
     'station',
     'Station',
     lifted,
-    `GABLED TERMINAL / CLOCK LANTERN / SUSPENDED FOOTBRIDGE + STAIRS / OPEN CANOPIES / TWIN TRACKS / TAPERED EMU TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
+    `GABLED TERMINAL / STEPPED CLOCK TOWER + SPIRE / SUSPENDED FOOTBRIDGE + STAIRS / OPEN CANOPIES / TWIN TRACKS / TAPERED EMU TRAIN / PARALLEL PLATFORMS / ${columns.size} BUILT CELLS / ${segmentCount} HEIGHT SEGMENTS`,
     'display-plaque',
   )
 }
