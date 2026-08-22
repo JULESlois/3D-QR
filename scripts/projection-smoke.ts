@@ -14,6 +14,7 @@ const cases: readonly ProjectionCase[] = [
   { label: 'typical-url', payload: 'https://github.com/JULESlois/3D-QR', minVersion: 3 },
   { label: 'medium-content', payload: `forest-${'mixed-case-payload/'.repeat(9)}`, minVersion: 6 },
   { label: 'large-content', payload: `city-${'projection-coverage/'.repeat(24)}`, minVersion: 10 },
+  { label: 'high-version', payload: `stress-${'function-zone-coverage/'.repeat(60)}`, minVersion: 15 },
 ]
 
 const EPSILON = 1e-7
