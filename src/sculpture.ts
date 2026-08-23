@@ -136,6 +136,15 @@ export function projectionToneForCell(cell: Pick<QRCell, 'dark'>): ProjectionTon
   return cell.dark ? 'dark' : 'light'
 }
 
+/**
+ * @deprecated Function-zone height caps are no longer part of the QR projection contract.
+ * Kept temporarily so older scene generators can migrate without breaking; callers should
+ * treat zone metadata as composition information rather than a scanner-height restriction.
+ */
+export function maxProjectionLevelForCell(_cell: Pick<QRCell, 'zone'>): number | undefined {
+  return undefined
+}
+
 function toneBiasedColorPhase(colorPhase: number, tone: ProjectionTone): number {
   const phase = Math.max(0, Math.min(0.999999, colorPhase))
   return tone === 'dark'
