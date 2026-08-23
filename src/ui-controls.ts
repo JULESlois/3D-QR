@@ -77,11 +77,6 @@ if (appShell) {
 
 const transitionStyle = document.createElement('style')
 transitionStyle.textContent = `
-  /* Palette experiments stay dormant; every scene continues using its default palette. */
-  .palette-control {
-    display: none !important;
-  }
-
   .scene-dock {
     position: fixed;
     z-index: 40;
