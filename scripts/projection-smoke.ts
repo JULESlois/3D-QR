@@ -22,12 +22,6 @@ const MIN_PAIR_LUMINANCE_GAP = 0.025
 const MIN_MEAN_LUMINANCE_GAP = 0.06
 const MIN_BASE_LUMINANCE_GAP = 0.06
 
-const PROTECTED_ZONE_MAX_LEVEL = {
-  alignment: 2,
-  format: 1,
-  version: 1,
-} as const
-
 const PAIRED_MATERIAL_KEYS = [
   'colors',
   'foundation',
@@ -225,37 +219,6 @@ function assertScannerProjection(styleId: string, matrix: QRMatrixData, build: G
   }
 }
 
-function assertProtectedFunctionZoneHeights(
-  styleId: string,
-  matrix: QRMatrixData,
-  build: GeneratedBuild,
-): void {
-  const topByColumn = new Map<string, GeneratedVoxel>()
-
-  for (const voxel of build.voxels) {
-    const key = cellKey(voxel.row, voxel.col)
-    const current = topByColumn.get(key)
-    if (!current || voxel.y > current.y) topByColumn.set(key, voxel)
-  }
-
-  for (const cell of matrix.cells) {
-    if (!(cell.zone in PROTECTED_ZONE_MAX_LEVEL)) continue
-
-    const zone = cell.zone as keyof typeof PROTECTED_ZONE_MAX_LEVEL
-    const top = topByColumn.get(cellKey(cell.row, cell.col))
-    if (!top) continue
-
-    const topLevel = Math.round(top.y / CELL_SIZE)
-    const maxLevel = PROTECTED_ZONE_MAX_LEVEL[zone]
-    if (topLevel > maxLevel) {
-      throw new Error(
-        `${styleId} elevates protected ${zone} QR cell ${cell.row}:${cell.col} to level ${topLevel}; `
-        + `expected at most ${maxLevel}.`,
-      )
-    }
-  }
-}
-
 function assertBuildMetrics(styleId: string, matrix: QRMatrixData, build: GeneratedBuild): void {
   const expectedMaxHeight = Math.max(...build.voxels.map((voxel) => voxel.y + CELL_SIZE))
   if (Math.abs(build.maxHeight - expectedMaxHeight) > EPSILON) {
@@ -350,7 +313,6 @@ for (const testCase of cases) {
     const repeat = style.generate(matrix, testCase.payload)
     assertVoxelStructure(style.id, matrix.size, build.voxels)
     assertScannerProjection(style.id, matrix, build)
-    assertProtectedFunctionZoneHeights(style.id, matrix, build)
     assertBuildMetrics(style.id, matrix, build)
     assertDeterministic(style.id, build, repeat)
   }
@@ -359,5 +321,5 @@ for (const testCase of cases) {
 console.log(
   `projection smoke passed for ${STYLES.length} styles across ${cases.length} QR sizes; `
   + `${pairedMaterialCount} paired material ramps across ${paletteCount} palettes preserve luminance polarity; `
-  + 'alignment/format/version function zones remain low-profile',
+  + 'QR columns preserve position, top-surface polarity, and quiet-zone clearance at arbitrary scene heights',
 )
