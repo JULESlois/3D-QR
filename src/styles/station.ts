@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -58,24 +59,24 @@ function register(
 function bodyKind(role: StationRole, level: number, topLevel: number): VoxelKind {
   switch (role) {
     case 'rail':
-      return 'stone'
+      return materialForRole('metal')
     case 'platform':
       return level === 1 ? 'stone' : 'plaster'
     case 'canopy':
-      return level === topLevel - 1 ? 'wood' : 'primary'
+      return level === topLevel - 1 ? 'wood' : materialForRole('metal')
     case 'post':
       return 'stone'
     case 'concourse':
       if (level >= topLevel - 2) return 'wood'
       return level % 3 === 0 ? 'glass' : 'plaster'
     case 'clock':
-      if (level >= topLevel - 1) return 'primary'
+      if (level >= topLevel - 1) return materialForRole('metal')
       if (level >= 11 && level <= 13) return 'glass'
       return 'stone'
     case 'train':
-      if (level === 2) return 'stone'
+      if (level === 2) return materialForRole('metal')
       if (level >= 4 && level < topLevel) return 'glass'
-      return 'primary'
+      return materialForRole('metal')
     case 'bridge':
       return level >= topLevel - 1 ? 'wood' : 'stone'
     default:
