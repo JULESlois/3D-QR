@@ -52,11 +52,12 @@ export interface SculptureVoxel {
   row: number
   col: number
   kind: VoxelKind
+  /** Variation within one semantic material ramp, always normalized to 0..1. */
   colorPhase: number
   /**
    * QR polarity of this visible surface. It deliberately does not replace material kind:
-   * water stays water, stone stays stone, foliage stays primary, etc. The paired scene
-   * palettes use this tone to select a darker or lighter variant of the same material.
+   * water stays water, stone stays stone, foliage stays primary, etc. Palette rendering
+   * selects the explicit dark or light material ramp from this field.
    */
   projectionTone?: ProjectionTone
 }
@@ -145,11 +146,8 @@ export function maxProjectionLevelForCell(_cell: Pick<QRCell, 'zone'>): number |
   return undefined
 }
 
-function toneBiasedColorPhase(colorPhase: number, tone: ProjectionTone): number {
-  const phase = Math.max(0, Math.min(0.999999, colorPhase))
-  return tone === 'dark'
-    ? phase * 0.5
-    : 0.5 + phase * 0.5
+function clampColorPhase(colorPhase: number): number {
+  return Math.max(0, Math.min(0.999999, colorPhase))
 }
 
 function makeBaseVoxel(
@@ -174,7 +172,7 @@ function makeBaseVoxel(
     row,
     col,
     kind,
-    colorPhase: projectionTone ? toneBiasedColorPhase(rawPhase, projectionTone) : rawPhase,
+    colorPhase: clampColorPhase(rawPhase),
     projectionTone,
   }
 }
@@ -257,7 +255,7 @@ export function pushCellVoxel(
     row: cell.row,
     col: cell.col,
     kind,
-    colorPhase: projectionTone ? toneBiasedColorPhase(colorPhase, projectionTone) : colorPhase,
+    colorPhase: clampColorPhase(colorPhase),
     projectionTone,
   })
 }
