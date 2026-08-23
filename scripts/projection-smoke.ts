@@ -1,4 +1,4 @@
-import { CELL_SIZE, QUIET_ZONE, cellKey, positionForCell } from '../src/sculpture'
+import { CELL_SIZE, QUIET_ZONE, cellKey, positionForCell, pushCellVoxel } from '../src/sculpture'
 import { createQRMatrix, type QRMatrixData } from '../src/qr'
 import { PALETTE_KEYS, getPalette, type ScenePaletteDefinition } from '../src/palettes'
 import { STYLES } from '../src/styles'
@@ -125,6 +125,19 @@ function assertAllPaletteContrast(): { pairedMaterialCount: number; paletteCount
   }
 
   return { pairedMaterialCount, paletteCount }
+}
+
+function assertColorPhaseIndependentOfProjectionTone(): void {
+  const phase = 0.73
+  const dark: GeneratedVoxel[] = []
+  const light: GeneratedVoxel[] = []
+
+  pushCellVoxel(dark, { row: 0, col: 0 }, 21, 1, 'stone', phase, 'dark')
+  pushCellVoxel(light, { row: 0, col: 0 }, 21, 1, 'stone', phase, 'light')
+
+  if (Math.abs(dark[0].colorPhase - phase) > EPSILON || Math.abs(light[0].colorPhase - phase) > EPSILON) {
+    throw new Error('projectionTone must not encode dark/light polarity into colorPhase.')
+  }
 }
 
 function assertVoxelStructure(styleId: string, matrixSize: number, voxels: GeneratedVoxel[]): void {
@@ -298,6 +311,7 @@ function assertDeterministic(styleId: string, first: GeneratedBuild, second: Gen
   }
 }
 
+assertColorPhaseIndependentOfProjectionTone()
 const { pairedMaterialCount, paletteCount } = assertAllPaletteContrast()
 
 for (const testCase of cases) {
@@ -321,5 +335,5 @@ for (const testCase of cases) {
 console.log(
   `projection smoke passed for ${STYLES.length} styles across ${cases.length} QR sizes; `
   + `${pairedMaterialCount} paired material ramps across ${paletteCount} palettes preserve luminance polarity; `
-  + 'QR columns preserve position, top-surface polarity, and quiet-zone clearance at arbitrary scene heights',
+  + 'material colorPhase is tone-independent; QR columns preserve position, top-surface polarity, and quiet-zone clearance',
 )
