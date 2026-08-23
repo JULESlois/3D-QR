@@ -55,7 +55,7 @@ function mixHex(source: string, target: string, amount: number): string {
 function polarityRamp(colors: readonly string[]): readonly string[] {
   // Keep every authored hue as an anchor. The first half becomes a richer/shadowed
   // version and the second half a sunlit version of the same sequence, matching
-  // sculpture.ts' projectionTone colorPhase mapping without collapsing to black/white.
+  // the explicit material-tone renderer without collapsing to black/white.
   const dark = colors.map((color) => mixHex(color, '#101820', 0.24))
   const light = colors.map((color) => mixHex(color, '#f2f0e7', 0.16))
   return [...dark, ...light]
@@ -86,13 +86,12 @@ function normalizeAlternatePalettes(): void {
 normalizeAlternatePalettes()
 
 // Paired material arrays are ordered as [dark variants..., matching light variants...].
-// sculpture.ts maps projectionTone into the lower or upper half while preserving the
-// material and relative hue slot. This keeps QR polarity without painting caps black/white.
+// projectionTone selects the explicit material tone while colorPhase only selects a
+// variation within that material. This preserves QR polarity without scanner-cap colors.
 setDefaultPalette('tree', 'blossom', {
   label: 'Blossom Meadow',
   swatch: ['#d86f91', '#8fae73', '#6a4735'],
   colors: ['#873b59', '#a44a69', '#bd5b79', '#df91a7', '#efb2c1', '#f7ced8'],
-  qrDark: '#733249',
   baseLight: '#98b77a',
   baseDark: ['#294832', '#36593a', '#456a43'],
   foundation: ['#5a4d3a', '#6c5b44', '#7b694e', '#8f7b5d', '#a08b69', '#b19b77'],
@@ -103,7 +102,6 @@ setDefaultPalette('forest', 'summer', {
   label: 'Fern Canopy',
   swatch: ['#5e8e49', '#9abb72', '#5a4330'],
   colors: ['#274b31', '#35623b', '#487845', '#6f9b5c', '#91b775', '#b2cd91'],
-  qrDark: '#1f3d2a',
   baseLight: '#9fbd7f',
   baseDark: ['#203f2c', '#2c5034', '#38613b'],
   foundation: ['#4d3d31', '#5f4b39', '#6e5842', '#795f48', '#8a6d51', '#9b7a5a'],
@@ -114,7 +112,6 @@ setDefaultPalette('mountain', 'summer', {
   label: 'Alpine',
   swatch: ['#436247', '#7f8581', '#b8d7dd'],
   colors: ['#294537', '#365744', '#49694e', '#6f845e', '#8fa273', '#afbd90'],
-  qrDark: '#263e34',
   baseLight: '#96a781',
   baseDark: ['#29483a', '#355846', '#42674f'],
   foundation: ['#4f5758', '#5d6666', '#697171', '#767e7d', '#858c89', '#969b96'],
@@ -127,7 +124,6 @@ setDefaultPalette('station', 'ginkgo', {
   label: 'Rail Steel',
   swatch: ['#4f5a5e', '#b64a3b', '#6d8d9a'],
   colors: ['#354247', '#79362f', '#334d59', '#77868b', '#c75a49', '#7798a5'],
-  qrDark: '#2f373a',
   baseLight: '#aeb8b5',
   baseDark: ['#30383a', '#3d4749', '#4a5555'],
   foundation: ['#454a49', '#525958', '#5f6664', '#6c7471', '#7d8581', '#8f9690'],
@@ -141,7 +137,6 @@ setDefaultPalette('house', 'ginkgo', {
   label: 'Garden House',
   swatch: ['#8c4035', '#8fa76c', '#d6c5a8'],
   colors: ['#652f2b', '#79352f', '#8b3c33', '#a95647', '#c56f5c', '#db8d73'],
-  qrDark: '#2f4931',
   baseLight: '#91aa71',
   baseDark: ['#2e4932', '#3b5a3a', '#4b6a43'],
   foundation: ['#5f5548', '#6c6052', '#7a6c5c', '#887967', '#998873', '#aa9780'],
@@ -155,7 +150,6 @@ setDefaultPalette('castle', 'summer', {
   label: 'Weathered Stone',
   swatch: ['#6d706a', '#b19d79', '#687858'],
   colors: ['#424944', '#4f594b', '#5e6459', '#747c70', '#87917b', '#9ba18d'],
-  qrDark: '#343a36',
   baseLight: '#b3a789',
   baseDark: ['#3d453e', '#4a5546', '#58634f'],
   foundation: ['#4f514e', '#5c5f59', '#696c64', '#767a70', '#85897c', '#95998a'],
@@ -170,7 +164,6 @@ setDefaultPalette('glyph', 'spectrum', {
     '#8f344a', '#93512f', '#8b712a', '#3f6f45', '#315f7b', '#554589',
     '#df7087', '#e1905b', '#d6bd59', '#76ad78', '#68a8c5', '#9180c8',
   ],
-  qrDark: '#2c3041',
   baseLight: '#aaa7b7',
   baseDark: ['#30333e', '#3d404d', '#4a4d5c'],
   foundation: ['#454754', '#525461', '#5e606d', '#70727f', '#81838f', '#9496a1'],
@@ -180,7 +173,6 @@ setDefaultPalette('city', 'ginkgo', {
   label: 'Metropolis',
   swatch: ['#5c7480', '#9b5646', '#8c6a43'],
   colors: ['#69372f', '#6e4c31', '#364b55', '#303f50', '#ad5c49', '#b9824f', '#617f8d', '#58708b'],
-  qrDark: '#283136',
   baseLight: '#949da0',
   baseDark: ['#30383c', '#3d474b', '#495458'],
   foundation: ['#41484b', '#4e5659', '#5a6366', '#687175', '#788184', '#899294'],
@@ -193,7 +185,6 @@ setDefaultPalette('lighthouse', 'blossom', {
   label: 'Harbor',
   swatch: ['#2f7891', '#89c8d8', '#dcebed'],
   colors: ['#264e5f', '#6e332e', '#455b64', '#79a8b6', '#c86658', '#b8d4da'],
-  qrDark: '#123f52',
   baseLight: '#86bfd0',
   baseDark: ['#16475a', '#20596d', '#2c6b7d'],
   foundation: ['#3c5962', '#4a6871', '#57767e', '#68868d', '#79979d', '#8aa8ad'],
@@ -207,7 +198,6 @@ setDefaultPalette('pagoda', 'ginkgo', {
   label: 'Vermilion Court',
   swatch: ['#a23c32', '#32453a', '#b4914f'],
   colors: ['#682b27', '#293831', '#705529', '#b34b3d', '#536b56', '#c7a15d'],
-  qrDark: '#302f2b',
   baseLight: '#aaa18f',
   baseDark: ['#303834', '#3e4840', '#4c5748'],
   foundation: ['#55524b', '#635f56', '#706c60', '#7d796b', '#8e8978', '#9f9985'],
@@ -220,7 +210,6 @@ setDefaultPalette('temple', 'blossom', {
   label: 'Torii Garden',
   swatch: ['#b64335', '#477044', '#9db58a'],
   colors: ['#6e2b27', '#833129', '#96372e', '#b94a3a', '#cf5c48', '#df7157'],
-  qrDark: '#26382d',
   baseLight: '#91aa78',
   baseDark: ['#294a32', '#365b3a', '#426847'],
   foundation: ['#596359', '#687267', '#768174', '#879183', '#98a293', '#a9b3a3'],
@@ -234,7 +223,6 @@ setDefaultPalette('crystal', 'spectrum', {
   label: 'Cyan Core',
   swatch: ['#3b8fa5', '#72c7d3', '#b8f3f2'],
   colors: ['#284d63', '#315f77', '#3a7189', '#5b94a8', '#75adbd', '#91c5cf'],
-  qrDark: '#233948',
   baseLight: '#6fa9b5',
   baseDark: ['#263e4b', '#31505d', '#3d626c'],
   foundation: ['#414d56', '#505c65', '#5e6a72', '#6e7980', '#7f8a90', '#919ca1'],
