@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import './styles.css'
 import { CELL_SIZE, type SculptureBuild, type SculptureVoxel } from './sculpture'
+import { materialColorForTone } from './material-tones'
 import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { createQRMatrix } from './qr'
 import { getStyle, isStyleId, type StyleId } from './styles'
@@ -95,10 +96,10 @@ const voxelMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.015,
 })
 
-const fallbackWood = ['#563b2d', '#6d4b34', '#815b3a'] as const
-const fallbackStone = ['#6f746d', '#85897e', '#a09d8d', '#5d655f'] as const
-const fallbackPlaster = ['#d8cbb4', '#e7dbc5', '#c9b99e', '#eee6d8'] as const
-const fallbackGlass = ['#5e8790', '#83a7aa', '#496f78'] as const
+const fallbackWood = ['#3f2a22', '#523428', '#65402f', '#76513c', '#896148', '#9b7255'] as const
+const fallbackStone = ['#505650', '#626861', '#73786f', '#85897e', '#999b8d', '#aaa99a'] as const
+const fallbackPlaster = ['#9f927e', '#b2a38b', '#c4b49a', '#d8cbb4', '#e7dbc5', '#eee6d8'] as const
+const fallbackGlass = ['#3c626c', '#4c7580', '#5e8790', '#83a7aa', '#9bbabd', '#b2cccd'] as const
 const tempColor = new THREE.Color()
 const dummy = new THREE.Object3D()
 
@@ -152,6 +153,17 @@ function indexedHexColor(colors: readonly string[], phase: number, target: THREE
   return target.set(colors[index])
 }
 
+function materialVoxelColor(
+  colors: readonly string[],
+  voxel: SculptureVoxel,
+  target: THREE.Color,
+): THREE.Color {
+  if (voxel.projectionTone) {
+    return target.set(materialColorForTone(colors, voxel.projectionTone, voxel.colorPhase))
+  }
+  return indexedHexColor(colors, voxel.colorPhase, target)
+}
+
 function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color {
   const palette = getPalette(styleId, paletteKey)
   const appearance = getStyle(styleId).appearance
@@ -162,35 +174,31 @@ function colorForVoxel(voxel: SculptureVoxel, target: THREE.Color): THREE.Color 
       return target.set(baseLight)
     case 'floor-dark':
       return indexedHexColor(palette.baseDark ?? appearance.baseDark, voxel.colorPhase, target)
-    case 'light-top':
-      return target.set(palette.lightTop ?? appearance.lightTop ?? baseLight)
     case 'water': {
       const colors = palette.water ?? appearance.water
       return colors
-        ? indexedHexColor(colors, voxel.colorPhase, target)
+        ? materialVoxelColor(colors, voxel, target)
         : target.set(baseLight)
     }
     case 'crystal':
-      return indexedHexColor(
+      return materialVoxelColor(
         palette.crystal ?? appearance.crystal ?? palette.glass ?? fallbackGlass,
-        voxel.colorPhase,
+        voxel,
         target,
       )
     case 'foundation':
-      return indexedHexColor(palette.foundation ?? appearance.foundation, voxel.colorPhase, target)
+      return materialVoxelColor(palette.foundation ?? appearance.foundation, voxel, target)
     case 'wood':
-      return indexedHexColor(palette.wood ?? fallbackWood, voxel.colorPhase, target)
+      return materialVoxelColor(palette.wood ?? fallbackWood, voxel, target)
     case 'stone':
-      return indexedHexColor(palette.stone ?? fallbackStone, voxel.colorPhase, target)
+      return materialVoxelColor(palette.stone ?? fallbackStone, voxel, target)
     case 'plaster':
-      return indexedHexColor(palette.plaster ?? fallbackPlaster, voxel.colorPhase, target)
+      return materialVoxelColor(palette.plaster ?? fallbackPlaster, voxel, target)
     case 'glass':
-      return indexedHexColor(palette.glass ?? fallbackGlass, voxel.colorPhase, target)
-    case 'qr-top':
-      return target.set(palette.qrDark)
+      return materialVoxelColor(palette.glass ?? fallbackGlass, voxel, target)
     case 'primary':
     default:
-      return indexedHexColor(palette.colors, voxel.colorPhase, target)
+      return materialVoxelColor(palette.colors, voxel, target)
   }
 }
 
