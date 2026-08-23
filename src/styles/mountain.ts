@@ -5,7 +5,6 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
-  maxProjectionLevelForCell,
   pushProjectedColumn,
   type SculptureBuild,
   type VoxelKind,
@@ -195,13 +194,11 @@ function terrainHeight(cell: QRCell, matrix: QRMatrixData, seedText: string): nu
 
   let height = Math.max(1, Math.min(14, 1 + Math.round(relief)))
 
-  // Mountain keeps finder/timing cells as low foothills for silhouette continuity,
-  // while alignment/format/version limits come from the shared projection contract.
-  // This prevents the scene from drifting if the global QR safety policy changes.
+  // Finder/timing cells remain deliberately low foothills as a scene-level composition
+  // choice. Alignment/format/version cells now participate in the same terrain relief as
+  // ordinary data cells; QR correctness is enforced by column position and top polarity.
   if (cell.zone === 'finder') height = Math.min(height, 3)
   if (cell.zone === 'timing') height = Math.min(height, 2)
-  const protectedMax = maxProjectionLevelForCell(cell)
-  if (protectedMax !== undefined) height = Math.min(height, protectedMax)
 
   return height
 }
