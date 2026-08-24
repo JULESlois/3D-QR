@@ -787,9 +787,9 @@ panelRestoreToggle?.addEventListener('click', () => {
 })
 syncControlPanelState()
 
-let scenePrevButton: HTMLButtonElement | null = null
-let sceneNextButton: HTMLButtonElement | null = null
-let sceneCurrentLabel: HTMLElement | null = null
+const scenePrevButton = styleRow?.querySelector<HTMLButtonElement>('.scene-arrow-prev') ?? null
+const sceneNextButton = styleRow?.querySelector<HTMLButtonElement>('.scene-arrow-next') ?? null
+const sceneCurrentLabel = styleRow?.querySelector<HTMLElement>('.scene-current-label') ?? null
 
 function currentSceneIndex(): number {
   const styleId = document.body.dataset.style
@@ -886,34 +886,7 @@ function changeSceneBy(delta: number): void {
   }, sceneOutMs)
 }
 
-if (styleRow && sceneButtons.length > 0) {
-  const options = document.createElement('div')
-  options.className = 'scene-options'
-  options.hidden = true
-  for (const button of sceneButtons) options.appendChild(button)
-
-  scenePrevButton = document.createElement('button')
-  scenePrevButton.type = 'button'
-  scenePrevButton.className = 'scene-arrow scene-arrow-prev'
-  scenePrevButton.textContent = '←'
-
-  sceneNextButton = document.createElement('button')
-  sceneNextButton.type = 'button'
-  sceneNextButton.className = 'scene-arrow scene-arrow-next'
-  sceneNextButton.textContent = '→'
-
-  const sceneCurrent = document.createElement('div')
-  sceneCurrent.className = 'scene-current'
-  sceneCurrent.setAttribute('role', 'status')
-  sceneCurrent.setAttribute('aria-live', 'polite')
-
-  sceneCurrentLabel = document.createElement('span')
-  sceneCurrentLabel.className = 'scene-current-label'
-  sceneCurrent.append(sceneCurrentLabel)
-
-  styleRow.classList.add('scene-stepper')
-  styleRow.replaceChildren(scenePrevButton, sceneCurrent, sceneNextButton, options)
-
+if (scenePrevButton && sceneNextButton && sceneCurrentLabel && sceneButtons.length > 0) {
   scenePrevButton.addEventListener('click', () => changeSceneBy(-1))
   sceneNextButton.addEventListener('click', () => changeSceneBy(1))
 
