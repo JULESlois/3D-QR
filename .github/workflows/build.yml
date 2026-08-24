@@ -38,12 +38,23 @@ jobs:
       - name: Browser viewport smoke
         run: node scripts/browser-smoke.mjs
 
+      - name: PNG export browser smoke
+        run: node scripts/png-export-smoke.mjs
+
       - name: Upload browser smoke screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-smoke
           path: browser-smoke/*.png
+          if-no-files-found: warn
+
+      - name: Upload PNG export smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: png-export-smoke
+          path: png-export-smoke/*.png
           if-no-files-found: warn
 
       - name: Configure Pages
