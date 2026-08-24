@@ -178,6 +178,15 @@ async function switchToQr(send) {
   await sleep(2_600)
 }
 
+async function isolateQrProjection(send) {
+  await send('Runtime.evaluate', {
+    expression: `document.querySelectorAll('.scene-dock, .control-panel, .panel-restore-toggle').forEach((element) => {
+      element.style.visibility = 'hidden'
+    })`,
+  })
+  await sleep(80)
+}
+
 function decodeQrScreenshot(bytes) {
   const png = PNG.sync.read(bytes)
   const pixels = new Uint8ClampedArray(
@@ -246,6 +255,7 @@ try {
 
   await navigate(send, 1024, 1024)
   await switchToQr(send)
+  await isolateQrProjection(send)
   const qrBytes = await capture(send, 'qr-view')
   const decodedPayload = decodeQrScreenshot(qrBytes)
 
