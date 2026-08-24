@@ -1,10 +1,13 @@
-const exportButton = document.querySelector<HTMLButtonElement>('#export-png')
-const stageCanvas = document.querySelector<HTMLCanvasElement>('#stage canvas')
+const exportButtonElement = document.querySelector<HTMLButtonElement>('#export-png')
+const stageCanvasElement = document.querySelector<HTMLCanvasElement>('#stage canvas')
 const meta = document.querySelector<HTMLElement>('#qr-meta')
 
-if (!exportButton || !stageCanvas) {
+if (!exportButtonElement || !stageCanvasElement) {
   throw new Error('PNG export requires #export-png and the stage canvas.')
 }
+
+const exportButton = exportButtonElement
+const stageCanvas = stageCanvasElement
 
 const PANEL_SIZE = 1024
 const MODE_SETTLE_MS = 2600
