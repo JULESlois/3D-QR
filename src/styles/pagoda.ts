@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -89,6 +90,7 @@ function pagodaColumnLayers(cell: QRCell, anchor: QRCell): PagodaLayer[] {
   const ring = Math.max(dr, dc)
   const cardinal = dr === 0 || dc === 0
   const layers = new Map<number, VoxelKind>()
+  const roof = materialForRole('roof')
 
   const fill = (from: number, to: number, kind: VoxelKind | ((level: number) => VoxelKind)): void => {
     for (let level = from; level <= to; level += 1) {
@@ -102,13 +104,13 @@ function pagodaColumnLayers(cell: QRCell, anchor: QRCell): PagodaLayer[] {
     // The central spine remains continuous: it visually supports every roof and
     // becomes the narrow timber finial above the fourth storey.
     fill(1, 4, timberStorey)
-    fill(5, 6, 'primary')
+    fill(5, 6, roof)
     fill(7, 8, timberStorey)
-    fill(9, 10, 'primary')
+    fill(9, 10, roof)
     fill(11, 12, timberStorey)
-    fill(13, 14, 'primary')
+    fill(13, 14, roof)
     fill(15, 16, timberStorey)
-    fill(17, 17, 'primary')
+    fill(17, 17, roof)
     fill(18, 20, 'wood')
     fill(21, 22, 'primary')
   } else {
@@ -116,17 +118,17 @@ function pagodaColumnLayers(cell: QRCell, anchor: QRCell): PagodaLayer[] {
     // rhythm. The roof slabs themselves are deliberately separated by open air,
     // preventing the old stepped-pyramid mass from returning in isometric view.
     if (ring === 1 || (ring === 2 && cardinal)) fill(1, 4, timberStorey)
-    if (ring <= 3 || (ring === 4 && cardinal)) fill(5, ring === 4 ? 5 : 6, 'primary')
+    if (ring <= 3 || (ring === 4 && cardinal)) fill(5, ring === 4 ? 5 : 6, roof)
 
     if (ring === 1 || (ring === 2 && cardinal)) fill(7, 8, timberStorey)
-    if (ring <= 2) fill(9, 10, 'primary')
+    if (ring <= 2) fill(9, 10, roof)
 
     if (ring === 1 || (ring === 2 && cardinal)) fill(11, 12, timberStorey)
-    if (ring <= 2) fill(13, 14, 'primary')
+    if (ring <= 2) fill(13, 14, roof)
 
     if (ring === 1) {
       fill(15, 16, timberStorey)
-      fill(17, 17, 'primary')
+      fill(17, 17, roof)
     }
   }
 
