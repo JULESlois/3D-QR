@@ -36,19 +36,9 @@ if (!sceneDock && appShell && styleRow) {
   sceneDock.append(styleRow)
 }
 
-// The final scene-copy DOM is static in index.html. ui-controls.ts only owns behavior.
+// The final control DOM is static in index.html. ui-controls.ts only owns behavior.
 const panelToggle = document.querySelector<HTMLButtonElement>('.panel-collapse-toggle')
-
-let panelRestoreToggle: HTMLButtonElement | null = null
-if (appShell) {
-  panelRestoreToggle = document.createElement('button')
-  panelRestoreToggle.type = 'button'
-  panelRestoreToggle.className = 'panel-restore-toggle'
-  panelRestoreToggle.setAttribute('aria-label', 'Show QR controls')
-  panelRestoreToggle.setAttribute('aria-hidden', 'true')
-  panelRestoreToggle.tabIndex = -1
-  appShell.append(panelRestoreToggle)
-}
+const panelRestoreToggle = document.querySelector<HTMLButtonElement>('.panel-restore-toggle')
 
 const transitionStyle = document.createElement('style')
 transitionStyle.textContent = `
