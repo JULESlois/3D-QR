@@ -97,4 +97,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (!target.closest('[data-style], [data-palette]')) return
     queueMicrotask(replaceShareHash)
   })
+
+  // Shared URLs are live application state, not just an initial-load bootstrap. Restoring
+  // on hash navigation makes pasted hashes and browser back/forward navigation update the
+  // sculpture in-place without requiring a reload. replaceState() above does not emit this
+  // event, so normal edits do not feed back into restoreShareState().
+  window.addEventListener('hashchange', restoreShareState)
 }
