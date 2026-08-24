@@ -41,6 +41,9 @@ jobs:
       - name: PNG export browser smoke
         run: node scripts/png-export-smoke.mjs
 
+      - name: GIF export browser smoke
+        run: node scripts/gif-export-browser-smoke.mjs
+
       - name: Upload browser smoke screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,6 +58,14 @@ jobs:
         with:
           name: png-export-smoke
           path: png-export-smoke/*.png
+          if-no-files-found: warn
+
+      - name: Upload GIF export smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gif-export-smoke
+          path: gif-export-smoke/*.gif
           if-no-files-found: warn
 
       - name: Configure Pages
