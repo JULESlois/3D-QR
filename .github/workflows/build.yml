@@ -35,6 +35,17 @@ jobs:
       - name: Type-check and build
         run: npm run build
 
+      - name: Browser viewport smoke
+        run: node scripts/browser-smoke.mjs
+
+      - name: Upload browser smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke
+          path: browser-smoke/*.png
+          if-no-files-found: warn
+
       - name: Configure Pages
         if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
