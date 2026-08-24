@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -70,6 +71,7 @@ function buildMainHall(
   hallRow: number,
   center: number,
 ): void {
+  const roofMaterial = materialForRole('roof')
   const halfWidth = Math.max(5, Math.min(10, Math.floor(matrix.size * 0.28)))
   const halfDepth = Math.max(2, Math.min(3, Math.floor(matrix.size * 0.09)))
   const bodyHalfWidth = Math.max(3, halfWidth - 2)
@@ -127,16 +129,14 @@ function buildMainHall(
 
       for (let level = roofBottom; level <= roofTop; level += 1) {
         const top = level === roofTop
-        const kind = level === roofBottom ? 'wood' : 'primary'
+        const kind = level === roofBottom ? 'wood' : roofMaterial
         pushCellVoxel(
           voxels,
           cell,
           matrix.size,
           level,
           kind,
-          kind === 'primary'
-            ? 0.08
-            : (localNoise(seedText, row, col, `hall-roof-${level}`) * 0.42 + level * 0.047) % 1,
+          (localNoise(seedText, row, col, `hall-roof-${level}`) * 0.42 + level * 0.047) % 1,
           top ? projectionToneForCell(cell) : undefined,
         )
       }
