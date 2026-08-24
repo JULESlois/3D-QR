@@ -1,7 +1,6 @@
 const appShell = document.querySelector<HTMLElement>('.app-shell')
 const stage = document.querySelector<HTMLElement>('#stage')
 const controlPanel = document.querySelector<HTMLElement>('.control-panel')
-const controlCopy = document.querySelector<HTMLElement>('.control-copy')
 const styleRow = document.querySelector<HTMLElement>('.style-row')
 const sceneButtons = styleRow
   ? Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
@@ -9,19 +8,11 @@ const sceneButtons = styleRow
 const modeToggle = document.querySelector<HTMLButtonElement>('#mode-toggle')
 const footerActions = modeToggle?.parentElement ?? null
 const exportButton = footerActions?.querySelector<HTMLButtonElement>('.style-chip') ?? null
-const eyebrow = document.querySelector<HTMLElement>('#style-eyebrow')
-const headline = document.querySelector<HTMLElement>('#style-headline')
-const lede = document.querySelector<HTMLElement>('#style-lede')
-const masthead = document.querySelector<HTMLElement>('.masthead')
-const styleControl = styleRow?.closest<HTMLElement>('.style-control') ?? null
 
 // Canvas click already owns the sculpture / QR reveal. Keep main.ts' reference alive,
 // but remove the duplicate visible button from the control surface.
 modeToggle?.remove()
 footerActions?.classList.add('footer-actions')
-// The corner identity/source labels compete with the artwork and the persistent scene nav.
-// main.ts already holds the hidden mode readout reference, so removing the masthead here is safe.
-masthead?.remove()
 
 // Treat the visible sculpture and its controls as one carousel page. The persistent scene
 // dock is detached below, so only artwork and its explanation leave the viewport.
@@ -43,26 +34,10 @@ if (!sceneDock && appShell && styleRow) {
   sceneDock.setAttribute('aria-label', 'Scene selector')
   appShell.append(sceneDock)
   sceneDock.append(styleRow)
-  styleControl?.remove()
 }
 
-// Rebuild the scene copy as a plain information block. Dynamic text is no longer bound
-// to a <details> summary; collapse is its own control and scene swaps move the whole page.
-let panelToggle: HTMLButtonElement | null = null
-if (controlCopy && eyebrow && headline && lede) {
-  const sceneCopy = document.createElement('div')
-  sceneCopy.className = 'scene-copy'
-  sceneCopy.setAttribute('aria-live', 'polite')
-  sceneCopy.append(eyebrow, headline, lede)
-
-  panelToggle = document.createElement('button')
-  panelToggle.type = 'button'
-  panelToggle.className = 'description-toggle panel-collapse-toggle'
-  panelToggle.setAttribute('aria-label', 'Hide QR controls for immersive view')
-  panelToggle.setAttribute('aria-expanded', 'true')
-
-  controlCopy.replaceChildren(sceneCopy, panelToggle)
-}
+// The final scene-copy DOM is static in index.html. ui-controls.ts only owns behavior.
+const panelToggle = document.querySelector<HTMLButtonElement>('.panel-collapse-toggle')
 
 let panelRestoreToggle: HTMLButtonElement | null = null
 if (appShell) {
