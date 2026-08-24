@@ -12,7 +12,79 @@
   </head>
   <body data-mode="art" data-style="tree" data-controls="expanded">
     <main class="app-shell">
-      <section class="stage" id="stage" aria-label="Interactive voxel QR sculpture"></section>
+      <div class="scene-window">
+        <section class="stage" id="stage" aria-label="Interactive voxel QR sculpture"></section>
+
+        <section class="control-panel" aria-label="QR controls">
+          <div class="control-copy">
+            <details class="description-disclosure" open>
+              <summary aria-label="Hide QR controls for immersive view">
+                <span>
+                  <span class="eyebrow" id="style-eyebrow">VOXEL QR SCULPTURE / TREE</span>
+                  <span class="control-copy-heading" id="style-headline" role="heading" aria-level="1">Grow the code.</span>
+                </span>
+                <span class="description-toggle" aria-hidden="true"></span>
+              </summary>
+              <div class="description-body">
+                <div class="description-body-inner">
+                  <p class="lede" id="style-lede">
+                    A QR-constrained canopy rises from dark modules while the ground keeps the rest of the symbol intact. Rotate the same voxel field into its scanner view.
+                  </p>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <label class="url-field" for="qr-input">
+            <span>URL OR TEXT</span>
+            <input
+              id="qr-input"
+              type="text"
+              inputmode="url"
+              autocomplete="off"
+              spellcheck="false"
+              value="https://github.com/JULESlois/3D-QR"
+              aria-describedby="qr-meta"
+            />
+          </label>
+
+          <div class="style-control">
+            <span class="palette-label">SCENE</span>
+            <div class="style-row" aria-label="Sculpture style">
+              <button class="style-chip is-active" type="button" data-style="tree">TREE</button>
+              <button class="style-chip" type="button" data-style="forest">FOREST</button>
+              <button class="style-chip" type="button" data-style="mountain">MOUNTAIN</button>
+              <button class="style-chip" type="button" data-style="station">STATION</button>
+              <button class="style-chip" type="button" data-style="house">HOUSE</button>
+              <button class="style-chip" type="button" data-style="castle">CASTLE</button>
+              <button class="style-chip" type="button" data-style="glyph">GLYPH</button>
+              <button class="style-chip" type="button" data-style="city">CITY</button>
+              <button class="style-chip" type="button" data-style="lighthouse">LIGHTHOUSE</button>
+              <button class="style-chip" type="button" data-style="pagoda">PAGODA</button>
+              <button class="style-chip" type="button" data-style="temple">TEMPLE</button>
+              <button class="style-chip" type="button" data-style="crystal">CRYSTAL</button>
+            </div>
+          </div>
+
+          <div class="palette-control">
+            <span class="palette-label">PALETTE</span>
+            <div class="palette-row" aria-label="Sculpture palette">
+              <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
+              <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
+              <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
+              <button class="palette-swatch" type="button" data-palette="spectrum" aria-label="Spectrum palette"></button>
+            </div>
+          </div>
+
+          <div class="panel-footer">
+            <p id="qr-meta" class="sr-status" role="status" aria-live="polite"></p>
+            <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
+              <span id="mode-toggle-label">VIEW QR</span>
+              <span class="toggle-glyph" aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </section>
+      </div>
 
       <header class="masthead">
         <a class="brand" href="#" aria-label="3D QR home">
@@ -24,76 +96,6 @@
           <span id="mode-readout" hidden></span>
         </div>
       </header>
-
-      <section class="control-panel" aria-label="QR controls">
-        <div class="control-copy">
-          <details class="description-disclosure" open>
-            <summary aria-label="Hide QR controls for immersive view">
-              <span>
-                <span class="eyebrow" id="style-eyebrow">VOXEL QR SCULPTURE / TREE</span>
-                <span class="control-copy-heading" id="style-headline" role="heading" aria-level="1">Grow the code.</span>
-              </span>
-              <span class="description-toggle" aria-hidden="true"></span>
-            </summary>
-            <div class="description-body">
-              <div class="description-body-inner">
-                <p class="lede" id="style-lede">
-                  A QR-constrained canopy rises from dark modules while the ground keeps the rest of the symbol intact. Rotate the same voxel field into its scanner view.
-                </p>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <label class="url-field" for="qr-input">
-          <span>URL OR TEXT</span>
-          <input
-            id="qr-input"
-            type="text"
-            inputmode="url"
-            autocomplete="off"
-            spellcheck="false"
-            value="https://github.com/JULESlois/3D-QR"
-            aria-describedby="qr-meta"
-          />
-        </label>
-
-        <div class="style-control">
-          <span class="palette-label">SCENE</span>
-          <div class="style-row" aria-label="Sculpture style">
-            <button class="style-chip is-active" type="button" data-style="tree">TREE</button>
-            <button class="style-chip" type="button" data-style="forest">FOREST</button>
-            <button class="style-chip" type="button" data-style="mountain">MOUNTAIN</button>
-            <button class="style-chip" type="button" data-style="station">STATION</button>
-            <button class="style-chip" type="button" data-style="house">HOUSE</button>
-            <button class="style-chip" type="button" data-style="castle">CASTLE</button>
-            <button class="style-chip" type="button" data-style="glyph">GLYPH</button>
-            <button class="style-chip" type="button" data-style="city">CITY</button>
-            <button class="style-chip" type="button" data-style="lighthouse">LIGHTHOUSE</button>
-            <button class="style-chip" type="button" data-style="pagoda">PAGODA</button>
-            <button class="style-chip" type="button" data-style="temple">TEMPLE</button>
-            <button class="style-chip" type="button" data-style="crystal">CRYSTAL</button>
-          </div>
-        </div>
-
-        <div class="palette-control">
-          <span class="palette-label">PALETTE</span>
-          <div class="palette-row" aria-label="Sculpture palette">
-            <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
-            <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
-            <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
-            <button class="palette-swatch" type="button" data-palette="spectrum" aria-label="Spectrum palette"></button>
-          </div>
-        </div>
-
-        <div class="panel-footer">
-          <p id="qr-meta" class="sr-status" role="status" aria-live="polite"></p>
-          <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
-            <span id="mode-toggle-label">VIEW QR</span>
-            <span class="toggle-glyph" aria-hidden="true">↗</span>
-          </button>
-        </div>
-      </section>
 
       <span id="style-specimen" hidden></span>
       <span id="stage-hint" hidden></span>
