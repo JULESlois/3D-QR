@@ -187,6 +187,80 @@ async function isolateQrProjection(send) {
   await sleep(80)
 }
 
+function otsuThreshold(gray) {
+  const histogram = new Uint32Array(256)
+  for (const value of gray) histogram[value] += 1
+
+  let totalWeighted = 0
+  for (let value = 0; value < 256; value += 1) totalWeighted += value * histogram[value]
+
+  let backgroundWeight = 0
+  let backgroundWeighted = 0
+  let bestThreshold = 127
+  let bestVariance = -1
+  const total = gray.length
+
+  for (let threshold = 0; threshold < 256; threshold += 1) {
+    backgroundWeight += histogram[threshold]
+    if (backgroundWeight === 0) continue
+    const foregroundWeight = total - backgroundWeight
+    if (foregroundWeight === 0) break
+
+    backgroundWeighted += threshold * histogram[threshold]
+    const backgroundMean = backgroundWeighted / backgroundWeight
+    const foregroundMean = (totalWeighted - backgroundWeighted) / foregroundWeight
+    const delta = backgroundMean - foregroundMean
+    const variance = backgroundWeight * foregroundWeight * delta * delta
+
+    if (variance > bestVariance) {
+      bestVariance = variance
+      bestThreshold = threshold
+    }
+  }
+
+  return bestThreshold
+}
+
+function closeVoxelGaps(png) {
+  const pixelCount = png.width * png.height
+  const gray = new Uint8Array(pixelCount)
+  for (let index = 0; index < pixelCount; index += 1) {
+    const offset = index * 4
+    gray[index] = Math.round(
+      png.data[offset] * 0.2126
+      + png.data[offset + 1] * 0.7152
+      + png.data[offset + 2] * 0.0722,
+    )
+  }
+
+  const threshold = otsuThreshold(gray)
+  const output = new Uint8ClampedArray(pixelCount * 4)
+  output.fill(255)
+  const radius = 2
+
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      if (gray[y * png.width + x] > threshold) continue
+      const minY = Math.max(0, y - radius)
+      const maxY = Math.min(png.height - 1, y + radius)
+      const minX = Math.max(0, x - radius)
+      const maxX = Math.min(png.width - 1, x + radius)
+
+      for (let yy = minY; yy <= maxY; yy += 1) {
+        for (let xx = minX; xx <= maxX; xx += 1) {
+          const offset = (yy * png.width + xx) * 4
+          output[offset] = 0
+          output[offset + 1] = 0
+          output[offset + 2] = 0
+          output[offset + 3] = 255
+        }
+      }
+    }
+  }
+
+  return output
+}
+
 function decodeQrScreenshot(bytes) {
   const png = PNG.sync.read(bytes)
   const pixels = new Uint8ClampedArray(
@@ -194,7 +268,8 @@ function decodeQrScreenshot(bytes) {
     png.data.byteOffset,
     png.data.byteLength,
   )
-  const decoded = jsQR(pixels, png.width, png.height, { inversionAttempts: 'attemptBoth' })
+  const raw = jsQR(pixels, png.width, png.height, { inversionAttempts: 'attemptBoth' })
+  const decoded = raw ?? jsQR(closeVoxelGaps(png), png.width, png.height, { inversionAttempts: 'attemptBoth' })
 
   if (!decoded) {
     throw new Error(`jsQR could not decode the ${png.width}×${png.height} QR projection screenshot`)
