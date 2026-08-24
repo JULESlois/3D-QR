@@ -201,9 +201,13 @@ try {
   await rm(userDataDir, { recursive: true, force: true })
   await mkdir(outputDir, { recursive: true })
 
-  preview = spawn('npm', ['run', 'preview', '--', '--host', host, '--port', String(previewPort), '--strictPort'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  preview = spawn(process.execPath, [
+    'node_modules/vite/bin/vite.js',
+    'preview',
+    '--host', host,
+    '--port', String(previewPort),
+    '--strictPort',
+  ], { stdio: 'ignore' })
   await waitForHttp(baseUrl)
 
   const chromePath = findChrome()
