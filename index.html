@@ -47,11 +47,18 @@
 
           <div class="palette-control">
             <span class="palette-label">PALETTE</span>
-            <div class="palette-row" aria-label="Sculpture palette">
+            <div class="palette-row" aria-label="Sculpture palette and export">
               <button class="palette-swatch is-active" type="button" data-palette="blossom" aria-label="Blossom palette"></button>
               <button class="palette-swatch" type="button" data-palette="summer" aria-label="Summer palette"></button>
               <button class="palette-swatch" type="button" data-palette="ginkgo" aria-label="Ginkgo palette"></button>
               <button class="palette-swatch" type="button" data-palette="spectrum" aria-label="Spectrum palette"></button>
+              <button
+                id="export-png"
+                class="style-chip"
+                type="button"
+                title="Export a 2048×1024 Art + QR PNG"
+                aria-label="Export Art and QR views as one PNG"
+              >PNG ×2</button>
             </div>
           </div>
 
@@ -106,5 +113,6 @@
     <script type="module" src="/src/ui-controls.ts"></script>
     <script type="module" src="/src/scene-swipe.ts"></script>
     <script type="module" src="/src/share-state.ts"></script>
+    <script type="module" src="/src/png-export.ts"></script>
   </body>
 </html>
