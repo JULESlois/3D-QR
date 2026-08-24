@@ -171,7 +171,11 @@ async function switchToQr(send) {
     returnByValue: true,
   })
   if (mode.result?.value !== 'qr') throw new Error('Canvas click did not enter QR projection mode')
-  await sleep(900)
+
+  // data-mode flips immediately, while the sculpture continues slerping toward the
+  // orthographic QR orientation for roughly two seconds. Capture only after that motion
+  // has settled; otherwise jsQR sees the art silhouette covering the projected code.
+  await sleep(2_600)
 }
 
 function decodeQrScreenshot(bytes) {
