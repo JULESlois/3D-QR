@@ -1,21 +1,30 @@
 import { isPaletteKey, type PaletteKey } from './palettes'
 import { isStyleId, type StyleId } from './styles'
 
+export type ProjectionView = 'art' | 'qr'
+
 export interface ShareState {
   payload: string
   style: StyleId
   palette: PaletteKey
+  view: ProjectionView
 }
 
 const PAYLOAD_KEY = 'q'
 const STYLE_KEY = 's'
 const PALETTE_KEY = 'p'
+const VIEW_KEY = 'v'
+
+function isProjectionView(value: string): value is ProjectionView {
+  return value === 'art' || value === 'qr'
+}
 
 export function encodeShareHash(state: ShareState): string {
   const params = new URLSearchParams()
   params.set(PAYLOAD_KEY, state.payload)
   params.set(STYLE_KEY, state.style)
   params.set(PALETTE_KEY, state.palette)
+  params.set(VIEW_KEY, state.view)
   return `#${params.toString()}`
 }
 
@@ -27,11 +36,13 @@ export function decodeShareHash(hash: string): Partial<ShareState> {
   const payload = params.get(PAYLOAD_KEY)
   const style = params.get(STYLE_KEY)
   const palette = params.get(PALETTE_KEY)
+  const view = params.get(VIEW_KEY)
   const state: Partial<ShareState> = {}
 
   if (payload?.trim()) state.payload = payload
   if (style && isStyleId(style)) state.style = style
   if (palette && isPaletteKey(palette)) state.palette = palette
+  if (view && isProjectionView(view)) state.view = view
   return state
 }
 
@@ -39,11 +50,21 @@ function currentState(): ShareState | null {
   const input = document.querySelector<HTMLInputElement>('#qr-input')
   const style = document.body.dataset.style
   const activePalette = document.querySelector<HTMLButtonElement>('[data-palette].is-active')?.dataset.palette
+  const view = document.body.dataset.mode
 
-  if (!input || !style || !isStyleId(style) || !activePalette || !isPaletteKey(activePalette)) return null
+  if (
+    !input
+    || !style
+    || !isStyleId(style)
+    || !activePalette
+    || !isPaletteKey(activePalette)
+    || !view
+    || !isProjectionView(view)
+  ) return null
+
   const payload = input.value.trim()
   if (!payload) return null
-  return { payload, style, palette: activePalette }
+  return { payload, style, palette: activePalette, view }
 }
 
 function replaceShareHash(): void {
@@ -60,6 +81,15 @@ function clickStyle(style: StyleId): void {
 
 function clickPalette(palette: PaletteKey): void {
   document.querySelector<HTMLButtonElement>(`[data-palette="${palette}"]`)?.click()
+}
+
+function restoreView(view: ProjectionView): void {
+  if (document.body.dataset.mode === view) return
+  document.querySelector<HTMLCanvasElement>('#stage canvas')?.dispatchEvent(new MouseEvent('click', {
+    bubbles: true,
+    clientX: 1,
+    clientY: 1,
+  }))
 }
 
 function restoreShareState(): void {
@@ -80,6 +110,12 @@ function restoreShareState(): void {
     // after the scene click has synchronously updated main.ts state and UI.
     queueMicrotask(() => clickPalette(state.palette!))
   }
+
+  if (state.view) {
+    // View mode is independent of scene/palette state, so restore it after the synchronous
+    // scene update. The renderer owns the actual sculpture rotation and body[data-mode].
+    queueMicrotask(() => restoreView(state.view!))
+  }
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
@@ -94,7 +130,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   document.addEventListener('click', (event) => {
     const target = event.target
     if (!(target instanceof Element)) return
-    if (!target.closest('[data-style], [data-palette]')) return
+    if (!target.closest('[data-style], [data-palette], #stage canvas')) return
     queueMicrotask(replaceShareHash)
   })
 
