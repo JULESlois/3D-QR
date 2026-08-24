@@ -158,6 +158,25 @@ async function navigate(send, width, height) {
   }
 }
 
+async function assertExportActionHierarchy(send) {
+  const state = await evaluateValue(send, `(() => {
+    const png = document.querySelector('#export-png')
+    const gif = Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === 'EXPORT GIF')
+    return {
+      pngFound: !!png,
+      gifFound: !!gif,
+      sameParent: !!png && !!gif && png.parentElement === gif.parentElement,
+      parentIsFooterActions: png?.parentElement?.classList.contains('footer-actions') ?? false,
+      pngInsidePalette: !!png?.closest('.palette-control')
+    }
+  })()`)
+
+  if (!state?.pngFound || !state.gifFound || !state.sameParent || !state.parentIsFooterActions || state.pngInsidePalette) {
+    throw new Error(`PNG and GIF exports are not peer footer actions: ${JSON.stringify(state)}`)
+  }
+}
+
 async function exerciseMobileUi(send) {
   const initial = await evaluateValue(send, `(() => ({
     style: document.body.dataset.style,
@@ -395,6 +414,7 @@ try {
   await send('Runtime.enable')
 
   await navigate(send, 1440, 900)
+  await assertExportActionHierarchy(send)
   const desktopBytes = await capture(send, 'desktop-art')
 
   await navigate(send, 390, 844)
