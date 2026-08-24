@@ -8,8 +8,9 @@
     "dev": "vite",
     "test:projection": "tsx scripts/projection-smoke.ts",
     "test:material": "tsx scripts/material-tone-smoke.ts",
+    "test:share": "tsx scripts/share-state-smoke.ts",
     "test:gif": "tsx scripts/gif-smoke.ts",
-    "build": "npm run test:projection && npm run test:material && npm run test:gif && tsc --noEmit && vite build",
+    "build": "npm run test:projection && npm run test:material && npm run test:share && npm run test:gif && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "engines": { "node": ">=20.19.0" },
