@@ -1,6 +1,11 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { spawn, spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import process from 'node:process'
+
+const require = createRequire(import.meta.url)
+const jsQR = require('jsqr')
+const { PNG } = require('pngjs')
 
 const host = '127.0.0.1'
 const previewPort = 4173
@@ -8,6 +13,7 @@ const debugPort = 9222
 const baseUrl = `http://${host}:${previewPort}`
 const outputDir = 'browser-smoke'
 const userDataDir = '.browser-smoke-chrome'
+const expectedQrPayload = 'https://github.com/JULESlois/3D-QR'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -142,7 +148,7 @@ async function capture(send, name) {
   const bytes = Buffer.from(result.data, 'base64')
   if (bytes.length < 10_000) throw new Error(`${name} screenshot is unexpectedly small (${bytes.length} bytes)`)
   await writeFile(`${outputDir}/${name}.png`, bytes)
-  return bytes.length
+  return bytes
 }
 
 async function switchToQr(send) {
@@ -168,28 +174,23 @@ async function switchToQr(send) {
   await sleep(900)
 }
 
-async function tryNativeQrDecode(send) {
-  const result = await send('Runtime.evaluate', {
-    expression: `(async () => {
-      if (!('BarcodeDetector' in window)) return { supported: false, count: 0 }
-      try {
-        const detector = new BarcodeDetector({ formats: ['qr_code'] })
-        const canvas = document.querySelector('#stage canvas')
-        const codes = canvas ? await detector.detect(canvas) : []
-        return { supported: true, count: codes.length, values: codes.map((code) => code.rawValue) }
-      } catch (error) {
-        return { supported: true, count: 0, error: String(error) }
-      }
-    })()`,
-    awaitPromise: true,
-    returnByValue: true,
-  })
+function decodeQrScreenshot(bytes) {
+  const png = PNG.sync.read(bytes)
+  const pixels = new Uint8ClampedArray(
+    png.data.buffer,
+    png.data.byteOffset,
+    png.data.byteLength,
+  )
+  const decoded = jsQR(pixels, png.width, png.height, { inversionAttempts: 'attemptBoth' })
 
-  const value = result.result?.value ?? { supported: false, count: 0 }
-  if (value.supported && value.count < 1) {
-    throw new Error(`Native BarcodeDetector is available but did not decode QR view: ${JSON.stringify(value)}`)
+  if (!decoded) {
+    throw new Error(`jsQR could not decode the ${png.width}×${png.height} QR projection screenshot`)
   }
-  return value
+  if (decoded.data !== expectedQrPayload) {
+    throw new Error(`QR projection decoded unexpected payload: ${JSON.stringify(decoded.data)}`)
+  }
+
+  return decoded.data
 }
 
 let preview
@@ -242,11 +243,11 @@ try {
   await navigate(send, 1024, 1024)
   await switchToQr(send)
   const qrBytes = await capture(send, 'qr-view')
-  const decode = await tryNativeQrDecode(send)
+  const decodedPayload = decodeQrScreenshot(qrBytes)
 
   console.log(
-    `browser smoke: desktop ${desktopBytes} bytes / mobile ${mobileBytes} bytes / QR ${qrBytes} bytes / `
-      + (decode.supported ? `BarcodeDetector decoded ${decode.count}` : 'BarcodeDetector unavailable; QR screenshot retained'),
+    `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes / QR ${qrBytes.length} bytes / `
+      + `jsQR decoded ${JSON.stringify(decodedPayload)}`,
   )
 } finally {
   socket?.close()
