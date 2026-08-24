@@ -2,19 +2,17 @@ const SWIPE_AXIS_LOCK = 12
 const SWIPE_MIN_DISTANCE = 48
 const SWIPE_VERTICAL_TOLERANCE = 44
 
-function installSceneSwipe(): boolean {
+function installSceneSwipe(): void {
   const dock = document.querySelector<HTMLElement>('.scene-dock')
-  const current = dock?.querySelector<HTMLElement>('.scene-current')
-  const previous = dock?.querySelector<HTMLButtonElement>('.scene-arrow-prev')
-  const next = dock?.querySelector<HTMLButtonElement>('.scene-arrow-next')
-  if (!dock || !current || !previous || !next) return false
-  if (current.dataset.swipeReady === 'true') return true
+  const sceneCurrent = dock?.querySelector<HTMLElement>('.scene-current')
+  const previousButton = dock?.querySelector<HTMLButtonElement>('.scene-arrow-prev')
+  const nextButton = dock?.querySelector<HTMLButtonElement>('.scene-arrow-next')
+  const label = sceneCurrent?.querySelector<HTMLElement>('.scene-current-label')
 
-  const sceneCurrent = current
-  const previousButton = previous
-  const nextButton = next
+  if (!dock || !sceneCurrent || !previousButton || !nextButton || !label) {
+    throw new Error('Static scene stepper markup is incomplete; scene swipe could not bind.')
+  }
 
-  sceneCurrent.dataset.swipeReady = 'true'
   sceneCurrent.style.touchAction = 'pan-y'
   sceneCurrent.style.cursor = 'grab'
   sceneCurrent.setAttribute('aria-label', 'Current scene. Swipe left or right to change scene.')
@@ -26,27 +24,22 @@ function installSceneSwipe(): boolean {
   let deltaY = 0
   let axis: 'horizontal' | 'vertical' | null = null
 
-  const label = sceneCurrent.querySelector<HTMLElement>('.scene-current-label')
-
   function renderDrag(): void {
-    if (!label) return
     const limited = Math.max(-42, Math.min(42, deltaX * 0.32))
     label.style.transform = `translateX(${limited}px)`
     label.style.opacity = String(Math.max(0.58, 1 - Math.abs(limited) / 100))
   }
 
   function resetDrag(): void {
-    if (label) {
-      label.style.transition = 'transform 160ms cubic-bezier(.22,.72,.22,1), opacity 160ms ease'
-      label.style.transform = 'translateX(0)'
-      label.style.opacity = '1'
-      window.setTimeout(() => {
-        if (!label) return
-        label.style.removeProperty('transition')
-        label.style.removeProperty('transform')
-        label.style.removeProperty('opacity')
-      }, 170)
-    }
+    label.style.transition = 'transform 160ms cubic-bezier(.22,.72,.22,1), opacity 160ms ease'
+    label.style.transform = 'translateX(0)'
+    label.style.opacity = '1'
+    window.setTimeout(() => {
+      label.style.removeProperty('transition')
+      label.style.removeProperty('transform')
+      label.style.removeProperty('opacity')
+    }, 170)
+
     sceneCurrent.style.cursor = 'grab'
     pointerId = null
     axis = null
@@ -108,14 +101,6 @@ function installSceneSwipe(): boolean {
   sceneCurrent.addEventListener('lostpointercapture', () => {
     if (pointerId !== null) resetDrag()
   })
-
-  return true
 }
 
-if (!installSceneSwipe()) {
-  const observer = new MutationObserver(() => {
-    if (!installSceneSwipe()) return
-    observer.disconnect()
-  })
-  observer.observe(document.documentElement, { childList: true, subtree: true })
-}
+installSceneSwipe()
