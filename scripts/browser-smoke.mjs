@@ -109,6 +109,25 @@ async function waitForPage(send, timeoutMs = 10_000) {
   throw new Error('Application canvas did not become ready in time')
 }
 
+async function evaluateValue(send, expression) {
+  const result = await send('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+  })
+  return result.result?.value
+}
+
+async function waitForValue(send, expression, expected, label, timeoutMs = 4_000) {
+  const deadline = Date.now() + timeoutMs
+  let current
+  while (Date.now() < deadline) {
+    current = await evaluateValue(send, expression)
+    if (current === expected) return current
+    await sleep(80)
+  }
+  throw new Error(`${label} did not settle to ${JSON.stringify(expected)}; got ${JSON.stringify(current)}`)
+}
+
 async function navigate(send, width, height) {
   await send('Emulation.setDeviceMetricsOverride', {
     width,
@@ -137,6 +156,59 @@ async function navigate(send, width, height) {
   if (!value || value.canvasWidth < 100 || value.canvasHeight < 100 || value.qrError || !value.sceneDock || !value.controls) {
     throw new Error(`Browser smoke health check failed: ${JSON.stringify(value)}`)
   }
+}
+
+async function exerciseMobileUi(send) {
+  const initial = await evaluateValue(send, `(() => ({
+    style: document.body.dataset.style,
+    sceneLabel: document.querySelector('.scene-current-label')?.textContent?.trim(),
+    palette: document.querySelector('.palette-swatch.is-active')?.dataset.palette,
+    controls: document.body.dataset.controls,
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+  }))()`)
+
+  if (!initial || initial.style !== 'tree' || initial.sceneLabel !== 'TREE' || initial.palette !== 'blossom' || initial.controls !== 'expanded' || initial.overflow) {
+    throw new Error(`Unexpected initial mobile UI state: ${JSON.stringify(initial)}`)
+  }
+
+  await evaluateValue(send, `document.querySelector('.palette-swatch[data-palette="summer"]')?.click()`)
+  await waitForValue(
+    send,
+    `document.querySelector('.palette-swatch.is-active')?.dataset.palette`,
+    'summer',
+    'Palette switch',
+  )
+
+  await evaluateValue(send, `document.querySelector('.scene-arrow-next')?.click()`)
+  await waitForValue(send, `document.body.dataset.style`, 'forest', 'Next-scene navigation')
+  await waitForValue(send, `document.querySelector('.scene-current-label')?.textContent?.trim()`, 'FOREST', 'Scene label')
+
+  await evaluateValue(send, `document.querySelector('.panel-collapse-toggle')?.click()`)
+  await waitForValue(send, `document.body.dataset.controls`, 'collapsed', 'Control-panel collapse', 5_000)
+  const collapsed = await evaluateValue(send, `(() => ({
+    restoreVisible: document.querySelector('.panel-restore-toggle')?.getAttribute('aria-hidden') === 'false',
+    restoreTabIndex: document.querySelector('.panel-restore-toggle')?.tabIndex,
+    dockVisible: getComputedStyle(document.querySelector('.scene-dock')).visibility !== 'hidden'
+  }))()`)
+  if (!collapsed?.restoreVisible || collapsed.restoreTabIndex !== 0 || !collapsed.dockVisible) {
+    throw new Error(`Collapsed controls are not recoverable: ${JSON.stringify(collapsed)}`)
+  }
+
+  await evaluateValue(send, `document.querySelector('.panel-restore-toggle')?.click()`)
+  await waitForValue(send, `document.body.dataset.controls`, 'expanded', 'Control-panel restore', 5_000)
+
+  const finalState = await evaluateValue(send, `(() => ({
+    style: document.body.dataset.style,
+    sceneLabel: document.querySelector('.scene-current-label')?.textContent?.trim(),
+    palette: document.querySelector('.palette-swatch.is-active')?.dataset.palette,
+    controls: document.body.dataset.controls,
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+  }))()`)
+  if (!finalState || finalState.style !== 'forest' || finalState.sceneLabel !== 'FOREST' || finalState.palette !== 'summer' || finalState.controls !== 'expanded' || finalState.overflow) {
+    throw new Error(`Mobile interaction smoke ended in an invalid state: ${JSON.stringify(finalState)}`)
+  }
+
+  return finalState
 }
 
 async function capture(send, name) {
@@ -326,6 +398,7 @@ try {
   const desktopBytes = await capture(send, 'desktop-art')
 
   await navigate(send, 390, 844)
+  const mobileState = await exerciseMobileUi(send)
   const mobileBytes = await capture(send, 'mobile-art')
 
   await navigate(send, 1024, 1024)
@@ -335,7 +408,7 @@ try {
   const decodedPayload = decodeQrScreenshot(qrBytes)
 
   console.log(
-    `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes / QR ${qrBytes.length} bytes / `
+    `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes (${mobileState.style}/${mobileState.palette}) / QR ${qrBytes.length} bytes / `
       + `jsQR decoded ${JSON.stringify(decodedPayload)}`,
   )
 } finally {
