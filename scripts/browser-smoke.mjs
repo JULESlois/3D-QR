@@ -28,6 +28,22 @@ function findChrome() {
   throw new Error(`Chrome/Chromium not found. Tried: ${candidates.join(', ')}`)
 }
 
+async function stopProcess(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return
+
+  await new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    }, 2_000)
+
+    child.once('exit', () => {
+      clearTimeout(timeout)
+      resolve()
+    })
+    child.kill('SIGTERM')
+  })
+}
+
 async function waitForHttp(url, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs
   let lastError
@@ -230,7 +246,6 @@ try {
   )
 } finally {
   socket?.close()
-  chrome?.kill('SIGTERM')
-  preview?.kill('SIGTERM')
-  await rm(userDataDir, { recursive: true, force: true })
+  await Promise.all([stopProcess(chrome), stopProcess(preview)])
+  await rm(userDataDir, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 })
 }
