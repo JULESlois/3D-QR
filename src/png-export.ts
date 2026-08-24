@@ -1,13 +1,19 @@
 const exportButtonElement = document.querySelector<HTMLButtonElement>('#export-png')
 const stageCanvasElement = document.querySelector<HTMLCanvasElement>('#stage canvas')
 const meta = document.querySelector<HTMLElement>('#qr-meta')
+const footerActionsElement = document.querySelector<HTMLElement>('.footer-actions')
+  ?? document.querySelector<HTMLElement>('.panel-footer > div')
 
-if (!exportButtonElement || !stageCanvasElement) {
-  throw new Error('PNG export requires #export-png and the stage canvas.')
+if (!exportButtonElement || !stageCanvasElement || !footerActionsElement) {
+  throw new Error('PNG export requires #export-png, the stage canvas, and footer export actions.')
 }
 
 const exportButton = exportButtonElement
 const stageCanvas = stageCanvasElement
+const footerActions = footerActionsElement
+
+// PNG is an export action, not a palette option. Keep it beside the GIF export control.
+footerActions.append(exportButton)
 
 const PANEL_SIZE = 1024
 const MODE_SETTLE_MS = 2600
