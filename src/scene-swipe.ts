@@ -4,14 +4,19 @@ const SWIPE_VERTICAL_TOLERANCE = 44
 
 function installSceneSwipe(): void {
   const dock = document.querySelector<HTMLElement>('.scene-dock')
-  const sceneCurrent = dock?.querySelector<HTMLElement>('.scene-current')
-  const previousButton = dock?.querySelector<HTMLButtonElement>('.scene-arrow-prev')
-  const nextButton = dock?.querySelector<HTMLButtonElement>('.scene-arrow-next')
-  const label = sceneCurrent?.querySelector<HTMLElement>('.scene-current-label')
+  const current = dock?.querySelector<HTMLElement>('.scene-current')
+  const previous = dock?.querySelector<HTMLButtonElement>('.scene-arrow-prev')
+  const next = dock?.querySelector<HTMLButtonElement>('.scene-arrow-next')
+  const currentLabel = current?.querySelector<HTMLElement>('.scene-current-label')
 
-  if (!dock || !sceneCurrent || !previousButton || !nextButton || !label) {
+  if (!dock || !current || !previous || !next || !currentLabel) {
     throw new Error('Static scene stepper markup is incomplete; scene swipe could not bind.')
   }
+
+  const sceneCurrent = current
+  const previousButton = previous
+  const nextButton = next
+  const label = currentLabel
 
   sceneCurrent.style.touchAction = 'pan-y'
   sceneCurrent.style.cursor = 'grab'
