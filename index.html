@@ -17,22 +17,19 @@
 
         <section class="control-panel" aria-label="QR controls">
           <div class="control-copy">
-            <details class="description-disclosure" open>
-              <summary aria-label="Hide QR controls for immersive view">
-                <span>
-                  <span class="eyebrow" id="style-eyebrow">VOXEL QR SCULPTURE / TREE</span>
-                  <span class="control-copy-heading" id="style-headline" role="heading" aria-level="1">Grow the code.</span>
-                </span>
-                <span class="description-toggle" aria-hidden="true"></span>
-              </summary>
-              <div class="description-body">
-                <div class="description-body-inner">
-                  <p class="lede" id="style-lede">
-                    A QR-constrained canopy rises from dark modules while the ground keeps the rest of the symbol intact. Rotate the same voxel field into its scanner view.
-                  </p>
-                </div>
-              </div>
-            </details>
+            <div class="scene-copy" aria-live="polite">
+              <span class="eyebrow" id="style-eyebrow">VOXEL QR SCULPTURE / TREE</span>
+              <span class="control-copy-heading" id="style-headline" role="heading" aria-level="1">Grow the code.</span>
+              <p class="lede" id="style-lede">
+                A QR-constrained canopy rises from dark modules while the ground keeps the rest of the symbol intact. Rotate the same voxel field into its scanner view.
+              </p>
+            </div>
+            <button
+              class="description-toggle panel-collapse-toggle"
+              type="button"
+              aria-label="Hide QR controls for immersive view"
+              aria-expanded="true"
+            ></button>
           </div>
 
           <label class="url-field" for="qr-input">
