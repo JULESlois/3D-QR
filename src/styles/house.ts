@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -11,6 +12,8 @@ import {
   type SculptureBuild,
   type VoxelKind,
 } from '../sculpture'
+
+const roofMaterial = materialForRole('roof')
 
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
   return (hashString(`${seedText}::house-v5::${salt}::${row}:${col}`) % 10000) / 10000
@@ -45,7 +48,7 @@ function pushStyledColumn(
       kind = flags.chimney && topLevel > wallHeight
         ? 'stone'
         : topLevel > wallHeight
-          ? 'primary'
+          ? roofMaterial
           : 'plaster'
     } else if (flags.chimney && level > wallHeight) {
       kind = 'stone'
@@ -60,7 +63,7 @@ function pushStyledColumn(
     } else if (level <= wallHeight) {
       kind = 'plaster'
     } else {
-      kind = level >= topLevel - 2 ? 'primary' : 'wood'
+      kind = level >= topLevel - 2 ? roofMaterial : 'wood'
     }
 
     pushCellVoxel(
@@ -248,11 +251,11 @@ function buildRoofDormers(
 
         for (let level = fromLevel; level <= topLevel; level += 1) {
           const kind: VoxelKind = level === topLevel
-            ? 'primary'
+            ? roofMaterial
             : dr === 1 && level === fromLevel
               ? 'glass'
               : level >= topLevel - 1
-                ? 'primary'
+                ? roofMaterial
                 : 'wood'
 
           pushCellVoxel(
