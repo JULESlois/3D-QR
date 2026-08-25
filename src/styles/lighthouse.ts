@@ -1,4 +1,5 @@
 import type { DarkModule, QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -11,6 +12,9 @@ import {
   type SculptureBuild,
   type VoxelKind,
 } from '../sculpture'
+
+const lighthouseMetalMaterial = materialForRole('metal')
+const lighthouseRoofMaterial = materialForRole('roof')
 
 function distance(a: Pick<QRCell, 'row' | 'col'>, b: Pick<QRCell, 'row' | 'col'>): number {
   return Math.hypot(a.row - b.row, a.col - b.col)
@@ -82,17 +86,17 @@ function distanceToBreakwater(
 function towerBodyKind(level: number, role: 'apron' | 'gallery' | 'shaft' | 'lantern'): VoxelKind {
   if (role === 'apron') return level <= 2 ? 'stone' : 'plaster'
 
-  // A dark structural ring under the gallery gives the tower a crisp horizontal
-  // break when viewed isometrically, instead of reading as one tapered voxel cone.
-  if (level === 9 || level === 10) return 'primary'
+  // The gallery ring is explicitly metal so it separates from both masonry and the
+  // broad scene accent ramp. Projection polarity is still carried independently.
+  if (level === 9 || level === 10) return lighthouseMetalMaterial
 
-  if (role === 'gallery') return level >= 9 ? 'primary' : level % 4 < 2 ? 'plaster' : 'primary'
+  if (role === 'gallery') return level >= 9 ? lighthouseMetalMaterial : level % 4 < 2 ? 'plaster' : 'primary'
   if (role === 'shaft') return level >= 12 ? 'glass' : level % 4 < 2 ? 'plaster' : 'primary'
 
-  // The lantern core stays visibly glazed above the gallery while the very top is
-  // capped by a dark roof material. Projection polarity is applied separately.
+  // The lantern core stays visibly glazed above the gallery while the very top uses
+  // the shared roof role, giving the cap a neutral tile/stone read rather than accent.
   if (level >= 14 && level <= 18) return 'glass'
-  if (level >= 19) return 'primary'
+  if (level >= 19) return lighthouseRoofMaterial
   return level % 4 < 2 ? 'plaster' : 'primary'
 }
 
@@ -243,7 +247,7 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
     'lighthouse',
     'Lighthouse',
     lifted,
-    'SCANNER-LIGHT WAVES / FINDER REEFS / CURVED BREAKWATER / STONE APRON / FLARED GALLERY / GLASS LANTERN / ROOF CAP',
+    'SCANNER-LIGHT WAVES / FINDER REEFS / CURVED BREAKWATER / STONE APRON / METAL GALLERY / GLASS LANTERN / ROOF CAP',
     'courtyard-pad',
   )
 }
