@@ -166,6 +166,7 @@ function buildApproach(
   toriiRow: number,
   center: number,
 ): void {
+  const pathMaterial = materialForRole('path')
   const halfWidth = matrix.size >= 33 ? 3 : 2
 
   for (let row = hallRow + 4; row < toriiRow; row += 1) {
@@ -175,7 +176,7 @@ function buildApproach(
       const nearHall = row <= hallRow + 6
       const nearTorii = row >= toriiRow - 2
       const step = nearHall ? 3 : nearTorii ? 2 : 1
-      pushProjectedColumn(voxels, cell, matrix.size, 1, step, 'stone', random)
+      pushProjectedColumn(voxels, cell, matrix.size, 1, step, pathMaterial, random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
@@ -300,7 +301,7 @@ export function generateTemple(matrix: QRMatrixData, seedText: string): Sculptur
     'temple',
     'Temple',
     lifted,
-    'UPTURNED KASAGI TORII / DEEP-EAVED RIDGE HALL / TIMBER FACADE / BROAD STONE APPROACH',
+    'UPTURNED KASAGI TORII / DEEP-EAVED RIDGE HALL / TIMBER FACADE / PALE PROCESSIONAL APPROACH',
     'courtyard-pad',
   )
 }
