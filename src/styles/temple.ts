@@ -6,7 +6,6 @@ import {
   createGenerationContext,
   finalizeSculpture,
   hashString,
-  maxProjectionLevelForCell,
   projectionToneForCell,
   pushCellVoxel,
   pushProjectedColumn,
@@ -20,10 +19,6 @@ function localNoise(seedText: string, row: number, col: number, salt: string): n
 function getCell(matrix: QRMatrixData, row: number, col: number): QRCell | undefined {
   if (row < 0 || row >= matrix.size || col < 0 || col >= matrix.size) return undefined
   return matrix.cells[row * matrix.size + col]
-}
-
-function isProtected(cell: QRCell): boolean {
-  return maxProjectionLevelForCell(cell) !== undefined
 }
 
 function buildFinderGardens(
@@ -81,7 +76,7 @@ function buildMainHall(
   for (let row = hallRow - halfDepth; row <= hallRow + halfDepth; row += 1) {
     for (let col = center - halfWidth; col <= center + halfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
-      if (!cell || isProtected(cell)) continue
+      if (!cell) continue
 
       const rowDistance = Math.abs(row - hallRow)
       const colDistance = Math.abs(col - center)
@@ -206,7 +201,7 @@ function buildTorii(
   for (const row of toriiRows) {
     for (const col of postColumns) {
       const cell = getCell(matrix, row, col)
-      if (!cell || isProtected(cell)) continue
+      if (!cell) continue
       for (let level = 1; level <= 11; level += 1) {
         pushCellVoxel(
           voxels,
@@ -225,7 +220,7 @@ function buildTorii(
   const nukiHalfWidth = Math.max(3, postOffset - 1)
   for (let col = center - nukiHalfWidth; col <= center + nukiHalfWidth; col += 1) {
     const cell = getCell(matrix, toriiRow + 1, col)
-    if (!cell || isProtected(cell)) continue
+    if (!cell) continue
     pushCellVoxel(voxels, cell, matrix.size, 9, 'primary', 0.08)
     pushCellVoxel(
       voxels,
@@ -242,7 +237,7 @@ function buildTorii(
   for (const row of toriiRows) {
     for (let col = center - safeHalfWidth; col <= center + safeHalfWidth; col += 1) {
       const cell = getCell(matrix, row, col)
-      if (!cell || isProtected(cell)) continue
+      if (!cell) continue
       const normalized = Math.abs(col - center) / Math.max(1, safeHalfWidth)
       const lift = normalized > 0.84 ? 2 : normalized > 0.62 ? 1 : 0
       const topLevel = 13 + lift
@@ -264,7 +259,7 @@ function buildTorii(
   const lowerLipHalfWidth = Math.max(4, safeHalfWidth - 1)
   for (let col = center - lowerLipHalfWidth; col <= center + lowerLipHalfWidth; col += 1) {
     const cell = getCell(matrix, toriiRow, col)
-    if (!cell || isProtected(cell)) continue
+    if (!cell) continue
     pushCellVoxel(voxels, cell, matrix.size, 12, 'primary', 0.08)
     lifted.add(cellKey(cell.row, cell.col))
   }
