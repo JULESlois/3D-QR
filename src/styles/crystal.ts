@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -197,6 +198,7 @@ function buildPeripheralPylons(
   halfCols: number,
   halfRows: number,
 ): void {
+  const pylonMaterial = materialForRole('metal')
   const points = [
     [center - halfRows + 1, center - halfCols + 1],
     [center - halfRows + 1, center + halfCols - 1],
@@ -209,7 +211,7 @@ function buildPeripheralPylons(
     const cell = getNearestDataCell(matrix, row, col, reserved, 4)
     if (!cell) continue
     reserved.add(cellKey(cell.row, cell.col))
-    pushProjectedColumn(voxels, cell, matrix.size, 1, 4, 'stone', random)
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 4, pylonMaterial, random)
     lifted.add(cellKey(cell.row, cell.col))
   }
 }
@@ -256,7 +258,7 @@ export function generateCrystal(matrix: QRMatrixData, seedText: string): Sculptu
     'crystal',
     'Crystal',
     lifted,
-    'FUNCTION-ZONE-SAFE HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / LOW SANCTUM FRAME',
+    'FUNCTION-ZONE-SAFE HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / METAL PYLONS / LOW SANCTUM FRAME',
     'mineral-slab',
   )
 }
