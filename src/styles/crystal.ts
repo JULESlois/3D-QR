@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -133,13 +134,10 @@ function buildFloatingCore(
   // matrix center on high-version QR codes, so radius two would search only protected
   // cells and silently drop the central spine that makes the silhouette recognizable.
   const heroShards = [
-    // Central spine and hanging point.
     [0, 0, 4, 22],
     [1, 0, 5, 19],
     [2, 0, 6, 15],
     [3, 0, 8, 12],
-
-    // Wide upper crown: asymmetric heights keep the outline crystalline rather than pyramidal.
     [-1, -1, 6, 20],
     [-1, 1, 6, 18],
     [-2, -2, 8, 18],
@@ -147,8 +145,6 @@ function buildFloatingCore(
     [-2, -3, 10, 16],
     [-3, 1, 10, 17],
     [-3, 3, 11, 15],
-
-    // Mid-body shoulders and fractured side planes.
     [0, -1, 6, 17],
     [0, 1, 6, 16],
     [0, -2, 8, 15],
@@ -169,9 +165,6 @@ function buildFloatingCore(
     lifted.add(cellKey(cell.row, cell.col))
   }
 
-  // Detached crown splinters exaggerate the broken mineral outline without competing
-  // with the central mass. The same data-cell remap keeps small alignment patterns from
-  // turning into isolated high crystal towers on larger QR versions.
   const splinters = [
     [-2, -5, 10, 15],
     [-1, 5, 11, 14],
@@ -197,6 +190,7 @@ function buildPeripheralPylons(
   halfCols: number,
   halfRows: number,
 ): void {
+  const pylonMaterial = materialForRole('metal')
   const points = [
     [center - halfRows + 1, center - halfCols + 1],
     [center - halfRows + 1, center + halfCols - 1],
@@ -209,7 +203,7 @@ function buildPeripheralPylons(
     const cell = getNearestDataCell(matrix, row, col, reserved, 4)
     if (!cell) continue
     reserved.add(cellKey(cell.row, cell.col))
-    pushProjectedColumn(voxels, cell, matrix.size, 1, 4, 'stone', random)
+    pushProjectedColumn(voxels, cell, matrix.size, 1, 4, pylonMaterial, random)
     lifted.add(cellKey(cell.row, cell.col))
   }
 }
@@ -256,7 +250,7 @@ export function generateCrystal(matrix: QRMatrixData, seedText: string): Sculptu
     'crystal',
     'Crystal',
     lifted,
-    'FUNCTION-ZONE-SAFE HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / LOW SANCTUM FRAME',
+    'FUNCTION-ZONE-SAFE HERO CRYSTAL / SPLIT CROWN / HANGING POINT / ENERGY BASIN / METAL PYLONS / LOW SANCTUM FRAME',
     'mineral-slab',
   )
 }
