@@ -10,10 +10,12 @@ const ROLE_MATERIALS = {
   // Keeping the role indirection lets a future renderer promote metal to dedicated PBR
   // properties without revisiting scene generators.
   metal: 'glass',
-  // Roof planes use the neutral stone/tile family rather than a scene's broad primary
-  // accent ramp. That keeps repeated eaves visually coherent and lets timber/plaster
-  // bodies retain the authored scene color without making roofs another accent surface.
-  roof: 'stone',
+  // Roof planes use the darker structural/foundation family rather than the same stone
+  // ramp as walls, courts, and plinths. This gives House, Pagoda, Temple, and Lighthouse
+  // roofs a clearer silhouette while retaining each palette's authored hue relationship.
+  // Foundation ramps are already paired for projectionTone, so scanner polarity remains
+  // explicit and no black/white scanner cap is introduced.
+  roof: 'foundation',
 } as const satisfies Record<SemanticMaterialRole, VoxelKind>
 
 export function materialForRole(role: SemanticMaterialRole): VoxelKind {
