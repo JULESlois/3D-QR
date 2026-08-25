@@ -57,17 +57,26 @@
 
           <div class="panel-footer">
             <p id="qr-meta" class="sr-status" role="status" aria-live="polite"></p>
-            <button
-              id="export-png"
-              class="style-chip"
-              type="button"
-              title="Export a 2048×1024 Art + QR PNG"
-              aria-label="Export Art and QR views as one PNG"
-            >PNG ×2</button>
-            <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
-              <span id="mode-toggle-label">VIEW QR</span>
-              <span class="toggle-glyph" aria-hidden="true">↗</span>
-            </button>
+            <div class="footer-actions">
+              <button
+                id="export-gif"
+                class="style-chip"
+                type="button"
+                title="Export a looping sculpture-to-QR reveal"
+                aria-label="Export reveal as GIF"
+              >EXPORT GIF</button>
+              <button
+                id="export-png"
+                class="style-chip"
+                type="button"
+                title="Export a 2048×1024 Art + QR PNG"
+                aria-label="Export Art and QR views as one PNG"
+              >PNG ×2</button>
+              <button id="mode-toggle" class="mode-toggle" type="button" aria-pressed="false">
+                <span id="mode-toggle-label">VIEW QR</span>
+                <span class="toggle-glyph" aria-hidden="true">↗</span>
+              </button>
+            </div>
           </div>
         </section>
       </div>
