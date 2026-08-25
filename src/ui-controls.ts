@@ -8,13 +8,11 @@ const controlPanel = requiredElement<HTMLElement>('.control-panel')
 const styleRow = requiredElement<HTMLElement>('.style-row')
 const sceneButtons = Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const modeToggle = requiredElement<HTMLButtonElement>('#mode-toggle')
-const footerActions = modeToggle.parentElement
-const exportButton = footerActions?.querySelector<HTMLButtonElement>('.style-chip') ?? null
+const exportButton = requiredElement<HTMLButtonElement>('#export-gif')
 
 // Canvas click already owns the sculpture / QR reveal. Keep main.ts' reference alive,
 // but remove the duplicate visible button from the control surface.
 modeToggle.remove()
-footerActions?.classList.add('footer-actions')
 
 // The scene window and dock are part of the static page contract. Failing fast here keeps
 // ui-controls.ts focused on behavior instead of silently rebuilding missing page structure.
@@ -283,12 +281,11 @@ function hideExportOverlay(delay = 0): void {
   exportOverlayTimer = window.setTimeout(() => {
     delete exportOverlay.dataset.open
     exportOverlay.setAttribute('aria-hidden', 'true')
-    exportButton?.focus({ preventScroll: true })
+    exportButton.focus({ preventScroll: true })
   }, delay)
 }
 
 function syncExportOverlayFromButton(): void {
-  if (!exportButton) return
   const label = exportButton.textContent?.trim() ?? ''
 
   if (label.startsWith('PREPARING')) {
@@ -325,14 +322,12 @@ function syncExportOverlayFromButton(): void {
   }
 }
 
-if (exportButton) {
-  exportButton.addEventListener('click', showExportOverlay)
-  const exportObserver = new MutationObserver(syncExportOverlayFromButton)
-  exportObserver.observe(exportButton, {
-    attributes: true,
-    attributeFilter: ['disabled', 'title'],
-    childList: true,
-    characterData: true,
-    subtree: true,
-  })
-}
+exportButton.addEventListener('click', showExportOverlay)
+const exportObserver = new MutationObserver(syncExportOverlayFromButton)
+exportObserver.observe(exportButton, {
+  attributes: true,
+  attributeFilter: ['disabled', 'title'],
+  childList: true,
+  characterData: true,
+  subtree: true,
+})
