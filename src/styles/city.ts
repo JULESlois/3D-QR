@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -243,13 +244,14 @@ function bodyKind(archetype: UrbanArchetype, level: number, topLevel: number): V
     case 'terrace':
       return level >= topLevel - 2 ? 'primary' : level % 3 === 0 ? 'glass' : 'plaster'
     case 'needle':
+      if (level >= topLevel - 2) return materialForRole('metal')
       return level % 4 === 0 ? 'primary' : 'glass'
     case 'ziggurat':
       return level % 3 === 0 ? 'primary' : 'stone'
     case 'bridge':
-      return level === topLevel - 1 ? 'primary' : 'glass'
+      return level === topLevel - 1 ? materialForRole('metal') : 'glass'
     case 'crown':
-      return level >= topLevel - 2 ? 'primary' : 'glass'
+      return level >= topLevel - 2 ? materialForRole('metal') : 'glass'
     case 'podium':
     default:
       return level === 2 ? 'primary' : 'stone'
