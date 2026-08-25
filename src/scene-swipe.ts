@@ -20,7 +20,10 @@ function installSceneSwipe(): void {
 
   sceneCurrent.style.touchAction = 'pan-y'
   sceneCurrent.style.cursor = 'grab'
-  sceneCurrent.setAttribute('aria-label', 'Current scene. Swipe left or right to change scene.')
+  sceneCurrent.setAttribute(
+    'aria-label',
+    'Current scene. Swipe left or right, or use the left and right arrow keys, to change scene.',
+  )
 
   let pointerId: number | null = null
   let startX = 0
@@ -105,6 +108,28 @@ function installSceneSwipe(): void {
   sceneCurrent.addEventListener('pointercancel', resetDrag)
   sceneCurrent.addEventListener('lostpointercapture', () => {
     if (pointerId !== null) resetDrag()
+  })
+
+  document.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+      return
+    }
+
+    const target = event.target
+    if (target instanceof HTMLElement) {
+      const tagName = target.tagName
+      if (target.isContentEditable || tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+        return
+      }
+    }
+
+    if (event.key === 'ArrowLeft' && !previousButton.disabled) {
+      event.preventDefault()
+      previousButton.click()
+    } else if (event.key === 'ArrowRight' && !nextButton.disabled) {
+      event.preventDefault()
+      nextButton.click()
+    }
   })
 }
 
