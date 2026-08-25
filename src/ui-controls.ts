@@ -4,47 +4,26 @@ function requiredElement<T extends Element>(selector: string): T {
   return element
 }
 
-const appShell = document.querySelector<HTMLElement>('.app-shell')
-const stage = document.querySelector<HTMLElement>('#stage')
-const controlPanel = document.querySelector<HTMLElement>('.control-panel')
-const styleRow = document.querySelector<HTMLElement>('.style-row')
-const sceneButtons = styleRow
-  ? Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
-  : []
-const modeToggle = document.querySelector<HTMLButtonElement>('#mode-toggle')
-const footerActions = modeToggle?.parentElement ?? null
+const controlPanel = requiredElement<HTMLElement>('.control-panel')
+const styleRow = requiredElement<HTMLElement>('.style-row')
+const sceneButtons = Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
+const modeToggle = requiredElement<HTMLButtonElement>('#mode-toggle')
+const footerActions = modeToggle.parentElement
 const exportButton = footerActions?.querySelector<HTMLButtonElement>('.style-chip') ?? null
 
 // Canvas click already owns the sculpture / QR reveal. Keep main.ts' reference alive,
 // but remove the duplicate visible button from the control surface.
-modeToggle?.remove()
+modeToggle.remove()
 footerActions?.classList.add('footer-actions')
 
-// Treat the visible sculpture and its controls as one carousel page. The persistent scene
-// dock is detached below, so only artwork and its explanation leave the viewport.
-let sceneWindow = appShell?.querySelector<HTMLElement>('.scene-window') ?? null
-if (!sceneWindow && appShell && stage && controlPanel) {
-  sceneWindow = document.createElement('div')
-  sceneWindow.className = 'scene-window'
-  appShell.insertBefore(sceneWindow, stage)
-  sceneWindow.append(stage, controlPanel)
-}
-
-// Scene navigation belongs to the viewport, not to the sliding scene page. Detaching the
-// original row keeps main.ts' button references intact while preventing scene changes from
-// carrying the selector off-screen.
-let sceneDock: HTMLElement | null = appShell?.querySelector<HTMLElement>('.scene-dock') ?? null
-if (!sceneDock && appShell && styleRow) {
-  sceneDock = document.createElement('nav')
-  sceneDock.className = 'scene-dock'
-  sceneDock.setAttribute('aria-label', 'Scene selector')
-  appShell.append(sceneDock)
-  sceneDock.append(styleRow)
-}
+// The scene window and dock are part of the static page contract. Failing fast here keeps
+// ui-controls.ts focused on behavior instead of silently rebuilding missing page structure.
+const sceneWindow = requiredElement<HTMLElement>('.scene-window')
+requiredElement<HTMLElement>('.scene-dock')
 
 // The final control DOM is static in index.html. ui-controls.ts only owns behavior.
-const panelToggle = document.querySelector<HTMLButtonElement>('.panel-collapse-toggle')
-const panelRestoreToggle = document.querySelector<HTMLButtonElement>('.panel-restore-toggle')
+const panelToggle = requiredElement<HTMLButtonElement>('.panel-collapse-toggle')
+const panelRestoreToggle = requiredElement<HTMLButtonElement>('.panel-restore-toggle')
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const panelFoldXMs = 300
@@ -70,14 +49,12 @@ function clearPhaseTimer(): void {
 }
 
 function captureExpandedPanelSize(): void {
-  if (!controlPanel) return
   const rect = controlPanel.getBoundingClientRect()
   if (rect.width > 0) controlPanel.style.setProperty('--controls-expanded-width', `${rect.width}px`)
   if (rect.height > 0) controlPanel.style.setProperty('--controls-expanded-height', `${rect.height}px`)
 }
 
 function releaseExpandedPanelSize(): void {
-  if (!controlPanel) return
   controlPanel.style.removeProperty('--controls-expanded-width')
   controlPanel.style.removeProperty('--controls-expanded-height')
 }
@@ -87,23 +64,19 @@ function syncControlPanelState(): void {
   document.body.dataset.controlsShape = controlShape
 
   const collapsedIntent = phase !== 'expanded'
-  if (controlPanel && panelToggle) {
-    controlPanel.setAttribute(
-      'aria-label',
-      collapsedIntent ? 'QR controls, collapsing or collapsed' : 'QR controls',
-    )
-    panelToggle.setAttribute(
-      'aria-label',
-      collapsedIntent ? 'QR controls are folding' : 'Hide QR controls for immersive view',
-    )
-    panelToggle.setAttribute('aria-expanded', String(!collapsedIntent))
-  }
+  controlPanel.setAttribute(
+    'aria-label',
+    collapsedIntent ? 'QR controls, collapsing or collapsed' : 'QR controls',
+  )
+  panelToggle.setAttribute(
+    'aria-label',
+    collapsedIntent ? 'QR controls are folding' : 'Hide QR controls for immersive view',
+  )
+  panelToggle.setAttribute('aria-expanded', String(!collapsedIntent))
 
-  if (panelRestoreToggle) {
-    const available = phase === 'collapsed'
-    panelRestoreToggle.setAttribute('aria-hidden', String(!available))
-    panelRestoreToggle.tabIndex = available ? 0 : -1
-  }
+  const available = phase === 'collapsed'
+  panelRestoreToggle.setAttribute('aria-hidden', String(!available))
+  panelRestoreToggle.tabIndex = available ? 0 : -1
 }
 
 function finishCollapsed(): void {
@@ -166,19 +139,19 @@ function expandControls(): void {
   }, panelFoldYMs)
 }
 
-panelToggle?.addEventListener('click', () => {
+panelToggle.addEventListener('click', () => {
   if (phase !== 'expanded') return
   collapseControls()
 })
-panelRestoreToggle?.addEventListener('click', () => {
+panelRestoreToggle.addEventListener('click', () => {
   if (phase !== 'collapsed') return
   expandControls()
 })
 syncControlPanelState()
 
-const scenePrevButton = styleRow?.querySelector<HTMLButtonElement>('.scene-arrow-prev') ?? null
-const sceneNextButton = styleRow?.querySelector<HTMLButtonElement>('.scene-arrow-next') ?? null
-const sceneCurrentLabel = styleRow?.querySelector<HTMLElement>('.scene-current-label') ?? null
+const scenePrevButton = requiredElement<HTMLButtonElement>('.scene-arrow-prev')
+const sceneNextButton = requiredElement<HTMLButtonElement>('.scene-arrow-next')
+const sceneCurrentLabel = requiredElement<HTMLElement>('.scene-current-label')
 
 function currentSceneIndex(): number {
   const styleId = document.body.dataset.style
@@ -187,7 +160,7 @@ function currentSceneIndex(): number {
 }
 
 function syncSceneStepper(): void {
-  if (!sceneCurrentLabel || sceneButtons.length === 0) return
+  if (sceneButtons.length === 0) return
 
   const index = currentSceneIndex()
   const current = sceneButtons[index]
@@ -195,20 +168,19 @@ function syncSceneStepper(): void {
   const next = sceneButtons[(index + 1) % sceneButtons.length]
 
   sceneCurrentLabel.textContent = current.textContent?.trim() || current.dataset.style?.toUpperCase() || 'SCENE'
-  scenePrevButton?.setAttribute('aria-label', `Previous scene: ${previous.textContent?.trim() || 'previous'}`)
-  sceneNextButton?.setAttribute('aria-label', `Next scene: ${next.textContent?.trim() || 'next'}`)
+  scenePrevButton.setAttribute('aria-label', `Previous scene: ${previous.textContent?.trim() || 'previous'}`)
+  sceneNextButton.setAttribute('aria-label', `Next scene: ${next.textContent?.trim() || 'next'}`)
 }
 
 function syncSceneDisabledState(): void {
   const appBusy = sceneButtons.some((button) => button.disabled)
-  if (scenePrevButton) scenePrevButton.disabled = sceneChanging || appBusy
-  if (sceneNextButton) sceneNextButton.disabled = sceneChanging || appBusy
+  scenePrevButton.disabled = sceneChanging || appBusy
+  sceneNextButton.disabled = sceneChanging || appBusy
 }
 
 function pulseArrow(direction: SceneDirection): void {
   if (reducedMotion) return
   const button = direction === 'next' ? sceneNextButton : scenePrevButton
-  if (!button) return
 
   window.clearTimeout(arrowTimer)
   button.dataset.pressed = 'true'
@@ -222,10 +194,8 @@ function settleSceneWindow(): void {
   sceneTimer = 0
   sceneChanging = false
 
-  if (sceneWindow) {
-    delete sceneWindow.dataset.scenePhase
-    delete sceneWindow.dataset.sceneDirection
-  }
+  delete sceneWindow.dataset.scenePhase
+  delete sceneWindow.dataset.sceneDirection
 
   syncSceneStepper()
   syncSceneDisabledState()
@@ -243,7 +213,7 @@ function changeSceneBy(delta: number): void {
   const direction: SceneDirection = delta > 0 ? 'next' : 'prev'
   pulseArrow(direction)
 
-  if (reducedMotion || !sceneWindow) {
+  if (reducedMotion) {
     target.click()
     syncSceneStepper()
     return
@@ -261,13 +231,11 @@ function changeSceneBy(delta: number): void {
     syncSceneStepper()
 
     // Reposition the newly bound page to the opposite side without animation.
-    if (!sceneWindow) return
     sceneWindow.dataset.scenePhase = 'pre-in'
     void sceneWindow.offsetWidth
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!sceneWindow) return
         sceneWindow.dataset.scenePhase = 'in'
         sceneTimer = window.setTimeout(settleSceneWindow, sceneInMs)
       })
@@ -275,18 +243,16 @@ function changeSceneBy(delta: number): void {
   }, sceneOutMs)
 }
 
-if (scenePrevButton && sceneNextButton && sceneCurrentLabel && sceneButtons.length > 0) {
-  scenePrevButton.addEventListener('click', () => changeSceneBy(-1))
-  sceneNextButton.addEventListener('click', () => changeSceneBy(1))
+scenePrevButton.addEventListener('click', () => changeSceneBy(-1))
+sceneNextButton.addEventListener('click', () => changeSceneBy(1))
 
-  const busyObserver = new MutationObserver(syncSceneDisabledState)
-  for (const button of sceneButtons) {
-    busyObserver.observe(button, { attributes: true, attributeFilter: ['disabled'] })
-  }
-
-  syncSceneStepper()
-  syncSceneDisabledState()
+const busyObserver = new MutationObserver(syncSceneDisabledState)
+for (const button of sceneButtons) {
+  busyObserver.observe(button, { attributes: true, attributeFilter: ['disabled'] })
 }
+
+syncSceneStepper()
+syncSceneDisabledState()
 
 // Export progress markup is part of the static page shell; this controller only updates
 // state while main.ts remains the GIF encoder owner.
