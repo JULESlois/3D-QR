@@ -14,6 +14,8 @@ const PAYLOAD_KEY = 'q'
 const STYLE_KEY = 's'
 const PALETTE_KEY = 'p'
 const VIEW_KEY = 'v'
+const SHARE_BUTTON_LABEL = 'COPY LINK'
+const SHARE_BUTTON_TITLE = 'Copy a link to this QR sculpture state'
 
 function isProjectionView(value: string): value is ProjectionView {
   return value === 'art' || value === 'qr'
@@ -118,6 +120,52 @@ function restoreShareState(): void {
   }
 }
 
+function fallbackCopyText(value: string): boolean {
+  const input = document.createElement('textarea')
+  input.value = value
+  input.setAttribute('readonly', '')
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  input.style.pointerEvents = 'none'
+  document.body.appendChild(input)
+  input.select()
+  input.setSelectionRange(0, value.length)
+
+  try {
+    return document.execCommand('copy')
+  } finally {
+    input.remove()
+  }
+}
+
+async function copyShareLink(button: HTMLButtonElement): Promise<void> {
+  replaceShareHash()
+  const url = window.location.href
+  let copied = false
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url)
+      copied = true
+    }
+  } catch {
+    copied = false
+  }
+
+  if (!copied) copied = fallbackCopyText(url)
+
+  button.textContent = copied ? 'COPIED ✓' : 'COPY FAILED'
+  button.title = copied ? 'Share link copied' : 'Could not copy share link'
+  document.dispatchEvent(new CustomEvent('share-link-copy', {
+    detail: { url, copied },
+  }))
+
+  window.setTimeout(() => {
+    button.textContent = SHARE_BUTTON_LABEL
+    button.title = SHARE_BUTTON_TITLE
+  }, 1800)
+}
+
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   restoreShareState()
 
@@ -132,6 +180,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (!(target instanceof Element)) return
     if (!target.closest('[data-style], [data-palette], #stage canvas')) return
     queueMicrotask(replaceShareHash)
+  })
+
+  document.querySelector<HTMLButtonElement>('#copy-share-link')?.addEventListener('click', (event) => {
+    void copyShareLink(event.currentTarget as HTMLButtonElement)
   })
 
   // Shared URLs are live application state, not just an initial-load bootstrap. Restoring
