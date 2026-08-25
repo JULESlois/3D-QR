@@ -14,6 +14,7 @@ import {
 } from '../sculpture'
 
 const roofMaterial = materialForRole('roof')
+const pathMaterial = materialForRole('path')
 
 function localNoise(seedText: string, row: number, col: number, salt: string): number {
   return (hashString(`${seedText}::house-v5::${salt}::${row}:${col}`) % 10000) / 10000
@@ -348,7 +349,7 @@ function buildEntryStepsAndPath(
     for (const col of [center - 1, center]) {
       const cell = getCell(matrix, row, col)
       if (!cell || cell.zone !== 'data') continue
-      pushProjectedColumn(voxels, cell, matrix.size, 1, 1, 'stone', random)
+      pushProjectedColumn(voxels, cell, matrix.size, 1, 1, pathMaterial, random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
