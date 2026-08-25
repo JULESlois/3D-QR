@@ -1,6 +1,6 @@
 import type { VoxelKind } from './sculpture'
 
-export type SemanticMaterialRole = 'metal' | 'roof'
+export type SemanticMaterialRole = 'metal' | 'roof' | 'path'
 
 const ROLE_MATERIALS = {
   // Architectural metal now uses the cool glass color family rather than the masonry
@@ -16,6 +16,10 @@ const ROLE_MATERIALS = {
   // Foundation ramps are already paired for projectionTone, so scanner polarity remains
   // explicit and no black/white scanner cap is introduced.
   roof: 'foundation',
+  // Paths and processional approaches use the plaster family so paved circulation reads
+  // lighter than retaining walls, plinths, and other stonework. The paired plaster ramps
+  // still preserve dark/light projection polarity on scanner-facing surfaces.
+  path: 'plaster',
 } as const satisfies Record<SemanticMaterialRole, VoxelKind>
 
 export function materialForRole(role: SemanticMaterialRole): VoxelKind {
