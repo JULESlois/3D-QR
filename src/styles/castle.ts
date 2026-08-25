@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -93,6 +94,7 @@ function buildDrawbridgeApproach(
   const startRow = center + Math.max(2, Math.round(matrix.size * 0.1))
   const bridgeEnd = center + Math.max(5, Math.round(matrix.size * 0.24))
   const approachEnd = Math.min(matrix.size - 2, center + Math.max(8, Math.round(matrix.size * 0.36)))
+  const pathMaterial = materialForRole('path')
 
   for (let row = startRow; row <= approachEnd; row += 1) {
     const onBridge = row <= bridgeEnd
@@ -101,7 +103,7 @@ function buildDrawbridgeApproach(
       if (!cell || cell.zone !== 'data') continue
 
       // A three-module timber deck projects straight out of the recessed gatehouse.
-      // It hands off to a lower stone causeway, giving the fortress a strong front axis
+      // It hands off to a lower paved causeway, giving the fortress a strong front axis
       // in isometric view without changing the QR column footprint.
       pushProjectedColumn(
         voxels,
@@ -109,7 +111,7 @@ function buildDrawbridgeApproach(
         matrix.size,
         1,
         onBridge ? 2 : 1,
-        onBridge ? 'wood' : 'stone',
+        onBridge ? 'wood' : pathMaterial,
         random,
       )
       lifted.add(cellKey(cell.row, cell.col))
