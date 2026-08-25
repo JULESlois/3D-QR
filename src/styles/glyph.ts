@@ -3,7 +3,6 @@ import {
   cellKey,
   createGenerationContext,
   finalizeSculpture,
-  maxProjectionLevelForCell,
   projectionToneForCell,
   pushVoxel,
   type SculptureBuild,
@@ -158,12 +157,6 @@ export function generateGlyph(matrix: QRMatrixData, seedText: string): Sculpture
     } else {
       topLevel = (module.row * 3 + module.col * 5) % 19 === 0 ? 2 : 1
     }
-
-    // Glyph is intentionally a dark-only free-standing body and therefore cannot skip
-    // protected dark modules altogether. Clamp those columns to the same structural
-    // ceiling as the shared projection core while leaving the monogram relief intact on data cells.
-    const protectedMax = maxProjectionLevelForCell(module)
-    if (protectedMax !== undefined) topLevel = Math.min(topLevel, protectedMax)
 
     for (let level = 1; level <= topLevel; level += 1) {
       const interiorKind = sample.band === 'face'

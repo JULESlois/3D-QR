@@ -5,7 +5,6 @@ import {
   createBaseVoxels,
   createGenerationContext,
   finalizeSculpture,
-  maxProjectionLevelForCell,
   projectionToneForCell,
   pushCellVoxel,
   type SculptureBuild,
@@ -39,7 +38,7 @@ function register(
   role: StationRole,
   priority: number,
 ): void {
-  if (!cell || cell.zone === 'finder' || maxProjectionLevelForCell(cell) !== undefined) return
+  if (!cell || cell.zone === 'finder') return
 
   const key = cellKey(cell.row, cell.col)
   let column = columns.get(key)
