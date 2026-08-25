@@ -109,6 +109,26 @@
       <span id="stage-hint" hidden></span>
     </main>
 
+    <div
+      class="export-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-overlay-title"
+      aria-describedby="export-overlay-detail"
+      aria-hidden="true"
+      tabindex="-1"
+    >
+      <div class="export-dialog">
+        <p class="export-kicker">GIF EXPORT</p>
+        <h2 class="export-title" id="export-overlay-title">Preparing reveal.</h2>
+        <p class="export-detail" id="export-overlay-detail">Building the animation frames.</p>
+        <div class="export-progress-track" aria-hidden="true">
+          <div class="export-progress-bar"></div>
+        </div>
+        <div class="export-percent">0%</div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
     <script type="module" src="/src/ui-controls.ts"></script>
     <script type="module" src="/src/scene-swipe.ts"></script>

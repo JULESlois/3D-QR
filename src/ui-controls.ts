@@ -1,3 +1,9 @@
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector)
+  if (!element) throw new Error(`Required UI element is missing: ${selector}`)
+  return element
+}
+
 const appShell = document.querySelector<HTMLElement>('.app-shell')
 const stage = document.querySelector<HTMLElement>('#stage')
 const controlPanel = document.querySelector<HTMLElement>('.control-panel')
@@ -282,48 +288,13 @@ if (scenePrevButton && sceneNextButton && sceneCurrentLabel && sceneButtons.leng
   syncSceneDisabledState()
 }
 
-// Export progress uses a blocking modal layer. main.ts remains the encoder owner; this UI
-// observes its existing button state so the export pipeline itself stays untouched.
-const exportOverlay = document.createElement('div')
-exportOverlay.className = 'export-overlay'
-exportOverlay.setAttribute('role', 'dialog')
-exportOverlay.setAttribute('aria-modal', 'true')
-exportOverlay.setAttribute('aria-labelledby', 'export-overlay-title')
-exportOverlay.setAttribute('aria-describedby', 'export-overlay-detail')
-exportOverlay.setAttribute('aria-hidden', 'true')
-exportOverlay.tabIndex = -1
-
-const exportDialog = document.createElement('div')
-exportDialog.className = 'export-dialog'
-
-const exportKicker = document.createElement('p')
-exportKicker.className = 'export-kicker'
-exportKicker.textContent = 'GIF EXPORT'
-
-const exportTitle = document.createElement('h2')
-exportTitle.className = 'export-title'
-exportTitle.id = 'export-overlay-title'
-exportTitle.textContent = 'Preparing reveal.'
-
-const exportDetail = document.createElement('p')
-exportDetail.className = 'export-detail'
-exportDetail.id = 'export-overlay-detail'
-exportDetail.textContent = 'Building the animation frames.'
-
-const exportProgressTrack = document.createElement('div')
-exportProgressTrack.className = 'export-progress-track'
-exportProgressTrack.setAttribute('aria-hidden', 'true')
-const exportProgressBar = document.createElement('div')
-exportProgressBar.className = 'export-progress-bar'
-exportProgressTrack.append(exportProgressBar)
-
-const exportPercent = document.createElement('div')
-exportPercent.className = 'export-percent'
-exportPercent.textContent = '0%'
-
-exportDialog.append(exportKicker, exportTitle, exportDetail, exportProgressTrack, exportPercent)
-exportOverlay.append(exportDialog)
-document.body.append(exportOverlay)
+// Export progress markup is part of the static page shell; this controller only updates
+// state while main.ts remains the GIF encoder owner.
+const exportOverlay = requiredElement<HTMLElement>('.export-overlay')
+const exportTitle = requiredElement<HTMLElement>('#export-overlay-title')
+const exportDetail = requiredElement<HTMLElement>('#export-overlay-detail')
+const exportProgressBar = requiredElement<HTMLElement>('.export-progress-bar')
+const exportPercent = requiredElement<HTMLElement>('.export-percent')
 
 function setExportProgress(progress: number): void {
   const normalized = Math.max(0, Math.min(1, progress))
