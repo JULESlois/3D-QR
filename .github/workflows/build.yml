@@ -38,6 +38,9 @@ jobs:
       - name: Browser viewport smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/browser-smoke.mjs
 
+      - name: Share-link browser smoke
+        run: node scripts/run-browser-smoke-ci.mjs scripts/share-link-browser-smoke.mjs
+
       - name: PNG export browser smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/png-export-smoke.mjs
 
