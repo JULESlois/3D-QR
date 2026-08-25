@@ -27,32 +27,9 @@ const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-l
 const styleRow = requiredElement<HTMLElement>('.style-row')
 const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
-const panelFooter = requiredElement<HTMLElement>('.panel-footer')
-const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
+const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
 
 const exportGifTitle = 'Export a looping sculpture-to-QR reveal'
-const exportGifButton = document.createElement('button')
-exportGifButton.type = 'button'
-exportGifButton.className = 'style-chip'
-exportGifButton.textContent = 'EXPORT GIF'
-exportGifButton.title = exportGifTitle
-exportGifButton.setAttribute('aria-label', 'Export reveal as GIF')
-exportGifButton.style.minHeight = '38px'
-exportGifButton.style.minWidth = '92px'
-exportGifButton.style.paddingInline = '11px'
-
-const footerActions = document.createElement('div')
-footerActions.style.display = 'flex'
-footerActions.style.alignItems = 'stretch'
-footerActions.style.justifyContent = 'flex-end'
-footerActions.style.gap = '8px'
-footerActions.style.width = '100%'
-// Keep both export actions in one interaction group. PNG starts in static HTML so it is
-// available even before this module runs, then moves next to GIF when the footer is wired.
-footerActions.append(exportGifButton, exportPngButton, modeToggle)
-panelFooter.append(footerActions)
-modeToggle.style.flex = '1 1 auto'
-modeToggle.style.width = 'auto'
 
 const scene = new THREE.Scene()
 const camera = new THREE.OrthographicCamera(-6, 6, 6, -6, 0.1, 50)
