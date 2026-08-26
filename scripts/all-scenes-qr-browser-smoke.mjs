@@ -14,6 +14,8 @@ const baseUrl = `http://${host}:${previewPort}`
 const outputDir = 'all-scenes-qr-smoke'
 const userDataDir = '.all-scenes-qr-smoke-chrome'
 const expectedPayload = 'https://github.com/JULESlois/3D-QR'
+const highVersionPayload = `city-${'projection-coverage/'.repeat(7)}`
+const minimumHighVersion = 10
 const styles = [
   'tree',
   'forest',
@@ -143,7 +145,7 @@ async function waitForPage(send) {
   )
 }
 
-async function capture(send, style, palette) {
+async function capture(send, style, palette, prefix = '') {
   const result = await send('Page.captureScreenshot', {
     format: 'png',
     captureBeyondViewport: false,
@@ -154,7 +156,8 @@ async function capture(send, style, palette) {
   if (bytes.length < 10_000) {
     throw new Error(`${label} QR screenshot is unexpectedly small (${bytes.length} bytes)`)
   }
-  await writeFile(`${outputDir}/${style}-${palette}-qr.png`, bytes)
+  const filenamePrefix = prefix ? `${prefix}-` : ''
+  await writeFile(`${outputDir}/${filenamePrefix}${style}-${palette}-qr.png`, bytes)
   return bytes
 }
 
@@ -232,7 +235,7 @@ function closeVoxelGaps(png) {
   return output
 }
 
-function decodeQr(bytes, style, palette) {
+function decodeQr(bytes, style, palette, expected) {
   const png = PNG.sync.read(bytes)
   const pixels = new Uint8ClampedArray(
     png.data.buffer,
@@ -244,7 +247,7 @@ function decodeQr(bytes, style, palette) {
   const label = `${style}/${palette}`
 
   if (!decoded) throw new Error(`jsQR could not decode ${label} QR projection`)
-  if (decoded.data !== expectedPayload) {
+  if (decoded.data !== expected) {
     throw new Error(`${label} QR projection decoded unexpected payload: ${JSON.stringify(decoded.data)}`)
   }
   return decoded.data
@@ -313,6 +316,28 @@ async function selectPalette(send, style, palette) {
   // Palette interpolation lasts 520ms. Capture only after the scanner-facing material
   // colors have reached the authored target ramp rather than testing an intermediate mix.
   await sleep(650)
+}
+
+async function setPayload(send, payload) {
+  const updated = await evaluateValue(send, `(() => {
+    const input = document.querySelector('#qr-input')
+    if (!(input instanceof HTMLInputElement)) return false
+    input.value = ${JSON.stringify("city-projection-coverage/projection-coverage/projection-coverage/projection-coverage/projection-coverage/projection-coverage/projection-coverage/")}
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  if (!updated) throw new Error('Could not update the QR payload input')
+
+  return waitForValue(
+    send,
+    `(() => {
+      const match = document.querySelector('#qr-meta')?.textContent?.match(/^QR V(\\d+)/)
+      return match ? Number(match[1]) : 0
+    })()`,
+    (version) => Number.isInteger(version) && version >= minimumHighVersion,
+    `High-version QR build (expected v${minimumHighVersion}+)`,
+    12_000,
+  )
 }
 
 let preview
@@ -384,7 +409,7 @@ try {
       try {
         await selectPalette(send, style, palette)
         const bytes = await capture(send, style, palette)
-        const payload = decodeQr(bytes, style, palette)
+        const payload = decodeQr(bytes, style, palette, expectedPayload)
         results.push(`${style}/${palette}:${bytes.length}:${payload.length}`)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -398,7 +423,32 @@ try {
     throw new Error(`QR decode failed for ${failures.length}/${combinationCount} scene/palette combinations: ${failures.join(' | ')}`)
   }
 
-  console.log(`all-scenes QR smoke: ${combinationCount} scene/palette combinations decoded / ${results.join(' | ')}`)
+  const highVersion = await setPayload(send, highVersionPayload)
+  const highVersionResults = []
+  const highVersionFailures = []
+  for (const style of styles) {
+    try {
+      await selectStyle(send, style)
+      const palette = await evaluateValue(send, `document.querySelector('.palette-swatch.is-active')?.dataset.palette ?? 'default'`)
+      const bytes = await capture(send, style, palette, `v${highVersion}`)
+      const payload = decodeQr(bytes, style, palette, highVersionPayload)
+      highVersionResults.push(`${style}/${palette}:${bytes.length}:${payload.length}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      highVersionFailures.push(`${style}: ${message}`)
+    }
+  }
+
+  if (highVersionFailures.length > 0) {
+    throw new Error(
+      `High-version v${highVersion} QR decode failed for ${highVersionFailures.length}/${styles.length} scenes: ${highVersionFailures.join(' | ')}`,
+    )
+  }
+
+  console.log(
+    `all-scenes QR smoke: ${combinationCount} scene/palette combinations decoded; `
+      + `high-version v${highVersion} decoded across ${styles.length} scenes / ${highVersionResults.join(' | ')} / default ${results.join(' | ')}`,
+  )
 } finally {
   socket?.close()
   await Promise.all([stopProcess(chrome), stopProcess(preview)])
