@@ -2,6 +2,7 @@ import './styles.css'
 import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { getStyle, isStyleId, type StyleId } from './styles'
 import { exportRevealGif } from './gif-export'
+import { exportPngPair } from './png-export'
 import { createPresentationController } from './presentation'
 import { createRenderRuntime } from './render-runtime'
 import { createVoxelMeshController } from './voxel-mesh'
@@ -227,6 +228,29 @@ exportGifButton.addEventListener('click', () => {
     resumeAnimation: () => renderer.setAnimationLoop(animate),
   })
 })
+
+exportPngButton.addEventListener('click', () => {
+  const build = sculpture.build
+  if (isExporting || !build) return
+
+  void exportPngPair({
+    scene,
+    camera,
+    renderer,
+    presentationGroup,
+    sculptureRoot,
+    artQuaternion: presentation.artQuaternion,
+    qrQuaternion: presentation.qrQuaternion,
+    build,
+    styleId: sculpture.styleId,
+    button: exportPngButton,
+    meta,
+    setBusy: setExportUiBusy,
+    pauseAnimation: () => renderer.setAnimationLoop(null),
+    resumeAnimation: () => renderer.setAnimationLoop(animate),
+  })
+})
+
 renderer.domElement.addEventListener('click', toggleMode)
 
 document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT, (event) => {
