@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import './styles.css'
-import { CELL_SIZE, type SculptureBuild } from './sculpture'
+import type { SculptureBuild } from './sculpture'
 import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { createQRMatrix } from './qr'
 import { getStyle, isStyleId, type StyleId } from './styles'
 import { exportRevealGif } from './gif-export'
 import { createPresentationController } from './presentation'
+import { createVoxelMeshController } from './voxel-mesh'
 import {
   applyPaletteColorBuffer,
   capturePaletteColors,
@@ -67,19 +68,10 @@ const sculptureRoot = new THREE.Group()
 presentationGroup.add(sculptureRoot)
 
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
-
-const voxelGeometry = new THREE.BoxGeometry(1, 1, 1)
-const voxelMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffffff,
-  roughness: 0.86,
-  metalness: 0.015,
-})
-
-const dummy = new THREE.Object3D()
+const voxelMeshes = createVoxelMeshController(sculptureRoot)
 
 let styleId: StyleId = 'tree'
 let paletteKey: PaletteKey = getStyle(styleId).defaultPalette
-let voxelMesh: THREE.InstancedMesh | null = null
 let currentBuild: SculptureBuild | null = null
 let rebuildTimer = 0
 let rotationProgress = 0
@@ -143,6 +135,7 @@ function updatePaletteUi(): void {
 
 function applyPalette(): void {
   paletteTransition = null
+  const voxelMesh = voxelMeshes.mesh
   if (voxelMesh && currentBuild) {
     applyPaletteColorBuffer(
       voxelMesh,
@@ -162,12 +155,6 @@ function setExportUiBusy(busy: boolean): void {
   for (const button of styleButtons) button.disabled = busy
   for (const button of paletteButtons) button.disabled = busy
   renderer.domElement.style.pointerEvents = busy ? 'none' : ''
-}
-
-function disposeVoxelMesh(): void {
-  if (!voxelMesh) return
-  sculptureRoot.remove(voxelMesh)
-  voxelMesh = null
 }
 
 function updateStyleCopy(): void {
@@ -196,26 +183,8 @@ function rebuild(value: string): void {
     const build = style.generate(matrix, content)
 
     paletteTransition = null
-    disposeVoxelMesh()
     currentBuild = build
-
-    const mesh = new THREE.InstancedMesh(voxelGeometry, voxelMaterial, build.voxels.length)
-    mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
-    mesh.frustumCulled = false
-    const voxelSize = CELL_SIZE * style.appearance.voxelFill
-
-    for (let i = 0; i < build.voxels.length; i += 1) {
-      const voxel = build.voxels[i]
-      dummy.position.set(voxel.x, voxel.y - build.pivotY, voxel.z)
-      dummy.quaternion.identity()
-      dummy.scale.set(voxelSize, voxelSize, voxelSize)
-      dummy.updateMatrix()
-      mesh.setMatrixAt(i, dummy.matrix)
-    }
-
-    mesh.instanceMatrix.needsUpdate = true
-    voxelMesh = mesh
-    sculptureRoot.add(mesh)
+    voxelMeshes.replace(build, style.appearance.voxelFill)
 
     applyPalette()
     presentation.updateComposition(
@@ -272,6 +241,7 @@ function requestStyleTransition(nextStyleId: StyleId): void {
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
   if (isExporting || nextPaletteKey === paletteKey || styleTransition) return
 
+  const voxelMesh = voxelMeshes.mesh
   const from = capturePaletteColors(voxelMesh)
   paletteKey = nextPaletteKey
   updatePaletteUi()
@@ -385,6 +355,7 @@ function animate(): void {
     }
   }
 
+  const voxelMesh = voxelMeshes.mesh
   if (paletteTransition && voxelMesh?.instanceColor) {
     const rawProgress = clamp01((now - paletteTransition.startedAt) / paletteTransition.duration)
     const colors = voxelMesh.instanceColor.array as Float32Array
