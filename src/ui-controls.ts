@@ -7,12 +7,7 @@ function requiredElement<T extends Element>(selector: string): T {
 const controlPanel = requiredElement<HTMLElement>('.control-panel')
 const styleRow = requiredElement<HTMLElement>('.style-row')
 const sceneButtons = Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
-const modeToggle = requiredElement<HTMLButtonElement>('#mode-toggle')
 const exportButton = requiredElement<HTMLButtonElement>('#export-gif')
-
-// Canvas click already owns the sculpture / QR reveal. Keep main.ts' reference alive,
-// but remove the duplicate visible button from the control surface.
-modeToggle.remove()
 
 // The scene window and dock are part of the static page contract. Failing fast here keeps
 // ui-controls.ts focused on behavior instead of silently rebuilding missing page structure.
