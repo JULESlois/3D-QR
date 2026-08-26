@@ -345,11 +345,21 @@ try {
   await isolateProjection(send)
 
   const results = []
+  const failures = []
   for (const style of styles) {
-    if (style !== 'tree') await selectStyle(send, style)
-    const bytes = await capture(send, style)
-    const payload = decodeQr(bytes, style)
-    results.push(`${style}:${bytes.length}:${payload.length}`)
+    try {
+      if (style !== 'tree') await selectStyle(send, style)
+      const bytes = await capture(send, style)
+      const payload = decodeQr(bytes, style)
+      results.push(`${style}:${bytes.length}:${payload.length}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      failures.push(`${style}: ${message}`)
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`QR decode failed for ${failures.length}/${styles.length} scenes: ${failures.join(' | ')}`)
   }
 
   console.log(`all-scenes QR smoke: ${styles.length} scenes decoded / ${results.join(' | ')}`)
