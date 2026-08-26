@@ -167,6 +167,63 @@ function otsuThreshold(gray) {
   return bestThreshold
 }
 
+function fillShortHorizontalGaps(source, width, height, maxGap) {
+  const output = Uint8Array.from(source)
+
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * width
+    let x = 1
+    while (x < width - 1) {
+      if (source[rowOffset + x] !== 0) {
+        x += 1
+        continue
+      }
+
+      const start = x
+      while (x < width && source[rowOffset + x] === 0) x += 1
+      const gap = x - start
+      const boundedByDark = start > 0
+        && x < width
+        && source[rowOffset + start - 1] === 1
+        && source[rowOffset + x] === 1
+
+      if (boundedByDark && gap <= maxGap) {
+        for (let fillX = start; fillX < x; fillX += 1) output[rowOffset + fillX] = 1
+      }
+    }
+  }
+
+  return output
+}
+
+function fillShortVerticalGaps(source, width, height, maxGap) {
+  const output = Uint8Array.from(source)
+
+  for (let x = 0; x < width; x += 1) {
+    let y = 1
+    while (y < height - 1) {
+      if (source[y * width + x] !== 0) {
+        y += 1
+        continue
+      }
+
+      const start = y
+      while (y < height && source[y * width + x] === 0) y += 1
+      const gap = y - start
+      const boundedByDark = start > 0
+        && y < height
+        && source[(start - 1) * width + x] === 1
+        && source[y * width + x] === 1
+
+      if (boundedByDark && gap <= maxGap) {
+        for (let fillY = start; fillY < y; fillY += 1) output[fillY * width + x] = 1
+      }
+    }
+  }
+
+  return output
+}
+
 function closeVoxelGaps(png) {
   const pixelCount = png.width * png.height
   const gray = new Uint8Array(pixelCount)
@@ -180,28 +237,26 @@ function closeVoxelGaps(png) {
   }
 
   const threshold = otsuThreshold(gray)
+  const binary = new Uint8Array(pixelCount)
+  for (let index = 0; index < pixelCount; index += 1) {
+    binary[index] = gray[index] <= threshold ? 1 : 0
+  }
+
+  // Scanner-facing voxel tops can leave one- to three-pixel gutters after browser
+  // rasterization. Fill only those bounded gaps instead of dilating every dark pixel:
+  // high-density symbols have small modules, so a fixed-radius dilation can consume
+  // legitimate light modules and destroy the QR topology it is meant to recover.
+  const horizontal = fillShortHorizontalGaps(binary, png.width, png.height, 3)
+  const closed = fillShortVerticalGaps(horizontal, png.width, png.height, 3)
   const output = new Uint8ClampedArray(pixelCount * 4)
-  output.fill(255)
-  const radius = 2
 
-  for (let y = 0; y < png.height; y += 1) {
-    for (let x = 0; x < png.width; x += 1) {
-      if (gray[y * png.width + x] > threshold) continue
-      const minY = Math.max(0, y - radius)
-      const maxY = Math.min(png.height - 1, y + radius)
-      const minX = Math.max(0, x - radius)
-      const maxX = Math.min(png.width - 1, x + radius)
-
-      for (let yy = minY; yy <= maxY; yy += 1) {
-        for (let xx = minX; xx <= maxX; xx += 1) {
-          const offset = (yy * png.width + xx) * 4
-          output[offset] = 0
-          output[offset + 1] = 0
-          output[offset + 2] = 0
-          output[offset + 3] = 255
-        }
-      }
-    }
+  for (let index = 0; index < pixelCount; index += 1) {
+    const value = closed[index] === 1 ? 0 : 255
+    const offset = index * 4
+    output[offset] = value
+    output[offset + 1] = value
+    output[offset + 2] = value
+    output[offset + 3] = 255
   }
 
   return output

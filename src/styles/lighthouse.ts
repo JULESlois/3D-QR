@@ -105,7 +105,10 @@ export function generateLighthouse(matrix: QRMatrixData, seedText: string): Scul
   const { random, center } = context
   const voxels = createBaseVoxels(context, {
     mode: 'full-pad',
-    quietZone: 3,
+    // Keep the physical harbor slab aligned with the project's four-module QR quiet
+    // zone. A three-module rim can still decode at low density, but the platform edge
+    // and foundation shadow intrude too close to V18+ symbols.
+    quietZone: 4,
     thickness: 2,
     foundationKind: 'foundation',
   })

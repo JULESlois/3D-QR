@@ -116,6 +116,7 @@ function rebuild(value: string): void {
 }
 
 function setMode(next: ProjectionView): void {
+  presentation.setView(next)
   viewTransitions.setView(next)
   ui.updateProjection(sculpture.styleId, next)
 }
