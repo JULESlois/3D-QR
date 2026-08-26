@@ -1,13 +1,17 @@
 import * as THREE from 'three'
 import { materialColorForTone } from './material-tones'
 import { getPalette, type PaletteKey } from './palettes'
-import type { SculptureBuild, SculptureVoxel } from './sculpture'
+import type { ProjectionTone, SculptureBuild, SculptureVoxel } from './sculpture'
 import { getStyle, type StyleId } from './styles'
 
 const fallbackWood = ['#3f2a22', '#523428', '#65402f', '#76513c', '#896148', '#9b7255'] as const
 const fallbackStone = ['#505650', '#626861', '#73786f', '#85897e', '#999b8d', '#aaa99a'] as const
 const fallbackPlaster = ['#9f927e', '#b2a38b', '#c4b49a', '#d8cbb4', '#e7dbc5', '#eee6d8'] as const
 const fallbackGlass = ['#3c626c', '#4c7580', '#5e8790', '#83a7aa', '#9bbabd', '#b2cccd'] as const
+
+const projectionHsl = { h: 0, s: 0, l: 0 }
+const DARK_PROJECTION_MAX_LIGHTNESS = 0.34
+const LIGHT_PROJECTION_MIN_LIGHTNESS = 0.68
 
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1)
@@ -18,13 +22,35 @@ function indexedHexColor(colors: readonly string[], phase: number, target: THREE
   return target.set(colors[index])
 }
 
+/**
+ * Paired material ramps preserve hue and material identity, but independently-authored
+ * materials can still overlap in absolute brightness (for example dark snow versus a
+ * light stone). A scanner sees all QR modules together, not one material at a time, so
+ * scanner-facing top surfaces need one shared lightness envelope across materials.
+ *
+ * Clamp only HSL lightness and only on surfaces that encode QR polarity. Side walls and
+ * ordinary art geometry retain the authored palette unchanged; scanner surfaces remain
+ * visibly green/blue/red/etc. rather than becoming generic black/white caps.
+ */
+function enforceProjectionContrast(
+  color: THREE.Color,
+  tone: ProjectionTone,
+): THREE.Color {
+  color.getHSL(projectionHsl)
+  const lightness = tone === 'dark'
+    ? Math.min(projectionHsl.l, DARK_PROJECTION_MAX_LIGHTNESS)
+    : Math.max(projectionHsl.l, LIGHT_PROJECTION_MIN_LIGHTNESS)
+  return color.setHSL(projectionHsl.h, projectionHsl.s, lightness)
+}
+
 function materialVoxelColor(
   colors: readonly string[],
   voxel: SculptureVoxel,
   target: THREE.Color,
 ): THREE.Color {
   if (voxel.projectionTone) {
-    return target.set(materialColorForTone(colors, voxel.projectionTone, voxel.colorPhase))
+    target.set(materialColorForTone(colors, voxel.projectionTone, voxel.colorPhase))
+    return enforceProjectionContrast(target, voxel.projectionTone)
   }
   return indexedHexColor(colors, voxel.colorPhase, target)
 }
@@ -41,14 +67,16 @@ function colorForVoxel(
 
   switch (voxel.kind) {
     case 'floor-light':
-      return target.set(baseLight)
+      target.set(baseLight)
+      return enforceProjectionContrast(target, 'light')
     case 'floor-dark':
-      return indexedHexColor(palette.baseDark ?? appearance.baseDark, voxel.colorPhase, target)
+      indexedHexColor(palette.baseDark ?? appearance.baseDark, voxel.colorPhase, target)
+      return enforceProjectionContrast(target, 'dark')
     case 'water': {
       const colors = palette.water ?? appearance.water
       return colors
         ? materialVoxelColor(colors, voxel, target)
-        : target.set(baseLight)
+        : enforceProjectionContrast(target.set(baseLight), voxel.projectionTone ?? 'light')
     }
     case 'crystal':
       return materialVoxelColor(
