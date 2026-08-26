@@ -239,6 +239,22 @@ function changeSceneBy(delta: number): void {
 scenePrevButton.addEventListener('click', () => changeSceneBy(-1))
 sceneNextButton.addEventListener('click', () => changeSceneBy(1))
 
+function isTextEditingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.matches('input, textarea, select, [contenteditable="true"]')
+    || target.closest('[contenteditable="true"]') !== null
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  if (isTextEditingTarget(event.target)) return
+  if (sceneChanging || sceneButtons.some((button) => button.disabled)) return
+
+  event.preventDefault()
+  changeSceneBy(event.key === 'ArrowRight' ? 1 : -1)
+})
+
 const busyObserver = new MutationObserver(syncSceneDisabledState)
 for (const button of sceneButtons) {
   busyObserver.observe(button, { attributes: true, attributeFilter: ['disabled'] })

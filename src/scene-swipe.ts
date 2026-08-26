@@ -109,28 +109,6 @@ function installSceneSwipe(): void {
   sceneCurrent.addEventListener('lostpointercapture', () => {
     if (pointerId !== null) resetDrag()
   })
-
-  document.addEventListener('keydown', (event) => {
-    if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
-      return
-    }
-
-    const target = event.target
-    if (target instanceof HTMLElement) {
-      const tagName = target.tagName
-      if (target.isContentEditable || tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
-        return
-      }
-    }
-
-    if (event.key === 'ArrowLeft' && !previousButton.disabled) {
-      event.preventDefault()
-      previousButton.click()
-    } else if (event.key === 'ArrowRight' && !nextButton.disabled) {
-      event.preventDefault()
-      nextButton.click()
-    }
-  })
 }
 
 installSceneSwipe()
