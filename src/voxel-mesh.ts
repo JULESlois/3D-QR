@@ -8,6 +8,26 @@ export interface VoxelMeshController {
   clear(): void
 }
 
+export function writeVoxelInstanceMatrices(
+  target: THREE.InstancedMesh,
+  build: SculptureBuild,
+  voxelFill: number,
+): void {
+  const dummy = new THREE.Object3D()
+  const voxelSize = CELL_SIZE * voxelFill
+
+  for (let i = 0; i < build.voxels.length; i += 1) {
+    const voxel = build.voxels[i]
+    dummy.position.set(voxel.x, voxel.y - build.pivotY, voxel.z)
+    dummy.quaternion.identity()
+    dummy.scale.set(voxelSize, voxelSize, voxelSize)
+    dummy.updateMatrix()
+    target.setMatrixAt(i, dummy.matrix)
+  }
+
+  target.instanceMatrix.needsUpdate = true
+}
+
 export function createVoxelMeshController(root: THREE.Group): VoxelMeshController {
   const geometry = new THREE.BoxGeometry(1, 1, 1)
   const material = new THREE.MeshStandardMaterial({
@@ -15,26 +35,14 @@ export function createVoxelMeshController(root: THREE.Group): VoxelMeshControlle
     roughness: 0.86,
     metalness: 0.015,
   })
-  const dummy = new THREE.Object3D()
   let mesh: THREE.InstancedMesh | null = null
   let build: SculptureBuild | null = null
   let authoredVoxelFill = 1
   let scannerFacing = false
   let appliedVoxelFill = Number.NaN
 
-  function writeInstanceMatrices(target: THREE.InstancedMesh, nextBuild: SculptureBuild, voxelFill: number): void {
-    const voxelSize = CELL_SIZE * voxelFill
-
-    for (let i = 0; i < nextBuild.voxels.length; i += 1) {
-      const voxel = nextBuild.voxels[i]
-      dummy.position.set(voxel.x, voxel.y - nextBuild.pivotY, voxel.z)
-      dummy.quaternion.identity()
-      dummy.scale.set(voxelSize, voxelSize, voxelSize)
-      dummy.updateMatrix()
-      target.setMatrixAt(i, dummy.matrix)
-    }
-
-    target.instanceMatrix.needsUpdate = true
+  function applyInstanceMatrices(target: THREE.InstancedMesh, nextBuild: SculptureBuild, voxelFill: number): void {
+    writeVoxelInstanceMatrices(target, nextBuild, voxelFill)
     appliedVoxelFill = voxelFill
   }
 
@@ -61,7 +69,7 @@ export function createVoxelMeshController(root: THREE.Group): VoxelMeshControlle
     const nextMesh = new THREE.InstancedMesh(geometry, material, nextBuild.voxels.length)
     nextMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     nextMesh.frustumCulled = false
-    writeInstanceMatrices(nextMesh, nextBuild, effectiveVoxelFill())
+    applyInstanceMatrices(nextMesh, nextBuild, effectiveVoxelFill())
 
     root.add(nextMesh)
     mesh = nextMesh
@@ -74,7 +82,7 @@ export function createVoxelMeshController(root: THREE.Group): VoxelMeshControlle
 
     const nextFill = effectiveVoxelFill()
     if (Math.abs(nextFill - appliedVoxelFill) < 0.0001) return
-    writeInstanceMatrices(mesh, build, nextFill)
+    applyInstanceMatrices(mesh, build, nextFill)
   }
 
   return {
