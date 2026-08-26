@@ -9,9 +9,12 @@ const fallbackStone = ['#505650', '#626861', '#73786f', '#85897e', '#999b8d', '#
 const fallbackPlaster = ['#9f927e', '#b2a38b', '#c4b49a', '#d8cbb4', '#e7dbc5', '#eee6d8'] as const
 const fallbackGlass = ['#3c626c', '#4c7580', '#5e8790', '#83a7aa', '#9bbabd', '#b2cccd'] as const
 
-const projectionHsl = { h: 0, s: 0, l: 0 }
-const DARK_PROJECTION_MAX_LIGHTNESS = 0.34
-const LIGHT_PROJECTION_MIN_LIGHTNESS = 0.68
+// Three.Color stores linear RGB values after parsing authored sRGB palette colors, so this
+// is the same relative-luminance space that a thresholding scanner effectively needs.
+// Keep a generous global gap across every semantic material rather than assuming each
+// material's locally-paired dark/light ramps are mutually separable from other materials.
+const DARK_PROJECTION_MAX_LUMINANCE = 0.1
+const LIGHT_PROJECTION_MIN_LUMINANCE = 0.62
 
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1)
@@ -22,25 +25,39 @@ function indexedHexColor(colors: readonly string[], phase: number, target: THREE
   return target.set(colors[index])
 }
 
+function relativeLuminance(color: THREE.Color): number {
+  return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722
+}
+
 /**
  * Paired material ramps preserve hue and material identity, but independently-authored
  * materials can still overlap in absolute brightness (for example dark snow versus a
  * light stone). A scanner sees all QR modules together, not one material at a time, so
- * scanner-facing top surfaces need one shared lightness envelope across materials.
+ * scanner-facing top surfaces need one shared luminance envelope across materials.
  *
- * Clamp only HSL lightness and only on surfaces that encode QR polarity. Side walls and
- * ordinary art geometry retain the authored palette unchanged; scanner surfaces remain
- * visibly green/blue/red/etc. rather than becoming generic black/white caps.
+ * Dark colors are scaled toward black only as far as required, preserving their linear
+ * RGB chromaticity exactly. Light colors are mixed toward white only as far as required.
+ * This applies only to surfaces that encode QR polarity; side walls and ordinary art
+ * geometry retain the authored palette unchanged, and scanner surfaces remain visibly
+ * green/blue/red/etc. rather than becoming generic black/white caps.
  */
 function enforceProjectionContrast(
   color: THREE.Color,
   tone: ProjectionTone,
 ): THREE.Color {
-  color.getHSL(projectionHsl)
-  const lightness = tone === 'dark'
-    ? Math.min(projectionHsl.l, DARK_PROJECTION_MAX_LIGHTNESS)
-    : Math.max(projectionHsl.l, LIGHT_PROJECTION_MIN_LIGHTNESS)
-  return color.setHSL(projectionHsl.h, projectionHsl.s, lightness)
+  const luminance = relativeLuminance(color)
+
+  if (tone === 'dark' && luminance > DARK_PROJECTION_MAX_LUMINANCE) {
+    color.multiplyScalar(DARK_PROJECTION_MAX_LUMINANCE / Math.max(luminance, 1e-6))
+    return color
+  }
+
+  if (tone === 'light' && luminance < LIGHT_PROJECTION_MIN_LUMINANCE) {
+    const amount = (LIGHT_PROJECTION_MIN_LUMINANCE - luminance) / Math.max(1e-6, 1 - luminance)
+    color.lerp(new THREE.Color(1, 1, 1), clamp01(amount))
+  }
+
+  return color
 }
 
 function materialVoxelColor(
