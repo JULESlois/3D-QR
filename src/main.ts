@@ -1,8 +1,6 @@
 import * as THREE from 'three'
 import './styles.css'
-import type { SculptureBuild } from './sculpture'
 import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
-import { createQRMatrix } from './qr'
 import { getStyle, isStyleId, type StyleId } from './styles'
 import { exportRevealGif } from './gif-export'
 import { createPresentationController } from './presentation'
@@ -18,6 +16,7 @@ import {
   type ProjectionView,
   type ProjectionViewRequestDetail,
 } from './projection-view'
+import { createSculptureController } from './sculpture-state'
 import { createViewTransitionController } from './view-transition'
 
 function requiredElement<T extends Element>(selector: string): T {
@@ -76,6 +75,7 @@ presentationGroup.add(sculptureRoot)
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 const voxelMeshes = createVoxelMeshController(sculptureRoot)
 const paletteTransitions = createPaletteTransitionController()
+const sculpture = createSculptureController('tree')
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const viewTransitions = createViewTransitionController(
   sculptureRoot,
@@ -84,9 +84,6 @@ const viewTransitions = createViewTransitionController(
   reducedMotion,
 )
 
-let styleId: StyleId = 'tree'
-let paletteKey: PaletteKey = getStyle(styleId).defaultPalette
-let currentBuild: SculptureBuild | null = null
 let rebuildTimer = 0
 let isExporting = false
 
@@ -95,8 +92,8 @@ function swatchBackground(colors: readonly string[]): string {
 }
 
 function updatePaletteUi(): void {
-  const style = getStyle(styleId)
-  const palette = getPalette(styleId, paletteKey)
+  const style = getStyle(sculpture.styleId)
+  const palette = getPalette(sculpture.styleId, sculpture.paletteKey)
   const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
   document.documentElement.style.setProperty('--accent', accent)
   paletteLabel.textContent = `SURFACE / ${palette.label.toUpperCase()}`
@@ -105,8 +102,8 @@ function updatePaletteUi(): void {
     const requested = button.dataset.palette
     if (!requested || !isPaletteKey(requested)) return
 
-    const option = getPalette(styleId, requested)
-    button.classList.toggle('is-active', requested === paletteKey)
+    const option = getPalette(sculpture.styleId, requested)
+    button.classList.toggle('is-active', requested === sculpture.paletteKey)
     button.style.background = swatchBackground(option.swatch)
     button.setAttribute('aria-label', `${style.label} palette: ${option.label}`)
     button.title = option.label
@@ -116,11 +113,12 @@ function updatePaletteUi(): void {
 function applyPalette(): void {
   paletteTransitions.cancel()
   const voxelMesh = voxelMeshes.mesh
-  if (voxelMesh && currentBuild) {
+  const build = sculpture.build
+  if (voxelMesh && build) {
     applyPaletteColorBuffer(
       voxelMesh,
-      currentBuild,
-      computePaletteColors(currentBuild, styleId, paletteKey),
+      build,
+      computePaletteColors(build, sculpture.styleId, sculpture.paletteKey),
     )
   }
   updatePaletteUi()
@@ -139,15 +137,15 @@ function setExportUiBusy(busy: boolean): void {
 }
 
 function updateStyleCopy(): void {
-  const style = getStyle(styleId)
+  const style = getStyle(sculpture.styleId)
   eyebrow.textContent = style.eyebrow
   headline.textContent = style.headline
   lede.textContent = style.description
   specimen.textContent = style.specimen
   styleButtons.forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.style === styleId)
+    button.classList.toggle('is-active', button.dataset.style === sculpture.styleId)
   })
-  document.body.dataset.style = styleId
+  document.body.dataset.style = sculpture.styleId
   setMode(viewTransitions.view)
 }
 
@@ -159,19 +157,16 @@ function rebuild(value: string): void {
   }
 
   try {
-    const matrix = createQRMatrix(content)
-    const style = getStyle(styleId)
-    const build = style.generate(matrix, content)
+    const { matrix, style, build } = sculpture.rebuild(content)
 
     paletteTransitions.cancel()
-    currentBuild = build
     voxelMeshes.replace(build, style.appearance.voxelFill)
 
     applyPalette()
     presentation.updateComposition(
       stage.clientWidth,
       stage.clientHeight,
-      currentBuild,
+      build,
       true,
     )
 
@@ -186,7 +181,7 @@ function rebuild(value: string): void {
 function setMode(next: ProjectionView): void {
   viewTransitions.setView(next)
   const showQr = next === 'qr'
-  const style = getStyle(styleId)
+  const style = getStyle(sculpture.styleId)
 
   modeReadout.textContent = showQr ? `QR / ${style.projectionLabel}` : `${style.label.toUpperCase()} / ISOMETRIC`
   stageHint.textContent = showQr
@@ -201,39 +196,40 @@ function toggleMode(): void {
 }
 
 function switchStyleImmediately(nextStyleId: StyleId): void {
-  styleId = nextStyleId
-  paletteKey = getStyle(styleId).defaultPalette
+  sculpture.setStyle(nextStyleId)
   updateStyleCopy()
   rebuild(input.value)
 }
 
 function requestStyleTransition(nextStyleId: StyleId): void {
-  if (isExporting || nextStyleId === styleId) return
+  if (isExporting || nextStyleId === sculpture.styleId) return
 
   switchStyleImmediately(nextStyleId)
   presentation.applyTransform()
 }
 
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
-  if (isExporting || nextPaletteKey === paletteKey) return
+  if (isExporting || nextPaletteKey === sculpture.paletteKey) return
 
   const voxelMesh = voxelMeshes.mesh
-  paletteKey = nextPaletteKey
+  sculpture.setPalette(nextPaletteKey)
   updatePaletteUi()
 
-  if (!currentBuild || !voxelMesh || reducedMotion) {
+  const build = sculpture.build
+  if (!build || !voxelMesh || reducedMotion) {
     applyPalette()
     return
   }
 
-  const to = computePaletteColors(currentBuild, styleId, paletteKey)
-  if (!paletteTransitions.start(voxelMesh, currentBuild, to)) {
-    applyPaletteColorBuffer(voxelMesh, currentBuild, to)
+  const to = computePaletteColors(build, sculpture.styleId, sculpture.paletteKey)
+  if (!paletteTransitions.start(voxelMesh, build, to)) {
+    applyPaletteColorBuffer(voxelMesh, build, to)
   }
 }
 
 exportGifButton.addEventListener('click', () => {
-  if (isExporting || !currentBuild) return
+  const build = sculpture.build
+  if (isExporting || !build) return
 
   void exportRevealGif({
     scene,
@@ -243,8 +239,8 @@ exportGifButton.addEventListener('click', () => {
     sculptureRoot,
     artQuaternion: presentation.artQuaternion,
     qrQuaternion: presentation.qrQuaternion,
-    build: currentBuild,
-    styleId,
+    build,
+    styleId: sculpture.styleId,
     button: exportGifButton,
     meta,
     setBusy: setExportUiBusy,
@@ -289,7 +285,7 @@ function resize(): void {
   const width = Math.max(1, stage.clientWidth)
   const height = Math.max(1, stage.clientHeight)
   renderer.setSize(width, height, false)
-  presentation.updateComposition(width, height, currentBuild, true)
+  presentation.updateComposition(width, height, sculpture.build, true)
 }
 
 const resizeObserver = new ResizeObserver(resize)
