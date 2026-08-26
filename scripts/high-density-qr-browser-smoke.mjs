@@ -367,7 +367,6 @@ try {
   const failures = []
   for (const style of styles) {
     try {
-      if (document !== undefined) {}
       const currentStyle = await evaluateValue(send, `document.body.dataset.style`)
       if (currentStyle !== style) await selectStyle(send, style)
       const bytes = await capture(send, style)
