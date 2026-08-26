@@ -85,6 +85,15 @@ requireText(uiControls, "requiredElement<HTMLButtonElement>('#export-gif')", 'sr
 requireText(styles, '.footer-actions', 'src/styles.css')
 requireText(styles, '.export-overlay', 'src/styles.css')
 
+// Keyboard navigation is part of the desktop scene-navigation contract. It must reuse the
+// same scene transition path as the visible arrows and must never steal cursor keys from
+// text-editing surfaces or fire while scene controls are disabled/busy.
+requireText(uiControls, "document.addEventListener('keydown'", 'src/ui-controls.ts')
+requireText(uiControls, "event.key === 'ArrowRight' ? 1 : -1", 'src/ui-controls.ts')
+requireText(uiControls, "target.matches('input, textarea, select, [contenteditable=\"true\"]')", 'src/ui-controls.ts')
+requireText(uiControls, 'sceneButtons.some((button) => button.disabled)', 'src/ui-controls.ts')
+requireText(uiControls, 'event.preventDefault()', 'src/ui-controls.ts')
+
 // Interactive/hash consumers request an exact Art/QR pose through a semantic command.
 // Exporters instead clone the current render hierarchy and mutate only that snapshot, so
 // capture can never corrupt the live presentation even if encoding fails part-way through.
@@ -120,4 +129,4 @@ for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 's
   forbidText(source, 'new MouseEvent("click"', label)
 }
 
-console.log('ui architecture smoke: static shell, app UI ownership, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')
+console.log('ui architecture smoke: static shell, app UI ownership, scene keyboard navigation, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')
