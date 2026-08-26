@@ -12,7 +12,13 @@ import {
   computePaletteColors,
 } from './palette-rendering'
 import { createPaletteTransitionController } from './palette-transition'
-import { createViewTransitionController, type ProjectionView } from './view-transition'
+import {
+  PROJECTION_VIEW_REQUEST_EVENT,
+  isProjectionView,
+  type ProjectionView,
+  type ProjectionViewRequestDetail,
+} from './projection-view'
+import { createViewTransitionController } from './view-transition'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -247,6 +253,12 @@ exportGifButton.addEventListener('click', () => {
   })
 })
 renderer.domElement.addEventListener('click', toggleMode)
+
+document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT, (event) => {
+  const request = event as CustomEvent<ProjectionViewRequestDetail>
+  if (!request.detail || !isProjectionView(request.detail.view)) return
+  setMode(request.detail.view)
+})
 
 styleRow.addEventListener('click', (event) => {
   const target = event.target
