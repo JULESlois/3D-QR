@@ -5,6 +5,7 @@ import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { createQRMatrix } from './qr'
 import { getStyle, isStyleId, type StyleId } from './styles'
 import { exportRevealGif } from './gif-export'
+import { createPresentationController } from './presentation'
 import {
   applyPaletteColorBuffer,
   capturePaletteColors,
@@ -65,13 +66,7 @@ scene.add(presentationGroup)
 const sculptureRoot = new THREE.Group()
 presentationGroup.add(sculptureRoot)
 
-const artQuaternion = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(0.76, -0.7, 0.035, 'XYZ'),
-)
-const qrQuaternion = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(Math.PI / 2, 0, 0, 'XYZ'),
-)
-sculptureRoot.quaternion.copy(artQuaternion)
+const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 
 const voxelGeometry = new THREE.BoxGeometry(1, 1, 1)
 const voxelMaterial = new THREE.MeshStandardMaterial({
@@ -90,9 +85,6 @@ let rebuildTimer = 0
 let rotationProgress = 0
 let targetRotationProgress = 0
 let currentView: 'art' | 'qr' = 'art'
-let composedScale = 1
-let composedX = 0
-let composedY = 0
 let isExporting = false
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -172,42 +164,6 @@ function setExportUiBusy(busy: boolean): void {
   renderer.domElement.style.pointerEvents = busy ? 'none' : ''
 }
 
-function applyPresentationTransform(lift = 0, scaleFactor = 1, flipY = 0): void {
-  presentationGroup.position.set(composedX, composedY + lift, 0)
-  presentationGroup.scale.setScalar(composedScale * scaleFactor)
-  presentationGroup.rotation.set(0, flipY, 0)
-}
-
-function updateComposition(): void {
-  const width = Math.max(1, stage.clientWidth)
-  const height = Math.max(1, stage.clientHeight)
-  const aspect = width / height
-  const viewHeight = aspect < 0.72 ? 14.4 : aspect < 1 ? 11.8 : 9.8
-
-  camera.top = viewHeight / 2
-  camera.bottom = -viewHeight / 2
-  camera.left = -(viewHeight * aspect) / 2
-  camera.right = (viewHeight * aspect) / 2
-  camera.updateProjectionMatrix()
-
-  if (currentBuild) {
-    const availableWidth = viewHeight * aspect
-    const targetFootprint = aspect < 0.72
-      ? Math.max(5.5, Math.min(7.0, availableWidth * 0.86))
-      : aspect < 1
-        ? 7.35
-        : 8.25
-    composedScale = Math.min(1.08, targetFootprint / currentBuild.footprint)
-  } else {
-    composedScale = 1
-  }
-
-  composedX = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
-  composedY = aspect > 1.15 ? 0.42 : 1.05
-
-  if (!styleTransition) applyPresentationTransform()
-}
-
 function disposeVoxelMesh(): void {
   if (!voxelMesh) return
   sculptureRoot.remove(voxelMesh)
@@ -262,7 +218,12 @@ function rebuild(value: string): void {
     sculptureRoot.add(mesh)
 
     applyPalette()
-    updateComposition()
+    presentation.updateComposition(
+      stage.clientWidth,
+      stage.clientHeight,
+      currentBuild,
+      !styleTransition,
+    )
 
     const detail = build.detail ? ` · ${build.detail}` : ''
     meta.textContent = `QR V${matrix.version} · ${matrix.size}×${matrix.size} · ${style.label.toUpperCase()} ${build.liftedModuleCount} · PAD D${build.baseDarkCount}/L${build.baseLightCount} · F${build.foundationVoxelCount} · ${style.projectionLabel}${detail}`
@@ -305,7 +266,7 @@ function requestStyleTransition(nextStyleId: StyleId): void {
   queuedStyleId = null
   styleTransition = null
   switchStyleImmediately(nextStyleId)
-  applyPresentationTransform()
+  presentation.applyTransform()
 }
 
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
@@ -345,7 +306,7 @@ exportGifButton.addEventListener('click', () => {
     styleTransition = null
     queuedStyleId = null
     switchStyleImmediately(exportTarget)
-    applyPresentationTransform()
+    presentation.applyTransform()
   }
 
   if (!currentBuild) return
@@ -356,8 +317,8 @@ exportGifButton.addEventListener('click', () => {
     renderer,
     presentationGroup,
     sculptureRoot,
-    artQuaternion,
-    qrQuaternion,
+    artQuaternion: presentation.artQuaternion,
+    qrQuaternion: presentation.qrQuaternion,
     build: currentBuild,
     styleId,
     button: exportGifButton,
@@ -398,7 +359,7 @@ function resize(): void {
   const width = Math.max(1, stage.clientWidth)
   const height = Math.max(1, stage.clientHeight)
   renderer.setSize(width, height, false)
-  updateComposition()
+  presentation.updateComposition(width, height, currentBuild, !styleTransition)
 }
 
 const resizeObserver = new ResizeObserver(resize)
@@ -445,10 +406,14 @@ function animate(): void {
     if (rawProgress >= 1) paletteTransition = null
   }
 
-  applyPresentationTransform()
+  presentation.applyTransform()
 
   const eased = smootherstep(rotationProgress)
-  sculptureRoot.quaternion.slerpQuaternions(artQuaternion, qrQuaternion, eased)
+  sculptureRoot.quaternion.slerpQuaternions(
+    presentation.artQuaternion,
+    presentation.qrQuaternion,
+    eased,
+  )
   renderer.render(scene, camera)
 }
 
