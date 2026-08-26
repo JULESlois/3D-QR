@@ -1,19 +1,13 @@
 const exportButtonElement = document.querySelector<HTMLButtonElement>('#export-png')
 const stageCanvasElement = document.querySelector<HTMLCanvasElement>('#stage canvas')
 const meta = document.querySelector<HTMLElement>('#qr-meta')
-const footerActionsElement = document.querySelector<HTMLElement>('.footer-actions')
-  ?? document.querySelector<HTMLElement>('.panel-footer > div')
 
-if (!exportButtonElement || !stageCanvasElement || !footerActionsElement) {
-  throw new Error('PNG export requires #export-png, the stage canvas, and footer export actions.')
+if (!exportButtonElement || !stageCanvasElement) {
+  throw new Error('PNG export requires #export-png and the stage canvas.')
 }
 
 const exportButton = exportButtonElement
 const stageCanvas = stageCanvasElement
-const footerActions = footerActionsElement
-
-// PNG is an export action, not a palette option. Keep it beside the GIF export control.
-footerActions.append(exportButton)
 
 const PANEL_SIZE = 1024
 const MODE_SETTLE_MS = 2600
@@ -105,13 +99,18 @@ async function exportPngPair(): Promise<void> {
   const initialMeta = meta?.textContent ?? ''
   const controls = Array.from(document.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input'))
   const priorDisabled = controls.map((control) => control.disabled)
+  const priorPointerEvents = stageCanvas.style.pointerEvents
 
   exportButton.textContent = 'CAPTURING…'
+  exportButton.setAttribute('aria-busy', 'true')
   document.body.dataset.pngExporting = 'true'
   controls.forEach((control) => { control.disabled = true })
+  // PNG capture temporarily owns the Art/QR presentation state. Pointer-events do not
+  // affect dispatchEvent(), so the exporter can still rotate internally while user clicks
+  // cannot race either capture pose.
+  stageCanvas.style.pointerEvents = 'none'
 
   try {
-    // Programmatic stage clicks still reach the renderer while UI controls stay frozen.
     await waitForMode('art')
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     const art = drawPanel('art')
@@ -153,6 +152,8 @@ async function exportPngPair(): Promise<void> {
     }
 
     controls.forEach((control, index) => { control.disabled = priorDisabled[index] })
+    stageCanvas.style.pointerEvents = priorPointerEvents
+    exportButton.removeAttribute('aria-busy')
     exportButton.textContent = initialLabel
     delete document.body.dataset.pngExporting
     if (meta && !meta.textContent?.startsWith('PNG EXPORT')) meta.textContent = initialMeta
