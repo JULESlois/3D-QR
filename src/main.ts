@@ -34,6 +34,8 @@ const styleRow = requiredElement<HTMLElement>('.style-row')
 const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
 const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
+const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
+const copyShareLinkButton = requiredElement<HTMLButtonElement>('#copy-share-link')
 
 const scene = new THREE.Scene()
 const camera = new THREE.OrthographicCamera(-6, 6, 6, -6, 0.1, 50)
@@ -120,8 +122,10 @@ function applyPalette(): void {
 
 function setExportUiBusy(busy: boolean): void {
   isExporting = busy
-  exportGifButton.disabled = busy
-  exportGifButton.setAttribute('aria-busy', String(busy))
+  for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
+    button.disabled = busy
+    button.setAttribute('aria-busy', String(busy))
+  }
   input.disabled = busy
   for (const button of styleButtons) button.disabled = busy
   for (const button of paletteButtons) button.disabled = busy
