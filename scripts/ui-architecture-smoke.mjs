@@ -60,20 +60,26 @@ for (const [source, label] of [[main, 'src/main.ts'], [uiControls, 'src/ui-contr
 }
 
 requireText(main, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/main.ts')
+requireText(main, "requiredElement<HTMLButtonElement>('#export-png')", 'src/main.ts')
 requireText(uiControls, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/ui-controls.ts')
 requireText(styles, '.footer-actions', 'src/styles.css')
 requireText(styles, '.export-overlay', 'src/styles.css')
 
-// Programmatic consumers request an exact Art/QR pose through a semantic command.
-// Synthetic canvas clicks are reserved for actual pointer interaction because a toggle
-// becomes ambiguous as soon as an exporter or hash restore needs a specific target pose.
+// Interactive/hash consumers request an exact Art/QR pose through a semantic command.
+// PNG export is different: it owns an offscreen square renderer and receives both final
+// quaternions directly, so it must not drive or wait for the live projection view.
 requireText(projectionView, "PROJECTION_VIEW_REQUEST_EVENT = 'projection-view-request'", 'src/projection-view.ts')
 requireText(main, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/main.ts')
-requireText(pngExport, 'requestProjectionView(mode)', 'src/png-export.ts')
+requireText(main, 'void exportPngPair({', 'src/main.ts')
+requireText(pngExport, 'artQuaternion: THREE.Quaternion', 'src/png-export.ts')
+requireText(pngExport, 'qrQuaternion: THREE.Quaternion', 'src/png-export.ts')
+requireText(pngExport, 'new THREE.WebGLRenderer({', 'src/png-export.ts')
+forbidText(pngExport, 'requestProjectionView(', 'src/png-export.ts')
+forbidText(pngExport, 'document.body.dataset.mode', 'src/png-export.ts')
 requireText(shareState, 'requestProjectionView(state.view!)', 'src/share-state.ts')
 for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 'src/share-state.ts']]) {
   forbidText(source, "new MouseEvent('click'", label)
   forbidText(source, 'new MouseEvent("click"', label)
 }
 
-console.log('ui architecture smoke: static shell, export hierarchy, stylesheet ownership, and projection commands passed')
+console.log('ui architecture smoke: static shell, export hierarchy, stylesheet ownership, projection commands, and offscreen PNG ownership passed')
