@@ -28,6 +28,7 @@ const styles = [
   'temple',
   'crystal',
 ]
+const palettes = ['blossom', 'summer', 'ginkgo', 'spectrum']
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -142,17 +143,18 @@ async function waitForPage(send) {
   )
 }
 
-async function capture(send, style) {
+async function capture(send, style, palette) {
   const result = await send('Page.captureScreenshot', {
     format: 'png',
     captureBeyondViewport: false,
     fromSurface: true,
   })
   const bytes = Buffer.from(result.data, 'base64')
+  const label = `${style}/${palette}`
   if (bytes.length < 10_000) {
-    throw new Error(`${style} QR screenshot is unexpectedly small (${bytes.length} bytes)`)
+    throw new Error(`${label} QR screenshot is unexpectedly small (${bytes.length} bytes)`)
   }
-  await writeFile(`${outputDir}/${style}-qr.png`, bytes)
+  await writeFile(`${outputDir}/${style}-${palette}-qr.png`, bytes)
   return bytes
 }
 
@@ -230,7 +232,7 @@ function closeVoxelGaps(png) {
   return output
 }
 
-function decodeQr(bytes, style) {
+function decodeQr(bytes, style, palette) {
   const png = PNG.sync.read(bytes)
   const pixels = new Uint8ClampedArray(
     png.data.buffer,
@@ -239,10 +241,11 @@ function decodeQr(bytes, style) {
   )
   const raw = jsQR(pixels, png.width, png.height, { inversionAttempts: 'attemptBoth' })
   const decoded = raw ?? jsQR(closeVoxelGaps(png), png.width, png.height, { inversionAttempts: 'attemptBoth' })
+  const label = `${style}/${palette}`
 
-  if (!decoded) throw new Error(`jsQR could not decode ${style} QR projection`)
+  if (!decoded) throw new Error(`jsQR could not decode ${label} QR projection`)
   if (decoded.data !== expectedPayload) {
-    throw new Error(`${style} QR projection decoded unexpected payload: ${JSON.stringify(decoded.data)}`)
+    throw new Error(`${label} QR projection decoded unexpected payload: ${JSON.stringify(decoded.data)}`)
   }
   return decoded.data
 }
@@ -289,7 +292,27 @@ async function selectStyle(send, style) {
     (value) => value === false,
     `${style} QR build`,
   )
-  await sleep(900)
+  await sleep(700)
+}
+
+async function selectPalette(send, style, palette) {
+  const clicked = await evaluateValue(send, `(() => {
+    const button = document.querySelector('[data-palette="${palette}"]')
+    if (!(button instanceof HTMLButtonElement) || button.disabled) return false
+    button.click()
+    return true
+  })()`)
+  if (!clicked) throw new Error(`Could not activate ${style}/${palette} palette`)
+
+  await waitForValue(
+    send,
+    `document.querySelector('.palette-swatch.is-active')?.dataset.palette`,
+    (value) => value === palette,
+    `${style}/${palette} palette`,
+  )
+  // Palette interpolation lasts 520ms. Capture only after the scanner-facing material
+  // colors have reached the authored target ramp rather than testing an intermediate mix.
+  await sleep(650)
 }
 
 let preview
@@ -347,22 +370,35 @@ try {
   const results = []
   const failures = []
   for (const style of styles) {
-    try {
-      if (style !== 'tree') await selectStyle(send, style)
-      const bytes = await capture(send, style)
-      const payload = decodeQr(bytes, style)
-      results.push(`${style}:${bytes.length}:${payload.length}`)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      failures.push(`${style}: ${message}`)
+    if (style !== 'tree') {
+      try {
+        await selectStyle(send, style)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        failures.push(`${style}: ${message}`)
+        continue
+      }
+    }
+
+    for (const palette of palettes) {
+      try {
+        await selectPalette(send, style, palette)
+        const bytes = await capture(send, style, palette)
+        const payload = decodeQr(bytes, style, palette)
+        results.push(`${style}/${palette}:${bytes.length}:${payload.length}`)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        failures.push(`${style}/${palette}: ${message}`)
+      }
     }
   }
 
+  const combinationCount = styles.length * palettes.length
   if (failures.length > 0) {
-    throw new Error(`QR decode failed for ${failures.length}/${styles.length} scenes: ${failures.join(' | ')}`)
+    throw new Error(`QR decode failed for ${failures.length}/${combinationCount} scene/palette combinations: ${failures.join(' | ')}`)
   }
 
-  console.log(`all-scenes QR smoke: ${styles.length} scenes decoded / ${results.join(' | ')}`)
+  console.log(`all-scenes QR smoke: ${combinationCount} scene/palette combinations decoded / ${results.join(' | ')}`)
 } finally {
   socket?.close()
   await Promise.all([stopProcess(chrome), stopProcess(preview)])
