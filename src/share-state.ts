@@ -68,12 +68,26 @@ function currentState(): ShareState | null {
   return { payload, style, palette: activePalette, view }
 }
 
-function replaceShareHash(): void {
+function clearShareHashForEmptyPayload(): void {
+  const input = document.querySelector<HTMLInputElement>('#qr-input')
+  if (!input || input.value.trim() || !window.location.hash) return
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+}
+
+function replaceShareHash(): boolean {
   const state = currentState()
-  if (!state) return
+  if (!state) {
+    // An empty editor cannot describe a QR sculpture. Remove any previously generated
+    // share hash instead of leaving a stale payload in the address bar.
+    clearShareHashForEmptyPayload()
+    return false
+  }
+
   const hash = encodeShareHash(state)
-  if (window.location.hash === hash) return
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`)
+  if (window.location.hash !== hash) {
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`)
+  }
+  return true
 }
 
 function clickStyle(style: StyleId): void {
@@ -128,8 +142,24 @@ function fallbackCopyText(value: string): boolean {
   }
 }
 
+function restoreShareButton(button: HTMLButtonElement): void {
+  window.setTimeout(() => {
+    button.textContent = SHARE_BUTTON_LABEL
+    button.title = SHARE_BUTTON_TITLE
+  }, 1800)
+}
+
 async function copyShareLink(button: HTMLButtonElement): Promise<void> {
-  replaceShareHash()
+  if (!replaceShareHash()) {
+    button.textContent = 'ADD CONTENT'
+    button.title = 'Enter URL or text before copying a share link'
+    document.dispatchEvent(new CustomEvent('share-link-copy', {
+      detail: { url: null, copied: false, reason: 'empty-payload' },
+    }))
+    restoreShareButton(button)
+    return
+  }
+
   const url = window.location.href
   let copied = false
 
@@ -150,10 +180,7 @@ async function copyShareLink(button: HTMLButtonElement): Promise<void> {
     detail: { url, copied },
   }))
 
-  window.setTimeout(() => {
-    button.textContent = SHARE_BUTTON_LABEL
-    button.title = SHARE_BUTTON_TITLE
-  }, 1800)
+  restoreShareButton(button)
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
