@@ -41,12 +41,12 @@ jobs:
       - name: All-scenes QR decode smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/all-scenes-qr-browser-smoke.mjs
 
-      - name: Share-link browser smoke
-        run: node scripts/run-browser-smoke-ci.mjs scripts/share-link-browser-smoke.mjs
-
       - name: High-density QR decode smoke
         timeout-minutes: 10
         run: node scripts/run-browser-smoke-ci.mjs scripts/high-density-qr-browser-smoke.mjs
+
+      - name: Share-link browser smoke
+        run: node scripts/run-browser-smoke-ci.mjs scripts/share-link-browser-smoke.mjs
 
       - name: PNG export browser smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/png-export-smoke.mjs
