@@ -242,12 +242,12 @@ function closeVoxelGaps(png) {
     binary[index] = gray[index] <= threshold ? 1 : 0
   }
 
-  // Scanner-facing voxel tops can leave one- or two-pixel gutters after browser
+  // Scanner-facing voxel tops can leave one- to three-pixel gutters after browser
   // rasterization. Fill only those bounded gaps instead of dilating every dark pixel:
   // high-density symbols have small modules, so a fixed-radius dilation can consume
   // legitimate light modules and destroy the QR topology it is meant to recover.
-  const horizontal = fillShortHorizontalGaps(binary, png.width, png.height, 2)
-  const closed = fillShortVerticalGaps(horizontal, png.width, png.height, 2)
+  const horizontal = fillShortHorizontalGaps(binary, png.width, png.height, 3)
+  const closed = fillShortVerticalGaps(horizontal, png.width, png.height, 3)
   const output = new Uint8ClampedArray(pixelCount * 4)
 
   for (let index = 0; index < pixelCount; index += 1) {
