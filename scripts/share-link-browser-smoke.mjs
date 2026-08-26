@@ -200,6 +200,50 @@ try {
   )
 
   await evaluateValue(send, `(() => {
+    const button = document.querySelector('#export-png')
+    if (!button) throw new Error('PNG export button was not found')
+    button.click()
+    location.hash = '#q=deferred-during-export&s=forest&p=summer&v=art'
+    return true
+  })()`)
+
+  const deferredWhileBusy = await waitForValue(
+    send,
+    `({
+      busy: document.body.dataset.exportBusy,
+      payload: document.querySelector('#qr-input')?.value,
+      style: document.body.dataset.style,
+      palette: document.querySelector('[data-palette].is-active')?.dataset.palette,
+      view: document.body.dataset.mode,
+      hash: location.hash
+    })`,
+    (value) => value?.busy === 'true'
+      && value?.hash.includes('q=deferred-during-export')
+      && value?.payload === payload
+      && value?.style === 'city'
+      && value?.palette === 'spectrum'
+      && value?.view === 'qr',
+    'share restoration deferral during export',
+  )
+
+  const deferredRestored = await waitForValue(
+    send,
+    `({
+      busy: document.body.dataset.exportBusy,
+      payload: document.querySelector('#qr-input')?.value,
+      style: document.body.dataset.style,
+      palette: document.querySelector('[data-palette].is-active')?.dataset.palette,
+      view: document.body.dataset.mode
+    })`,
+    (value) => value?.busy === undefined
+      && value?.payload === 'deferred-during-export'
+      && value?.style === 'forest'
+      && value?.palette === 'summer'
+      && value?.view === 'art',
+    'deferred share restoration after export',
+  )
+
+  await evaluateValue(send, `(() => {
     window.__shareCopyEvent = null
     window.__copiedShareLink = null
     document.addEventListener('share-link-copy', (event) => {
@@ -252,7 +296,7 @@ try {
     'hash-navigation restoration',
   )
 
-  console.log(`share-link browser smoke: ${canonical.style}/${canonical.palette}/${canonical.view} copied, empty payload cleared ${cleared.hash.length} hash chars without copying stale state, then restored to ${restored.style}/${restored.palette}/${restored.view}; ${copied.href.length} URL chars / ${emptyCopy.label}`)
+  console.log(`share-link browser smoke: ${canonical.style}/${canonical.palette}/${canonical.view} copied; ${deferredWhileBusy.style}/${deferredWhileBusy.palette}/${deferredWhileBusy.view} held atomically during PNG export then restored to ${deferredRestored.style}/${deferredRestored.palette}/${deferredRestored.view}; empty payload cleared ${cleared.hash.length} hash chars without copying stale state, then restored to ${restored.style}/${restored.palette}/${restored.view}; ${copied.href.length} URL chars / ${emptyCopy.label}`)
 } finally {
   socket?.close()
   await stopProcess(chrome)
