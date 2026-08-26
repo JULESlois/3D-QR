@@ -43,15 +43,15 @@ export function createAppUiController(): AppUiController {
   const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
   const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
   const copyShareLinkButton = requiredElement<HTMLButtonElement>('#copy-share-link')
+  const exportActionButtons = [exportGifButton, exportPngButton, copyShareLinkButton]
   const exportControls: Array<HTMLButtonElement | HTMLInputElement> = [
-    exportGifButton,
-    exportPngButton,
-    copyShareLinkButton,
+    ...exportActionButtons,
     input,
     ...styleButtons,
     ...paletteButtons,
   ]
   let busySnapshot: Map<HTMLButtonElement | HTMLInputElement, boolean> | null = null
+  let ariaBusySnapshot: Map<HTMLButtonElement, string | null> | null = null
   let pointerEventsSnapshot: string | null = null
 
   function updatePalette(styleId: StyleId, paletteKey: PaletteKey): void {
@@ -102,12 +102,13 @@ export function createAppUiController(): AppUiController {
     if (busy) {
       if (!busySnapshot) {
         busySnapshot = new Map(exportControls.map((control) => [control, control.disabled]))
+        ariaBusySnapshot = new Map(
+          exportActionButtons.map((button) => [button, button.getAttribute('aria-busy')]),
+        )
         pointerEventsSnapshot = pointerSurface.style.pointerEvents
       }
       for (const control of exportControls) control.disabled = true
-      for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
-        button.setAttribute('aria-busy', 'true')
-      }
+      for (const button of exportActionButtons) button.setAttribute('aria-busy', 'true')
       pointerSurface.style.pointerEvents = 'none'
       return
     }
@@ -116,8 +117,12 @@ export function createAppUiController(): AppUiController {
       for (const [control, disabled] of busySnapshot) control.disabled = disabled
       busySnapshot = null
     }
-    for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
-      button.setAttribute('aria-busy', 'false')
+    if (ariaBusySnapshot) {
+      for (const [button, ariaBusy] of ariaBusySnapshot) {
+        if (ariaBusy === null) button.removeAttribute('aria-busy')
+        else button.setAttribute('aria-busy', ariaBusy)
+      }
+      ariaBusySnapshot = null
     }
     if (pointerEventsSnapshot !== null) {
       pointerSurface.style.pointerEvents = pointerEventsSnapshot
