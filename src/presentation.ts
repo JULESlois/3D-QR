@@ -13,6 +13,8 @@ export interface PresentationController {
   ) => void
 }
 
+const FRAME_MARGIN = 0.16
+
 export function createPresentationController(
   camera: THREE.OrthographicCamera,
   presentationGroup: THREE.Group,
@@ -66,7 +68,19 @@ export function createPresentationController(
     }
 
     composedX = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
-    composedY = aspect > 1.15 ? 0.42 : 1.05
+
+    const preferredY = aspect > 1.15 ? 0.42 : 1.05
+    if (build) {
+      // Keep the complete QR projection footprint, including its four-module quiet zone,
+      // inside the orthographic camera. Dense QR versions are scaled up to the same target
+      // footprint as smaller symbols, so a fixed upward art offset can otherwise clip the
+      // top quiet zone and make an otherwise-correct QR projection undecodable.
+      const scaledFootprint = build.footprint * composedScale
+      const maxVerticalOffset = Math.max(0, viewHeight / 2 - scaledFootprint / 2 - FRAME_MARGIN)
+      composedY = THREE.MathUtils.clamp(preferredY, -maxVerticalOffset, maxVerticalOffset)
+    } else {
+      composedY = preferredY
+    }
 
     if (applyImmediately) applyTransform()
   }

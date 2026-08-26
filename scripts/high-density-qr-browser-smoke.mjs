@@ -167,7 +167,7 @@ function otsuThreshold(gray) {
   return bestThreshold
 }
 
-function closeVoxelGaps(png) {
+function closeVoxelGaps(png, radius = 1) {
   const pixelCount = png.width * png.height
   const gray = new Uint8Array(pixelCount)
   for (let index = 0; index < pixelCount; index += 1) {
@@ -180,28 +180,63 @@ function closeVoxelGaps(png) {
   }
 
   const threshold = otsuThreshold(gray)
-  const output = new Uint8ClampedArray(pixelCount * 4)
-  output.fill(255)
-  const radius = 2
+  const dark = new Uint8Array(pixelCount)
+  for (let index = 0; index < pixelCount; index += 1) {
+    dark[index] = gray[index] <= threshold ? 1 : 0
+  }
 
+  // The renderer deliberately leaves sub-pixel/one-pixel seams between voxel tops.
+  // A camera naturally integrates those seams; a raw screenshot does not. Use a true
+  // morphological closing (dilate then erode) to bridge narrow seams while restoring
+  // module boundaries afterward. The previous dilation-only fallback expanded every dark
+  // module and distorted V18+ symbols enough that jsQR could not recover them.
+  const dilated = new Uint8Array(pixelCount)
   for (let y = 0; y < png.height; y += 1) {
     for (let x = 0; x < png.width; x += 1) {
-      if (gray[y * png.width + x] > threshold) continue
-      const minY = Math.max(0, y - radius)
-      const maxY = Math.min(png.height - 1, y + radius)
-      const minX = Math.max(0, x - radius)
-      const maxX = Math.min(png.width - 1, x + radius)
-
-      for (let yy = minY; yy <= maxY; yy += 1) {
-        for (let xx = minX; xx <= maxX; xx += 1) {
-          const offset = (yy * png.width + xx) * 4
-          output[offset] = 0
-          output[offset + 1] = 0
-          output[offset + 2] = 0
-          output[offset + 3] = 255
+      let found = false
+      for (
+        let yy = Math.max(0, y - radius);
+        yy <= Math.min(png.height - 1, y + radius) && !found;
+        yy += 1
+      ) {
+        for (let xx = Math.max(0, x - radius); xx <= Math.min(png.width - 1, x + radius); xx += 1) {
+          if (dark[yy * png.width + xx]) {
+            found = true
+            break
+          }
         }
       }
+      dilated[y * png.width + x] = found ? 1 : 0
     }
+  }
+
+  const closed = new Uint8Array(pixelCount)
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      let keep = y >= radius
+        && y < png.height - radius
+        && x >= radius
+        && x < png.width - radius
+      for (let yy = y - radius; yy <= y + radius && keep; yy += 1) {
+        for (let xx = x - radius; xx <= x + radius; xx += 1) {
+          if (!dilated[yy * png.width + xx]) {
+            keep = false
+            break
+          }
+        }
+      }
+      closed[y * png.width + x] = keep ? 1 : 0
+    }
+  }
+
+  const output = new Uint8ClampedArray(pixelCount * 4)
+  for (let index = 0; index < pixelCount; index += 1) {
+    const value = closed[index] ? 0 : 255
+    const offset = index * 4
+    output[offset] = value
+    output[offset + 1] = value
+    output[offset + 2] = value
+    output[offset + 3] = 255
   }
 
   return output
@@ -214,8 +249,10 @@ function decodeQr(bytes, style) {
     png.data.byteOffset,
     png.data.byteLength,
   )
-  const raw = jsQR(pixels, png.width, png.height, { inversionAttempts: 'attemptBoth' })
-  const decoded = raw ?? jsQR(closeVoxelGaps(png), png.width, png.height, { inversionAttempts: 'attemptBoth' })
+  const options = { inversionAttempts: 'attemptBoth' }
+  const raw = jsQR(pixels, png.width, png.height, options)
+  const closed3 = raw ?? jsQR(closeVoxelGaps(png, 1), png.width, png.height, options)
+  const decoded = closed3 ?? jsQR(closeVoxelGaps(png, 2), png.width, png.height, options)
 
   if (!decoded) throw new Error(`jsQR could not decode ${style} high-density QR projection`)
   if (decoded.data !== expectedPayload) {
