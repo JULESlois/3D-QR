@@ -2,6 +2,8 @@ import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { getStyle, type StyleId } from './styles'
 import type { ProjectionView } from './projection-view'
 
+const EXPORT_BUSY_CHANGE_EVENT = 'export-busy-change'
+
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
   if (!element) throw new Error(`Required UI element is missing: ${selector}`)
@@ -10,6 +12,18 @@ function requiredElement<T extends Element>(selector: string): T {
 
 function swatchBackground(colors: readonly string[]): string {
   return `linear-gradient(135deg, ${colors.join(', ')})`
+}
+
+function setDocumentExportBusy(busy: boolean): void {
+  const wasBusy = document.body.dataset.exportBusy === 'true'
+  if (wasBusy === busy) return
+
+  if (busy) document.body.dataset.exportBusy = 'true'
+  else delete document.body.dataset.exportBusy
+
+  document.dispatchEvent(new CustomEvent(EXPORT_BUSY_CHANGE_EVENT, {
+    detail: { busy },
+  }))
 }
 
 export interface AppUiController {
@@ -110,6 +124,7 @@ export function createAppUiController(): AppUiController {
       for (const control of exportControls) control.disabled = true
       for (const button of exportActionButtons) button.setAttribute('aria-busy', 'true')
       pointerSurface.style.pointerEvents = 'none'
+      setDocumentExportBusy(true)
       return
     }
 
@@ -128,6 +143,9 @@ export function createAppUiController(): AppUiController {
       pointerSurface.style.pointerEvents = pointerEventsSnapshot
       pointerEventsSnapshot = null
     }
+    // Publish the idle state only after controls are restored so deferred hash restoration
+    // can safely drive the same scene/palette controls as an ordinary navigation.
+    setDocumentExportBusy(false)
   }
 
   return {
