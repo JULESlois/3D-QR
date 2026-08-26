@@ -38,6 +38,9 @@ jobs:
       - name: Browser viewport smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/browser-smoke.mjs
 
+      - name: All-scenes QR decode smoke
+        run: node scripts/run-browser-smoke-ci.mjs scripts/all-scenes-qr-browser-smoke.mjs
+
       - name: Share-link browser smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/share-link-browser-smoke.mjs
 
@@ -53,6 +56,14 @@ jobs:
         with:
           name: browser-smoke
           path: browser-smoke/*.png
+          if-no-files-found: warn
+
+      - name: Upload all-scenes QR screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-scenes-qr-smoke
+          path: all-scenes-qr-smoke/*.png
           if-no-files-found: warn
 
       - name: Upload PNG export smoke artifact
