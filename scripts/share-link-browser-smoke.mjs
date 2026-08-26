@@ -199,6 +199,43 @@ try {
     'share-link copy',
   )
 
+  await evaluateValue(send, `(() => {
+    window.__shareCopyEvent = null
+    window.__copiedShareLink = null
+    document.addEventListener('share-link-copy', (event) => {
+      window.__shareCopyEvent = event.detail
+    }, { once: true })
+    const input = document.querySelector('#qr-input')
+    input.value = '   '
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+
+  const cleared = await waitForValue(
+    send,
+    `({ hash: location.hash, payload: document.querySelector('#qr-input')?.value })`,
+    (value) => value?.hash === '' && value?.payload.trim() === '',
+    'empty payload share-state cleanup',
+  )
+
+  await evaluateValue(send, `document.querySelector('#copy-share-link').click()`)
+  const emptyCopy = await waitForValue(
+    send,
+    `({
+      event: window.__shareCopyEvent,
+      copied: window.__copiedShareLink,
+      hash: location.hash,
+      label: document.querySelector('#copy-share-link')?.textContent?.trim()
+    })`,
+    (value) => value?.event?.copied === false
+      && value?.event?.url === null
+      && value?.event?.reason === 'empty-payload'
+      && value?.copied === null
+      && value?.hash === ''
+      && value?.label === 'ADD CONTENT',
+    'empty payload copy guard',
+  )
+
   await evaluateValue(send, `location.hash = '#q=restored-state&s=tree&p=blossom&v=art'`)
   const restored = await waitForValue(
     send,
@@ -215,7 +252,7 @@ try {
     'hash-navigation restoration',
   )
 
-  console.log(`share-link browser smoke: ${canonical.style}/${canonical.palette}/${canonical.view} copied and restored to ${restored.style}/${restored.palette}/${restored.view}; ${copied.href.length} URL chars`)
+  console.log(`share-link browser smoke: ${canonical.style}/${canonical.palette}/${canonical.view} copied, empty payload cleared ${cleared.hash.length} hash chars without copying stale state, then restored to ${restored.style}/${restored.palette}/${restored.view}; ${copied.href.length} URL chars / ${emptyCopy.label}`)
 } finally {
   socket?.close()
   await stopProcess(chrome)
