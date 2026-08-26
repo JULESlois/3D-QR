@@ -81,17 +81,6 @@ let isExporting = false
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-type StyleTransition = {
-  nextStyleId: StyleId
-  nextPaletteKey: PaletteKey
-  startedAt: number
-  duration: number
-  swapped: boolean
-}
-
-let styleTransition: StyleTransition | null = null
-let queuedStyleId: StyleId | null = null
-
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1)
 }
@@ -182,7 +171,7 @@ function rebuild(value: string): void {
       stage.clientWidth,
       stage.clientHeight,
       currentBuild,
-      !styleTransition,
+      true,
     )
 
     const detail = build.detail ? ` · ${build.detail}` : ''
@@ -223,14 +212,12 @@ function switchStyleImmediately(nextStyleId: StyleId): void {
 function requestStyleTransition(nextStyleId: StyleId): void {
   if (isExporting || nextStyleId === styleId) return
 
-  queuedStyleId = null
-  styleTransition = null
   switchStyleImmediately(nextStyleId)
   presentation.applyTransform()
 }
 
 function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
-  if (isExporting || nextPaletteKey === paletteKey || styleTransition) return
+  if (isExporting || nextPaletteKey === paletteKey) return
 
   const voxelMesh = voxelMeshes.mesh
   paletteKey = nextPaletteKey
@@ -249,17 +236,7 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
 
 modeToggle.addEventListener('click', toggleMode)
 exportGifButton.addEventListener('click', () => {
-  if (isExporting) return
-
-  if (styleTransition) {
-    const exportTarget = queuedStyleId ?? styleTransition.nextStyleId
-    styleTransition = null
-    queuedStyleId = null
-    switchStyleImmediately(exportTarget)
-    presentation.applyTransform()
-  }
-
-  if (!currentBuild) return
+  if (isExporting || !currentBuild) return
 
   void exportRevealGif({
     scene,
@@ -309,7 +286,7 @@ function resize(): void {
   const width = Math.max(1, stage.clientWidth)
   const height = Math.max(1, stage.clientHeight)
   renderer.setSize(width, height, false)
-  presentation.updateComposition(width, height, currentBuild, !styleTransition)
+  presentation.updateComposition(width, height, currentBuild, true)
 }
 
 const resizeObserver = new ResizeObserver(resize)
