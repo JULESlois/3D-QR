@@ -19,6 +19,7 @@ const PALETTE_KEY = 'p'
 const VIEW_KEY = 'v'
 const SHARE_BUTTON_LABEL = 'COPY LINK'
 const SHARE_BUTTON_TITLE = 'Copy a link to this QR sculpture state'
+const EXPORT_BUSY_CHANGE_EVENT = 'export-busy-change'
 
 export function encodeShareHash(state: ShareState): string {
   const params = new URLSearchParams()
@@ -98,7 +99,18 @@ function clickPalette(palette: PaletteKey): void {
   document.querySelector<HTMLButtonElement>(`[data-palette="${palette}"]`)?.click()
 }
 
+let pendingShareRestore = false
+
 function restoreShareState(): void {
+  // Exports temporarily disable the same input/scene/palette controls used to apply a
+  // shared state. Defer the whole restore rather than allowing payload/style/palette/view
+  // to diverge when a hash navigation occurs mid-export. The latest location hash wins.
+  if (document.body.dataset.exportBusy === 'true') {
+    pendingShareRestore = true
+    return
+  }
+  pendingShareRestore = false
+
   const state = decodeShareHash(window.location.hash)
   const input = document.querySelector<HTMLInputElement>('#qr-input')
 
@@ -208,4 +220,9 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   // sculpture in-place without requiring a reload. replaceState() above does not emit this
   // event, so normal edits do not feed back into restoreShareState().
   window.addEventListener('hashchange', restoreShareState)
+
+  document.addEventListener(EXPORT_BUSY_CHANGE_EVENT, (event) => {
+    const change = event as CustomEvent<{ busy?: boolean }>
+    if (change.detail?.busy === false && pendingShareRestore) restoreShareState()
+  })
 }
