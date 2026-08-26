@@ -43,6 +43,16 @@ export function createAppUiController(): AppUiController {
   const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
   const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
   const copyShareLinkButton = requiredElement<HTMLButtonElement>('#copy-share-link')
+  const exportControls: Array<HTMLButtonElement | HTMLInputElement> = [
+    exportGifButton,
+    exportPngButton,
+    copyShareLinkButton,
+    input,
+    ...styleButtons,
+    ...paletteButtons,
+  ]
+  let busySnapshot: Map<HTMLButtonElement | HTMLInputElement, boolean> | null = null
+  let pointerEventsSnapshot: string | null = null
 
   function updatePalette(styleId: StyleId, paletteKey: PaletteKey): void {
     const style = getStyle(styleId)
@@ -89,14 +99,30 @@ export function createAppUiController(): AppUiController {
   }
 
   function setExportBusy(busy: boolean, pointerSurface: HTMLElement): void {
-    for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
-      button.disabled = busy
-      button.setAttribute('aria-busy', String(busy))
+    if (busy) {
+      if (!busySnapshot) {
+        busySnapshot = new Map(exportControls.map((control) => [control, control.disabled]))
+        pointerEventsSnapshot = pointerSurface.style.pointerEvents
+      }
+      for (const control of exportControls) control.disabled = true
+      for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
+        button.setAttribute('aria-busy', 'true')
+      }
+      pointerSurface.style.pointerEvents = 'none'
+      return
     }
-    input.disabled = busy
-    for (const button of styleButtons) button.disabled = busy
-    for (const button of paletteButtons) button.disabled = busy
-    pointerSurface.style.pointerEvents = busy ? 'none' : ''
+
+    if (busySnapshot) {
+      for (const [control, disabled] of busySnapshot) control.disabled = disabled
+      busySnapshot = null
+    }
+    for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
+      button.setAttribute('aria-busy', 'false')
+    }
+    if (pointerEventsSnapshot !== null) {
+      pointerSurface.style.pointerEvents = pointerEventsSnapshot
+      pointerEventsSnapshot = null
+    }
   }
 
   return {
