@@ -66,11 +66,11 @@ function renderPanel(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   camera: THREE.OrthographicCamera,
-  sculptureRoot: THREE.Group,
+  exportSculptureRoot: THREE.Group,
   quaternion: THREE.Quaternion,
   background: string,
 ): HTMLCanvasElement {
-  sculptureRoot.quaternion.copy(quaternion)
+  exportSculptureRoot.quaternion.copy(quaternion)
   renderer.setClearColor(new THREE.Color(background), 1)
   renderer.render(scene, camera)
 
