@@ -1,10 +1,12 @@
 import * as THREE from 'three'
+import type { ProjectionView } from './projection-view'
 import type { SculptureBuild } from './sculpture'
 
 export interface PresentationController {
   artQuaternion: THREE.Quaternion
   qrQuaternion: THREE.Quaternion
   applyTransform: (lift?: number, scaleFactor?: number, flipY?: number) => void
+  setView: (view: ProjectionView) => void
   updateComposition: (
     width: number,
     height: number,
@@ -26,12 +28,18 @@ export function createPresentationController(
   )
   sculptureRoot.quaternion.copy(artQuaternion)
 
+  let view: ProjectionView = 'art'
   let composedScale = 1
-  let composedX = 0
-  let composedY = 0
+  let artX = 0
+  let artY = 0
 
   const applyTransform = (lift = 0, scaleFactor = 1, flipY = 0): void => {
-    presentationGroup.position.set(composedX, composedY + lift, 0)
+    // Art view deliberately offsets the sculpture away from the controls. Scanner view
+    // instead centers the complete projection footprint so all four quiet-zone edges stay
+    // inside the orthographic viewport, including on square/mobile layouts.
+    const x = view === 'qr' ? 0 : artX
+    const y = view === 'qr' ? 0 : artY
+    presentationGroup.position.set(x, y + lift, 0)
     presentationGroup.scale.setScalar(composedScale * scaleFactor)
     presentationGroup.rotation.set(0, flipY, 0)
   }
@@ -65,8 +73,8 @@ export function createPresentationController(
       composedScale = 1
     }
 
-    composedX = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
-    composedY = aspect > 1.15 ? 0.42 : 1.05
+    artX = aspect > 1.45 ? 1.85 : aspect > 1.15 ? 1.25 : 0
+    artY = aspect > 1.15 ? 0.42 : 1.05
 
     if (applyImmediately) applyTransform()
   }
@@ -75,6 +83,10 @@ export function createPresentationController(
     artQuaternion,
     qrQuaternion,
     applyTransform,
+    setView(next) {
+      view = next
+      applyTransform()
+    },
     updateComposition,
   }
 }
