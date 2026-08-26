@@ -1,3 +1,5 @@
+import { requestProjectionView, type ProjectionView } from './projection-view'
+
 const exportButtonElement = document.querySelector<HTMLButtonElement>('#export-png')
 const stageCanvasElement = document.querySelector<HTMLCanvasElement>('#stage canvas')
 const meta = document.querySelector<HTMLElement>('#qr-meta')
@@ -12,20 +14,14 @@ const stageCanvas = stageCanvasElement
 const PANEL_SIZE = 1024
 const MODE_SETTLE_MS = 2600
 
-type ProjectionMode = 'art' | 'qr'
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
 
-async function waitForMode(mode: ProjectionMode): Promise<void> {
+async function waitForMode(mode: ProjectionView): Promise<void> {
   if (document.body.dataset.mode === mode) return
 
-  stageCanvas.dispatchEvent(new MouseEvent('click', {
-    bubbles: true,
-    clientX: Math.max(1, Math.floor(stageCanvas.clientWidth / 2)),
-    clientY: Math.max(1, Math.floor(stageCanvas.clientHeight / 2)),
-  }))
+  requestProjectionView(mode)
 
   const deadline = performance.now() + 1200
   while (document.body.dataset.mode !== mode) {
@@ -40,7 +36,7 @@ async function waitForMode(mode: ProjectionMode): Promise<void> {
   await sleep(MODE_SETTLE_MS)
 }
 
-function drawPanel(mode: ProjectionMode): HTMLCanvasElement {
+function drawPanel(mode: ProjectionView): HTMLCanvasElement {
   const panel = document.createElement('canvas')
   panel.width = PANEL_SIZE
   panel.height = PANEL_SIZE
@@ -94,7 +90,7 @@ function safeSegment(value: string): string {
 async function exportPngPair(): Promise<void> {
   if (exportButton.disabled) return
 
-  const initialMode: ProjectionMode = document.body.dataset.mode === 'qr' ? 'qr' : 'art'
+  const initialMode: ProjectionView = document.body.dataset.mode === 'qr' ? 'qr' : 'art'
   const initialLabel = exportButton.textContent || 'EXPORT PNG'
   const initialMeta = meta?.textContent ?? ''
   const controls = Array.from(document.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input'))
@@ -105,9 +101,9 @@ async function exportPngPair(): Promise<void> {
   exportButton.setAttribute('aria-busy', 'true')
   document.body.dataset.pngExporting = 'true'
   controls.forEach((control) => { control.disabled = true })
-  // PNG capture temporarily owns the Art/QR presentation state. Pointer-events do not
-  // affect dispatchEvent(), so the exporter can still rotate internally while user clicks
-  // cannot race either capture pose.
+  // PNG capture temporarily owns the Art/QR presentation state. Explicit projection
+  // commands still work while pointer interaction is locked, so user clicks cannot race
+  // either capture pose.
   stageCanvas.style.pointerEvents = 'none'
 
   try {
@@ -144,10 +140,7 @@ async function exportPngPair(): Promise<void> {
     await sleep(1200)
   } finally {
     if (document.body.dataset.mode !== initialMode) {
-      // Restore the view the user was in without leaving controls interactive mid-rotation.
-      controls.forEach((control, index) => { control.disabled = priorDisabled[index] })
-      stageCanvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 1, clientY: 1 }))
-      controls.forEach((control) => { control.disabled = true })
+      requestProjectionView(initialMode)
       await sleep(MODE_SETTLE_MS)
     }
 
