@@ -5,9 +5,7 @@ export type ProjectionView = 'art' | 'qr'
 export interface ViewTransitionController {
   readonly view: ProjectionView
   setView: (next: ProjectionView) => void
-  toggle: () => ProjectionView
   update: (delta: number) => void
-  snap: () => void
 }
 
 function clamp01(value: number): number {
@@ -51,12 +49,6 @@ export function createViewTransitionController(
       }
     },
 
-    toggle() {
-      const next: ProjectionView = view === 'art' ? 'qr' : 'art'
-      this.setView(next)
-      return next
-    },
-
     update(delta) {
       if (reducedMotion) {
         progress = targetProgress
@@ -67,11 +59,6 @@ export function createViewTransitionController(
           progress = targetProgress
         }
       }
-      applyQuaternion()
-    },
-
-    snap() {
-      progress = targetProgress
       applyQuaternion()
     },
   }
