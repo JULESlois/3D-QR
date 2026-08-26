@@ -2,6 +2,7 @@ import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
 import { getStyle, type StyleId } from './styles'
 import type { ProjectionView } from './projection-view'
 
+// Document-level state lets non-UI modules defer mutations until export controls are restored.
 const EXPORT_BUSY_CHANGE_EVENT = 'export-busy-change'
 
 function requiredElement<T extends Element>(selector: string): T {
