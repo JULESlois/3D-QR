@@ -23,8 +23,6 @@ function requiredElement<T extends Element>(selector: string): T {
 const stage = requiredElement<HTMLElement>('#stage')
 const input = requiredElement<HTMLInputElement>('#qr-input')
 const meta = requiredElement<HTMLElement>('#qr-meta')
-const modeToggle = requiredElement<HTMLButtonElement>('#mode-toggle')
-const modeToggleLabel = requiredElement<HTMLElement>('#mode-toggle-label')
 const modeReadout = requiredElement<HTMLElement>('#mode-readout')
 const stageHint = requiredElement<HTMLElement>('#stage-hint')
 const eyebrow = requiredElement<HTMLElement>('#style-eyebrow')
@@ -124,7 +122,6 @@ function setExportUiBusy(busy: boolean): void {
   isExporting = busy
   exportGifButton.disabled = busy
   exportGifButton.setAttribute('aria-busy', String(busy))
-  modeToggle.disabled = busy
   input.disabled = busy
   for (const button of styleButtons) button.disabled = busy
   for (const button of paletteButtons) button.disabled = busy
@@ -181,8 +178,6 @@ function setMode(next: ProjectionView): void {
   const showQr = next === 'qr'
   const style = getStyle(styleId)
 
-  modeToggle.setAttribute('aria-pressed', String(showQr))
-  modeToggleLabel.textContent = showQr ? `BACK TO ${style.label.toUpperCase()}` : 'VIEW QR'
   modeReadout.textContent = showQr ? `QR / ${style.projectionLabel}` : `${style.label.toUpperCase()} / ISOMETRIC`
   stageHint.textContent = showQr
     ? `CLICK TO RETURN · ${style.specimen}`
@@ -227,7 +222,6 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
   }
 }
 
-modeToggle.addEventListener('click', toggleMode)
 exportGifButton.addEventListener('click', () => {
   if (isExporting || !currentBuild) return
 
