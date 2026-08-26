@@ -9,10 +9,9 @@ import { createPresentationController } from './presentation'
 import { createVoxelMeshController } from './voxel-mesh'
 import {
   applyPaletteColorBuffer,
-  capturePaletteColors,
   computePaletteColors,
-  createPaletteDelays,
 } from './palette-rendering'
+import { createPaletteTransitionController } from './palette-transition'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -69,6 +68,7 @@ presentationGroup.add(sculptureRoot)
 
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 const voxelMeshes = createVoxelMeshController(sculptureRoot)
+const paletteTransitions = createPaletteTransitionController()
 
 let styleId: StyleId = 'tree'
 let paletteKey: PaletteKey = getStyle(styleId).defaultPalette
@@ -81,14 +81,6 @@ let isExporting = false
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-type PaletteTransition = {
-  from: Float32Array
-  to: Float32Array
-  delays: Float32Array
-  startedAt: number
-  duration: number
-}
-
 type StyleTransition = {
   nextStyleId: StyleId
   nextPaletteKey: PaletteKey
@@ -97,7 +89,6 @@ type StyleTransition = {
   swapped: boolean
 }
 
-let paletteTransition: PaletteTransition | null = null
 let styleTransition: StyleTransition | null = null
 let queuedStyleId: StyleId | null = null
 
@@ -134,7 +125,7 @@ function updatePaletteUi(): void {
 }
 
 function applyPalette(): void {
-  paletteTransition = null
+  paletteTransitions.cancel()
   const voxelMesh = voxelMeshes.mesh
   if (voxelMesh && currentBuild) {
     applyPaletteColorBuffer(
@@ -182,7 +173,7 @@ function rebuild(value: string): void {
     const style = getStyle(styleId)
     const build = style.generate(matrix, content)
 
-    paletteTransition = null
+    paletteTransitions.cancel()
     currentBuild = build
     voxelMeshes.replace(build, style.appearance.voxelFill)
 
@@ -242,7 +233,6 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
   if (isExporting || nextPaletteKey === paletteKey || styleTransition) return
 
   const voxelMesh = voxelMeshes.mesh
-  const from = capturePaletteColors(voxelMesh)
   paletteKey = nextPaletteKey
   updatePaletteUi()
 
@@ -252,18 +242,8 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
   }
 
   const to = computePaletteColors(currentBuild, styleId, paletteKey)
-  if (!from || from.length !== to.length) {
+  if (!paletteTransitions.start(voxelMesh, currentBuild, to)) {
     applyPaletteColorBuffer(voxelMesh, currentBuild, to)
-    paletteTransition = null
-    return
-  }
-
-  paletteTransition = {
-    from,
-    to,
-    delays: createPaletteDelays(currentBuild),
-    startedAt: performance.now(),
-    duration: 520,
   }
 }
 
@@ -355,27 +335,7 @@ function animate(): void {
     }
   }
 
-  const voxelMesh = voxelMeshes.mesh
-  if (paletteTransition && voxelMesh?.instanceColor) {
-    const rawProgress = clamp01((now - paletteTransition.startedAt) / paletteTransition.duration)
-    const colors = voxelMesh.instanceColor.array as Float32Array
-    const delaySpan = 0.34
-    const activeSpan = 1 - delaySpan
-
-    for (let i = 0; i < paletteTransition.delays.length; i += 1) {
-      const localProgress = clamp01(
-        (rawProgress - paletteTransition.delays[i] * delaySpan) / activeSpan,
-      )
-      const eased = smootherstep(localProgress)
-      const offset = i * 3
-      colors[offset] = THREE.MathUtils.lerp(paletteTransition.from[offset], paletteTransition.to[offset], eased)
-      colors[offset + 1] = THREE.MathUtils.lerp(paletteTransition.from[offset + 1], paletteTransition.to[offset + 1], eased)
-      colors[offset + 2] = THREE.MathUtils.lerp(paletteTransition.from[offset + 2], paletteTransition.to[offset + 2], eased)
-    }
-
-    voxelMesh.instanceColor.needsUpdate = true
-    if (rawProgress >= 1) paletteTransition = null
-  }
+  paletteTransitions.update(voxelMeshes.mesh, now)
 
   presentation.applyTransform()
 
