@@ -41,6 +41,9 @@ jobs:
       - name: All-scenes QR decode smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/all-scenes-qr-browser-smoke.mjs
 
+      - name: High-density QR decode smoke
+        run: node scripts/run-browser-smoke-ci.mjs scripts/high-density-qr-browser-smoke.mjs
+
       - name: Share-link browser smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/share-link-browser-smoke.mjs
 
@@ -64,6 +67,14 @@ jobs:
         with:
           name: all-scenes-qr-smoke
           path: all-scenes-qr-smoke/*.png
+          if-no-files-found: warn
+
+      - name: Upload high-density QR screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: high-density-qr-smoke
+          path: high-density-qr-smoke/*.png
           if-no-files-found: warn
 
       - name: Upload PNG export smoke artifact
