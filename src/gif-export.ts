@@ -57,8 +57,8 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
     scene,
     camera,
     renderer,
-    presentationGroup,
-    sculptureRoot,
+    presentationGroup: livePresentationGroup,
+    sculptureRoot: liveSculptureRoot,
     artQuaternion,
     qrQuaternion,
     build,
@@ -78,7 +78,11 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
   let feedback: { label: string; title: string } | null = null
 
   try {
-    const exportSnapshot = createExportSceneSnapshot(scene, presentationGroup, sculptureRoot)
+    const exportSnapshot = createExportSceneSnapshot(
+      scene,
+      livePresentationGroup,
+      liveSculptureRoot,
+    )
     const { GIFEncoder, quantize, applyPalette } = await loadGifEncoder()
     const frameDelay = Math.round(1000 / EXPORT_FPS)
     const gif = GIFEncoder()
