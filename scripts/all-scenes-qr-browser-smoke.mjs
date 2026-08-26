@@ -280,7 +280,7 @@ async function selectStyle(send, style) {
   await waitForValue(
     send,
     `document.body.dataset.style`,
-    (value) => value === '${style}',
+    (value) => value === style,
     `${style} scene`,
   )
   await waitForValue(
