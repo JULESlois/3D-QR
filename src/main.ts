@@ -12,6 +12,7 @@ import {
   computePaletteColors,
 } from './palette-rendering'
 import { createPaletteTransitionController } from './palette-transition'
+import { createViewTransitionController, type ProjectionView } from './view-transition'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -69,26 +70,19 @@ presentationGroup.add(sculptureRoot)
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 const voxelMeshes = createVoxelMeshController(sculptureRoot)
 const paletteTransitions = createPaletteTransitionController()
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const viewTransitions = createViewTransitionController(
+  sculptureRoot,
+  presentation.artQuaternion,
+  presentation.qrQuaternion,
+  reducedMotion,
+)
 
 let styleId: StyleId = 'tree'
 let paletteKey: PaletteKey = getStyle(styleId).defaultPalette
 let currentBuild: SculptureBuild | null = null
 let rebuildTimer = 0
-let rotationProgress = 0
-let targetRotationProgress = 0
-let currentView: 'art' | 'qr' = 'art'
 let isExporting = false
-
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-function clamp01(value: number): number {
-  return THREE.MathUtils.clamp(value, 0, 1)
-}
-
-function smootherstep(value: number): number {
-  const t = clamp01(value)
-  return t * t * t * (t * (t * 6 - 15) + 10)
-}
 
 function swatchBackground(colors: readonly string[]): string {
   return `linear-gradient(135deg, ${colors.join(', ')})`
@@ -147,7 +141,7 @@ function updateStyleCopy(): void {
     button.classList.toggle('is-active', button.dataset.style === styleId)
   })
   document.body.dataset.style = styleId
-  setMode(currentView)
+  setMode(viewTransitions.view)
 }
 
 function rebuild(value: string): void {
@@ -182,11 +176,10 @@ function rebuild(value: string): void {
   }
 }
 
-function setMode(next: 'art' | 'qr'): void {
-  currentView = next
+function setMode(next: ProjectionView): void {
+  viewTransitions.setView(next)
   const showQr = next === 'qr'
   const style = getStyle(styleId)
-  targetRotationProgress = showQr ? 1 : 0
 
   modeToggle.setAttribute('aria-pressed', String(showQr))
   modeToggleLabel.textContent = showQr ? `BACK TO ${style.label.toUpperCase()}` : 'VIEW QR'
@@ -199,7 +192,7 @@ function setMode(next: 'art' | 'qr'): void {
 
 function toggleMode(): void {
   if (isExporting) return
-  setMode(currentView === 'art' ? 'qr' : 'art')
+  setMode(viewTransitions.view === 'art' ? 'qr' : 'art')
 }
 
 function switchStyleImmediately(nextStyleId: StyleId): void {
@@ -300,28 +293,12 @@ setMode('art')
 const clock = new THREE.Clock()
 
 function animate(): void {
-  const delta = Math.min(clock.getDelta(), 0.05)
+  const delta = clock.getDelta()
   const now = performance.now()
 
-  if (reducedMotion) {
-    rotationProgress = targetRotationProgress
-  } else {
-    rotationProgress += (targetRotationProgress - rotationProgress) * (1 - Math.exp(-4.9 * delta))
-    if (Math.abs(targetRotationProgress - rotationProgress) < 0.00015) {
-      rotationProgress = targetRotationProgress
-    }
-  }
-
   paletteTransitions.update(voxelMeshes.mesh, now)
-
   presentation.applyTransform()
-
-  const eased = smootherstep(rotationProgress)
-  sculptureRoot.quaternion.slerpQuaternions(
-    presentation.artQuaternion,
-    presentation.qrQuaternion,
-    eased,
-  )
+  viewTransitions.update(delta)
   renderer.render(scene, camera)
 }
 
