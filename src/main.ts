@@ -1,6 +1,6 @@
 import './styles.css'
 import { isPaletteKey, type PaletteKey } from './palettes'
-import { isStyleId, type StyleId } from './styles'
+import { getStyle, isStyleId, type StyleId } from './styles'
 import { exportRevealGif } from './gif-export'
 import { exportPngPair } from './png-export'
 import { createPresentationController } from './presentation'
@@ -191,6 +191,7 @@ exportPngButton.addEventListener('click', () => {
     artQuaternion: presentation.artQuaternion,
     qrQuaternion: presentation.qrQuaternion,
     build,
+    voxelFill: getStyle(sculpture.styleId).appearance.voxelFill,
     styleId: sculpture.styleId,
     button: exportPngButton,
     meta,

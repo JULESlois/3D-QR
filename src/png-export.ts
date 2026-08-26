@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { SculptureBuild } from './sculpture'
 import { createExportSceneSnapshot } from './export-scene'
+import { writeVoxelInstanceMatrices } from './voxel-mesh'
 
 const PANEL_SIZE = 1024
 const EXPORT_VIEW_HEIGHT = 10.6
@@ -14,6 +15,7 @@ export interface PngExportContext {
   artQuaternion: THREE.Quaternion
   qrQuaternion: THREE.Quaternion
   build: SculptureBuild
+  voxelFill: number
   styleId: string
   button: HTMLButtonElement
   meta: HTMLElement
@@ -67,9 +69,13 @@ function renderPanel(
   scene: THREE.Scene,
   camera: THREE.OrthographicCamera,
   exportSculptureRoot: THREE.Group,
+  exportVoxelMesh: THREE.InstancedMesh,
+  build: SculptureBuild,
+  voxelFill: number,
   quaternion: THREE.Quaternion,
   background: string,
 ): HTMLCanvasElement {
+  writeVoxelInstanceMatrices(exportVoxelMesh, build, voxelFill)
   exportSculptureRoot.quaternion.copy(quaternion)
   renderer.setClearColor(new THREE.Color(background), 1)
   renderer.render(scene, camera)
@@ -105,6 +111,7 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
     artQuaternion,
     qrQuaternion,
     build,
+    voxelFill,
     styleId,
     button,
     meta,
@@ -144,6 +151,9 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
       exportSnapshot.scene,
       exportCamera,
       exportSnapshot.sculptureRoot,
+      exportSnapshot.voxelMesh,
+      build,
+      voxelFill,
       artQuaternion,
       paper,
     )
@@ -152,6 +162,9 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
       exportSnapshot.scene,
       exportCamera,
       exportSnapshot.sculptureRoot,
+      exportSnapshot.voxelMesh,
+      build,
+      1,
       qrQuaternion,
       paperClean,
     )
