@@ -1,6 +1,5 @@
 import * as THREE from 'three'
-
-export type ProjectionView = 'art' | 'qr'
+import type { ProjectionView } from './projection-view'
 
 export interface ViewTransitionController {
   readonly view: ProjectionView

@@ -1,10 +1,13 @@
 import { readFile } from 'node:fs/promises'
 
-const [html, main, uiControls, styles] = await Promise.all([
+const [html, main, uiControls, styles, pngExport, shareState, projectionView] = await Promise.all([
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
   readFile('src/ui-controls.ts', 'utf8'),
   readFile('src/styles.css', 'utf8'),
+  readFile('src/png-export.ts', 'utf8'),
+  readFile('src/share-state.ts', 'utf8'),
+  readFile('src/projection-view.ts', 'utf8'),
 ])
 
 function requireText(source, text, label) {
@@ -61,4 +64,16 @@ requireText(uiControls, "requiredElement<HTMLButtonElement>('#export-gif')", 'sr
 requireText(styles, '.footer-actions', 'src/styles.css')
 requireText(styles, '.export-overlay', 'src/styles.css')
 
-console.log('ui architecture smoke: static scene shell, export hierarchy, and stylesheet ownership passed')
+// Programmatic consumers request an exact Art/QR pose through a semantic command.
+// Synthetic canvas clicks are reserved for actual pointer interaction because a toggle
+// becomes ambiguous as soon as an exporter or hash restore needs a specific target pose.
+requireText(projectionView, "PROJECTION_VIEW_REQUEST_EVENT = 'projection-view-request'", 'src/projection-view.ts')
+requireText(main, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/main.ts')
+requireText(pngExport, 'requestProjectionView(mode)', 'src/png-export.ts')
+requireText(shareState, 'requestProjectionView(state.view!)', 'src/share-state.ts')
+for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 'src/share-state.ts']]) {
+  forbidText(source, "new MouseEvent('click'", label)
+  forbidText(source, 'new MouseEvent("click"', label)
+}
+
+console.log('ui architecture smoke: static shell, export hierarchy, stylesheet ownership, and projection commands passed')

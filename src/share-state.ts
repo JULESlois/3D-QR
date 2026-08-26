@@ -1,7 +1,10 @@
 import { isPaletteKey, type PaletteKey } from './palettes'
+import {
+  isProjectionView,
+  requestProjectionView,
+  type ProjectionView,
+} from './projection-view'
 import { isStyleId, type StyleId } from './styles'
-
-export type ProjectionView = 'art' | 'qr'
 
 export interface ShareState {
   payload: string
@@ -16,10 +19,6 @@ const PALETTE_KEY = 'p'
 const VIEW_KEY = 'v'
 const SHARE_BUTTON_LABEL = 'COPY LINK'
 const SHARE_BUTTON_TITLE = 'Copy a link to this QR sculpture state'
-
-function isProjectionView(value: string): value is ProjectionView {
-  return value === 'art' || value === 'qr'
-}
 
 export function encodeShareHash(state: ShareState): string {
   const params = new URLSearchParams()
@@ -85,15 +84,6 @@ function clickPalette(palette: PaletteKey): void {
   document.querySelector<HTMLButtonElement>(`[data-palette="${palette}"]`)?.click()
 }
 
-function restoreView(view: ProjectionView): void {
-  if (document.body.dataset.mode === view) return
-  document.querySelector<HTMLCanvasElement>('#stage canvas')?.dispatchEvent(new MouseEvent('click', {
-    bubbles: true,
-    clientX: 1,
-    clientY: 1,
-  }))
-}
-
 function restoreShareState(): void {
   const state = decodeShareHash(window.location.hash)
   const input = document.querySelector<HTMLInputElement>('#qr-input')
@@ -114,9 +104,9 @@ function restoreShareState(): void {
   }
 
   if (state.view) {
-    // View mode is independent of scene/palette state, so restore it after the synchronous
-    // scene update. The renderer owns the actual sculpture rotation and body[data-mode].
-    queueMicrotask(() => restoreView(state.view!))
+    // View mode is independent of scene/palette state. Request the exact projection pose
+    // instead of synthesizing a canvas click, which would only toggle the current pose.
+    queueMicrotask(() => requestProjectionView(state.view!))
   }
 }
 
