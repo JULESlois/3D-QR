@@ -100,8 +100,8 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
     scene,
     camera,
     renderer,
-    presentationGroup,
-    sculptureRoot,
+    presentationGroup: livePresentationGroup,
+    sculptureRoot: liveSculptureRoot,
     artQuaternion,
     qrQuaternion,
     build,
@@ -123,7 +123,11 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
   let exportRenderer: THREE.WebGLRenderer | null = null
 
   try {
-    const exportSnapshot = createExportSceneSnapshot(scene, presentationGroup, sculptureRoot)
+    const exportSnapshot = createExportSceneSnapshot(
+      scene,
+      livePresentationGroup,
+      liveSculptureRoot,
+    )
     exportRenderer = createExportRenderer(renderer)
     const exportCamera = createExportCamera(camera)
     const css = getComputedStyle(document.documentElement)
