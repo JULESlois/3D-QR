@@ -76,6 +76,11 @@ function clearShareHashForEmptyPayload(): void {
 }
 
 function replaceShareHash(): boolean {
+  // Input timers and click microtasks may still be queued when an export starts. Do not let
+  // that stale synchronization overwrite a browser/user hash navigation while restoration
+  // is intentionally deferred until the export finishes.
+  if (document.body.dataset.exportBusy === 'true') return false
+
   const state = currentState()
   if (!state) {
     // An empty editor cannot describe a QR sculpture. Remove any previously generated
