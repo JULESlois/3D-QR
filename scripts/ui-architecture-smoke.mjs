@@ -1,12 +1,25 @@
 import { readFile } from 'node:fs/promises'
 
-const [html, main, appUi, uiControls, styles, pngExport, shareState, projectionView] = await Promise.all([
+const [
+  html,
+  main,
+  appUi,
+  uiControls,
+  styles,
+  pngExport,
+  gifExport,
+  exportScene,
+  shareState,
+  projectionView,
+] = await Promise.all([
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
   readFile('src/app-ui.ts', 'utf8'),
   readFile('src/ui-controls.ts', 'utf8'),
   readFile('src/styles.css', 'utf8'),
   readFile('src/png-export.ts', 'utf8'),
+  readFile('src/gif-export.ts', 'utf8'),
+  readFile('src/export-scene.ts', 'utf8'),
   readFile('src/share-state.ts', 'utf8'),
   readFile('src/projection-view.ts', 'utf8'),
 ])
@@ -73,11 +86,29 @@ requireText(styles, '.footer-actions', 'src/styles.css')
 requireText(styles, '.export-overlay', 'src/styles.css')
 
 // Interactive/hash consumers request an exact Art/QR pose through a semantic command.
-// PNG export is different: it owns an offscreen square renderer and receives both final
-// quaternions directly, so it must not drive or wait for the live projection view.
+// Exporters instead clone the current render hierarchy and mutate only that snapshot, so
+// capture can never corrupt the live presentation even if encoding fails part-way through.
 requireText(projectionView, "PROJECTION_VIEW_REQUEST_EVENT = 'projection-view-request'", 'src/projection-view.ts')
 requireText(main, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/main.ts')
 requireText(main, 'void exportPngPair({', 'src/main.ts')
+requireText(exportScene, 'scene.clone(true)', 'src/export-scene.ts')
+requireText(exportScene, 'InstancedMesh.clone()', 'src/export-scene.ts')
+for (const [source, label] of [[pngExport, 'src/png-export.ts'], [gifExport, 'src/gif-export.ts']]) {
+  requireText(source, 'createExportSceneSnapshot(', label)
+  requireText(source, 'presentationGroup: livePresentationGroup', label)
+  requireText(source, 'sculptureRoot: liveSculptureRoot', label)
+  requireText(source, 'exportSnapshot.presentationGroup', label)
+  requireText(source, 'exportSnapshot.sculptureRoot', label)
+  forbidText(source, 'pauseAnimation', label)
+  forbidText(source, 'resumeAnimation', label)
+  forbidText(source, 'liveSculptureRoot.quaternion.', label)
+  forbidText(source, 'livePresentationGroup.position.', label)
+  forbidText(source, 'livePresentationGroup.scale.', label)
+  forbidText(source, 'livePresentationGroup.rotation.', label)
+}
+forbidText(main, 'pauseAnimation:', 'src/main.ts')
+forbidText(main, 'resumeAnimation:', 'src/main.ts')
+
 requireText(pngExport, 'artQuaternion: THREE.Quaternion', 'src/png-export.ts')
 requireText(pngExport, 'qrQuaternion: THREE.Quaternion', 'src/png-export.ts')
 requireText(pngExport, 'new THREE.WebGLRenderer({', 'src/png-export.ts')
@@ -89,4 +120,4 @@ for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 's
   forbidText(source, 'new MouseEvent("click"', label)
 }
 
-console.log('ui architecture smoke: static shell, app UI ownership, export hierarchy, stylesheet ownership, projection commands, and offscreen PNG ownership passed')
+console.log('ui architecture smoke: static shell, app UI ownership, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')

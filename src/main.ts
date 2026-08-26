@@ -174,8 +174,6 @@ exportGifButton.addEventListener('click', () => {
     button: exportGifButton,
     meta,
     setBusy: setExportUiBusy,
-    pauseAnimation: () => renderer.setAnimationLoop(null),
-    resumeAnimation: () => renderer.setAnimationLoop(animate),
   })
 })
 
@@ -196,8 +194,6 @@ exportPngButton.addEventListener('click', () => {
     button: exportPngButton,
     meta,
     setBusy: setExportUiBusy,
-    pauseAnimation: () => renderer.setAnimationLoop(null),
-    resumeAnimation: () => renderer.setAnimationLoop(animate),
   })
 })
 

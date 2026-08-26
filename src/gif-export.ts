@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { SculptureBuild } from './sculpture'
+import { createExportSceneSnapshot } from './export-scene'
 
 const EXPORT_SIZE = 512
 const EXPORT_FPS = 18
@@ -19,8 +20,6 @@ export interface GifExportContext {
   button: HTMLButtonElement
   meta: HTMLElement
   setBusy: (busy: boolean) => void
-  pauseAnimation: () => void
-  resumeAnimation: () => void
 }
 
 function clamp01(value: number): number {
@@ -58,8 +57,8 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
     scene,
     camera,
     renderer,
-    presentationGroup,
-    sculptureRoot,
+    presentationGroup: livePresentationGroup,
+    sculptureRoot: liveSculptureRoot,
     artQuaternion,
     qrQuaternion,
     build,
@@ -67,25 +66,23 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
     button,
     meta,
     setBusy,
-    pauseAnimation,
-    resumeAnimation,
   } = context
 
   const previousMeta = meta.textContent
-  const savedQuaternion = sculptureRoot.quaternion.clone()
-  const savedPosition = presentationGroup.position.clone()
-  const savedScale = presentationGroup.scale.clone()
-  const savedPresentationQuaternion = presentationGroup.quaternion.clone()
 
   setBusy(true)
   button.textContent = 'PREPARING…'
   button.title = 'Preparing GIF export'
-  pauseAnimation()
 
   let exportRenderer: THREE.WebGLRenderer | null = null
   let feedback: { label: string; title: string } | null = null
 
   try {
+    const exportSnapshot = createExportSceneSnapshot(
+      scene,
+      livePresentationGroup,
+      liveSculptureRoot,
+    )
     const { GIFEncoder, quantize, applyPalette } = await loadGifEncoder()
     const frameDelay = Math.round(1000 / EXPORT_FPS)
     const gif = GIFEncoder()
@@ -119,16 +116,20 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
     if (!captureContext) throw new Error('Canvas capture is unavailable in this browser')
 
     const exportScale = Math.min(1.08, 8.35 / build.footprint)
-    presentationGroup.position.set(0, 0.42, 0)
-    presentationGroup.scale.setScalar(exportScale)
-    presentationGroup.rotation.set(0, 0, 0)
+    exportSnapshot.presentationGroup.position.set(0, 0.42, 0)
+    exportSnapshot.presentationGroup.scale.setScalar(exportScale)
+    exportSnapshot.presentationGroup.rotation.set(0, 0, 0)
 
     for (let frame = 0; frame < EXPORT_FRAME_COUNT; frame += 1) {
       const progress = frame / (EXPORT_FRAME_COUNT - 1)
       const revealProgress = smootherstep(revealRotationProgress(progress))
-      sculptureRoot.quaternion.slerpQuaternions(artQuaternion, qrQuaternion, revealProgress)
+      exportSnapshot.sculptureRoot.quaternion.slerpQuaternions(
+        artQuaternion,
+        qrQuaternion,
+        revealProgress,
+      )
 
-      exportRenderer.render(scene, exportCamera)
+      exportRenderer.render(exportSnapshot.scene, exportCamera)
       captureContext.clearRect(0, 0, EXPORT_SIZE, EXPORT_SIZE)
       captureContext.drawImage(exportRenderer.domElement, 0, 0, EXPORT_SIZE, EXPORT_SIZE)
       const pixels = captureContext.getImageData(0, 0, EXPORT_SIZE, EXPORT_SIZE).data
@@ -170,13 +171,8 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
     meta.textContent = `GIF EXPORT ERROR · ${message}`
     feedback = { label: 'EXPORT FAILED', title: message }
   } finally {
-    sculptureRoot.quaternion.copy(savedQuaternion)
-    presentationGroup.position.copy(savedPosition)
-    presentationGroup.scale.copy(savedScale)
-    presentationGroup.quaternion.copy(savedPresentationQuaternion)
     exportRenderer?.dispose()
     setBusy(false)
-    resumeAnimation()
 
     if (feedback) showExportFeedback(button, feedback.label, feedback.title)
     else {

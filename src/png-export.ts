@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { SculptureBuild } from './sculpture'
+import { createExportSceneSnapshot } from './export-scene'
 
 const PANEL_SIZE = 1024
 const EXPORT_VIEW_HEIGHT = 10.6
@@ -17,8 +18,6 @@ export interface PngExportContext {
   button: HTMLButtonElement
   meta: HTMLElement
   setBusy: (busy: boolean) => void
-  pauseAnimation: () => void
-  resumeAnimation: () => void
 }
 
 function sleep(ms: number): Promise<void> {
@@ -67,11 +66,11 @@ function renderPanel(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   camera: THREE.OrthographicCamera,
-  sculptureRoot: THREE.Group,
+  exportSculptureRoot: THREE.Group,
   quaternion: THREE.Quaternion,
   background: string,
 ): HTMLCanvasElement {
-  sculptureRoot.quaternion.copy(quaternion)
+  exportSculptureRoot.quaternion.copy(quaternion)
   renderer.setClearColor(new THREE.Color(background), 1)
   renderer.render(scene, camera)
 
@@ -101,8 +100,8 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
     scene,
     camera,
     renderer,
-    presentationGroup,
-    sculptureRoot,
+    presentationGroup: livePresentationGroup,
+    sculptureRoot: liveSculptureRoot,
     artQuaternion,
     qrQuaternion,
     build,
@@ -110,27 +109,25 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
     button,
     meta,
     setBusy,
-    pauseAnimation,
-    resumeAnimation,
   } = context
 
   if (button.disabled) return
 
   const initialLabel = button.textContent || 'PNG ×2'
   const initialMeta = meta.textContent
-  const savedQuaternion = sculptureRoot.quaternion.clone()
-  const savedPosition = presentationGroup.position.clone()
-  const savedScale = presentationGroup.scale.clone()
-  const savedPresentationQuaternion = presentationGroup.quaternion.clone()
 
   button.textContent = 'CAPTURING…'
   document.body.dataset.pngExporting = 'true'
   setBusy(true)
-  pauseAnimation()
 
   let exportRenderer: THREE.WebGLRenderer | null = null
 
   try {
+    const exportSnapshot = createExportSceneSnapshot(
+      scene,
+      livePresentationGroup,
+      liveSculptureRoot,
+    )
     exportRenderer = createExportRenderer(renderer)
     const exportCamera = createExportCamera(camera)
     const css = getComputedStyle(document.documentElement)
@@ -138,23 +135,23 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
     const paperClean = css.getPropertyValue('--paper-clean').trim() || '#f8f8f5'
     const exportScale = Math.min(1.08, 8.35 / build.footprint)
 
-    presentationGroup.position.set(0, 0.42, 0)
-    presentationGroup.scale.setScalar(exportScale)
-    presentationGroup.rotation.set(0, 0, 0)
+    exportSnapshot.presentationGroup.position.set(0, 0.42, 0)
+    exportSnapshot.presentationGroup.scale.setScalar(exportScale)
+    exportSnapshot.presentationGroup.rotation.set(0, 0, 0)
 
     const art = renderPanel(
       exportRenderer,
-      scene,
+      exportSnapshot.scene,
       exportCamera,
-      sculptureRoot,
+      exportSnapshot.sculptureRoot,
       artQuaternion,
       paper,
     )
     const qr = renderPanel(
       exportRenderer,
-      scene,
+      exportSnapshot.scene,
       exportCamera,
-      sculptureRoot,
+      exportSnapshot.sculptureRoot,
       qrQuaternion,
       paperClean,
     )
@@ -182,13 +179,8 @@ export async function exportPngPair(context: PngExportContext): Promise<void> {
     meta.textContent = `PNG EXPORT ERROR · ${message}`
     await sleep(1200)
   } finally {
-    sculptureRoot.quaternion.copy(savedQuaternion)
-    presentationGroup.position.copy(savedPosition)
-    presentationGroup.scale.copy(savedScale)
-    presentationGroup.quaternion.copy(savedPresentationQuaternion)
     exportRenderer?.dispose()
     setBusy(false)
-    resumeAnimation()
     button.textContent = initialLabel
     delete document.body.dataset.pngExporting
     if (!meta.textContent?.startsWith('PNG EXPORT')) meta.textContent = initialMeta
