@@ -296,19 +296,29 @@ try {
   await sleep(800)
 
   await evaluateValue(send, `(() => {
-    const button = Array.from(document.querySelectorAll('button'))
-      .find((candidate) => candidate.textContent?.trim() === 'EXPORT GIF')
-    if (!button) throw new Error('GIF export button was not found')
+    const button = document.querySelector('#export-gif')
+    const pngButton = document.querySelector('#export-png')
+    const shareButton = document.querySelector('#copy-share-link')
+    if (!button || !pngButton || !shareButton) throw new Error('Footer export controls were not found')
 
     const overlay = document.querySelector('.export-overlay')
-    window.__gifExportSmoke = { overlaySeen: overlay?.dataset.open === 'true', labels: [] }
+    window.__gifExportSmoke = {
+      overlaySeen: overlay?.dataset.open === 'true',
+      competingActionsDisabledSeen: false,
+      labels: []
+    }
     const sample = () => {
       const label = button.textContent?.trim() ?? ''
       if (window.__gifExportSmoke.labels.at(-1) !== label) window.__gifExportSmoke.labels.push(label)
       if (overlay?.dataset.open === 'true') window.__gifExportSmoke.overlaySeen = true
+      if (button.disabled && pngButton.disabled && shareButton.disabled) {
+        window.__gifExportSmoke.competingActionsDisabledSeen = true
+      }
     }
     const observer = new MutationObserver(sample)
     observer.observe(button, { attributes: true, childList: true, characterData: true, subtree: true })
+    observer.observe(pngButton, { attributes: true, attributeFilter: ['disabled', 'aria-busy'] })
+    observer.observe(shareButton, { attributes: true, attributeFilter: ['disabled', 'aria-busy'] })
     if (overlay) observer.observe(overlay, { attributes: true, attributeFilter: ['data-open', 'aria-hidden'] })
     sample()
     button.click()
@@ -336,25 +346,32 @@ try {
   const restored = await waitForValue(
     send,
     `(() => {
-      const button = Array.from(document.querySelectorAll('button'))
-        .find((candidate) => candidate.textContent?.trim() === 'EXPORT GIF')
+      const button = document.querySelector('#export-gif')
+      const pngButton = document.querySelector('#export-png')
+      const shareButton = document.querySelector('#copy-share-link')
       const overlay = document.querySelector('.export-overlay')
       return {
         mode: document.body.dataset.mode,
         label: button?.textContent?.trim() ?? null,
         buttonDisabled: button?.disabled ?? true,
+        pngDisabled: pngButton?.disabled ?? true,
+        shareDisabled: shareButton?.disabled ?? true,
         inputDisabled: document.querySelector('#qr-input')?.disabled ?? true,
         overlayHidden: !overlay || overlay.getAttribute('aria-hidden') === 'true',
         overlaySeen: window.__gifExportSmoke?.overlaySeen ?? false,
+        competingActionsDisabledSeen: window.__gifExportSmoke?.competingActionsDisabledSeen ?? false,
         labels: window.__gifExportSmoke?.labels ?? []
       }
     })()`,
     (value) => value?.mode === 'art'
       && value?.label === 'EXPORT GIF'
       && value?.buttonDisabled === false
+      && value?.pngDisabled === false
+      && value?.shareDisabled === false
       && value?.inputDisabled === false
       && value?.overlayHidden === true
-      && value?.overlaySeen === true,
+      && value?.overlaySeen === true
+      && value?.competingActionsDisabledSeen === true,
     'GIF export state restoration',
     10_000,
   )
@@ -368,7 +385,7 @@ try {
 
   console.log(
     `gif export browser smoke: ${download.filename} / ${download.bytes} bytes / ${parsed.width}×${parsed.height} / `
-      + `${parsed.frames} frames / ${parsed.delays[0]} cs delay / looping / UI restored`,
+      + `${parsed.frames} frames / ${parsed.delays[0]} cs delay / looping / competing actions locked / UI restored`,
   )
 } finally {
   socket?.close()
