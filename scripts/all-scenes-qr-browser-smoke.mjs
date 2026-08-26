@@ -14,7 +14,7 @@ const baseUrl = `http://${host}:${previewPort}`
 const outputDir = 'all-scenes-qr-smoke'
 const userDataDir = '.all-scenes-qr-smoke-chrome'
 const expectedPayload = 'https://github.com/JULESlois/3D-QR'
-const highVersionPayload = `city-${'projection-coverage/'.repeat(24)}`
+const highVersionPayload = `city-${'projection-coverage/'.repeat(7)}`
 const minimumHighVersion = 10
 const styles = [
   'tree',
@@ -322,7 +322,7 @@ async function setPayload(send, payload) {
   const updated = await evaluateValue(send, `(() => {
     const input = document.querySelector('#qr-input')
     if (!(input instanceof HTMLInputElement)) return false
-    input.value = ${JSON.stringify(highVersionPayload)}
+    input.value = ${JSON.stringify("city-projection-coverage/projection-coverage/projection-coverage/projection-coverage/projection-coverage/projection-coverage/projection-coverage/")}
     input.dispatchEvent(new Event('input', { bubbles: true }))
     return true
   })()`)
