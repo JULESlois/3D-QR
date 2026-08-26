@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises'
 
-const [html, main, uiControls, styles, pngExport, shareState, projectionView] = await Promise.all([
+const [html, main, appUi, uiControls, styles, pngExport, shareState, projectionView] = await Promise.all([
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
+  readFile('src/app-ui.ts', 'utf8'),
   readFile('src/ui-controls.ts', 'utf8'),
   readFile('src/styles.css', 'utf8'),
   readFile('src/png-export.ts', 'utf8'),
@@ -50,7 +51,7 @@ for (const id of ['export-gif', 'export-png', 'copy-share-link']) {
 
 // UI structure belongs in static HTML. Runtime scripts may bind state/events, but they
 // should not regress to rebuilding the shell or injecting style elements.
-for (const [source, label] of [[main, 'src/main.ts'], [uiControls, 'src/ui-controls.ts']]) {
+for (const [source, label] of [[main, 'src/main.ts'], [appUi, 'src/app-ui.ts'], [uiControls, 'src/ui-controls.ts']]) {
   forbidText(source, "document.createElement('button')", label)
   forbidText(source, 'document.createElement("button")', label)
   forbidText(source, "document.createElement('nav')", label)
@@ -59,8 +60,14 @@ for (const [source, label] of [[main, 'src/main.ts'], [uiControls, 'src/ui-contr
   forbidText(source, 'document.createElement("style")', label)
 }
 
-requireText(main, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/main.ts')
-requireText(main, "requiredElement<HTMLButtonElement>('#export-png')", 'src/main.ts')
+// main.ts owns orchestration; the app UI controller owns application-facing static DOM
+// bindings and presentation text/busy state. ui-controls.ts separately owns the overlay.
+requireText(main, 'createAppUiController()', 'src/main.ts')
+requireText(appUi, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/app-ui.ts')
+requireText(appUi, "requiredElement<HTMLButtonElement>('#export-png')", 'src/app-ui.ts')
+requireText(appUi, "requiredElement<HTMLButtonElement>('#copy-share-link')", 'src/app-ui.ts')
+forbidText(main, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/main.ts')
+forbidText(main, "requiredElement<HTMLButtonElement>('#export-png')", 'src/main.ts')
 requireText(uiControls, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/ui-controls.ts')
 requireText(styles, '.footer-actions', 'src/styles.css')
 requireText(styles, '.export-overlay', 'src/styles.css')
@@ -82,4 +89,4 @@ for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 's
   forbidText(source, 'new MouseEvent("click"', label)
 }
 
-console.log('ui architecture smoke: static shell, export hierarchy, stylesheet ownership, projection commands, and offscreen PNG ownership passed')
+console.log('ui architecture smoke: static shell, app UI ownership, export hierarchy, stylesheet ownership, projection commands, and offscreen PNG ownership passed')
