@@ -1,6 +1,6 @@
 import './styles.css'
-import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
-import { getStyle, isStyleId, type StyleId } from './styles'
+import { isPaletteKey, type PaletteKey } from './palettes'
+import { isStyleId, type StyleId } from './styles'
 import { exportRevealGif } from './gif-export'
 import { exportPngPair } from './png-export'
 import { createPresentationController } from './presentation'
@@ -19,6 +19,7 @@ import {
 } from './projection-view'
 import { createSculptureController } from './sculpture-state'
 import { createViewTransitionController } from './view-transition'
+import { createAppUiController } from './app-ui'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -27,21 +28,16 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const stage = requiredElement<HTMLElement>('#stage')
-const input = requiredElement<HTMLInputElement>('#qr-input')
-const meta = requiredElement<HTMLElement>('#qr-meta')
-const modeReadout = requiredElement<HTMLElement>('#mode-readout')
-const stageHint = requiredElement<HTMLElement>('#stage-hint')
-const eyebrow = requiredElement<HTMLElement>('#style-eyebrow')
-const headline = requiredElement<HTMLElement>('#style-headline')
-const lede = requiredElement<HTMLElement>('#style-lede')
-const specimen = requiredElement<HTMLElement>('#style-specimen')
-const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
-const styleRow = requiredElement<HTMLElement>('.style-row')
-const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
-const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
-const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
-const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
-const copyShareLinkButton = requiredElement<HTMLButtonElement>('#copy-share-link')
+const ui = createAppUiController()
+const {
+  input,
+  meta,
+  styleRow,
+  styleButtons,
+  paletteButtons,
+  exportGifButton,
+  exportPngButton,
+} = ui
 
 const runtime = createRenderRuntime(stage)
 const {
@@ -67,29 +63,6 @@ const viewTransitions = createViewTransitionController(
 let rebuildTimer = 0
 let isExporting = false
 
-function swatchBackground(colors: readonly string[]): string {
-  return `linear-gradient(135deg, ${colors.join(', ')})`
-}
-
-function updatePaletteUi(): void {
-  const style = getStyle(sculpture.styleId)
-  const palette = getPalette(sculpture.styleId, sculpture.paletteKey)
-  const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
-  document.documentElement.style.setProperty('--accent', accent)
-  paletteLabel.textContent = `SURFACE / ${palette.label.toUpperCase()}`
-
-  paletteButtons.forEach((button) => {
-    const requested = button.dataset.palette
-    if (!requested || !isPaletteKey(requested)) return
-
-    const option = getPalette(sculpture.styleId, requested)
-    button.classList.toggle('is-active', requested === sculpture.paletteKey)
-    button.style.background = swatchBackground(option.swatch)
-    button.setAttribute('aria-label', `${style.label} palette: ${option.label}`)
-    button.title = option.label
-  })
-}
-
 function applyPalette(): void {
   paletteTransitions.cancel()
   const voxelMesh = voxelMeshes.mesh
@@ -101,32 +74,16 @@ function applyPalette(): void {
       computePaletteColors(build, sculpture.styleId, sculpture.paletteKey),
     )
   }
-  updatePaletteUi()
+  ui.updatePalette(sculpture.styleId, sculpture.paletteKey)
 }
 
 function setExportUiBusy(busy: boolean): void {
   isExporting = busy
-  for (const button of [exportGifButton, exportPngButton, copyShareLinkButton]) {
-    button.disabled = busy
-    button.setAttribute('aria-busy', String(busy))
-  }
-  input.disabled = busy
-  for (const button of styleButtons) button.disabled = busy
-  for (const button of paletteButtons) button.disabled = busy
-  renderer.domElement.style.pointerEvents = busy ? 'none' : ''
+  ui.setExportBusy(busy, renderer.domElement)
 }
 
 function updateStyleCopy(): void {
-  const style = getStyle(sculpture.styleId)
-  eyebrow.textContent = style.eyebrow
-  headline.textContent = style.headline
-  lede.textContent = style.description
-  specimen.textContent = style.specimen
-  styleButtons.forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.style === sculpture.styleId)
-  })
-  document.body.dataset.style = sculpture.styleId
-  setMode(viewTransitions.view)
+  ui.updateStyle(sculpture.styleId, viewTransitions.view)
 }
 
 function rebuild(value: string): void {
@@ -160,14 +117,7 @@ function rebuild(value: string): void {
 
 function setMode(next: ProjectionView): void {
   viewTransitions.setView(next)
-  const showQr = next === 'qr'
-  const style = getStyle(sculpture.styleId)
-
-  modeReadout.textContent = showQr ? `QR / ${style.projectionLabel}` : `${style.label.toUpperCase()} / ISOMETRIC`
-  stageHint.textContent = showQr
-    ? `CLICK TO RETURN · ${style.specimen}`
-    : 'CLICK TO ROTATE · FULL-SCENE QR POLARITY / SAME PROJECTION'
-  document.body.dataset.mode = showQr ? 'qr' : 'art'
+  ui.updateProjection(sculpture.styleId, next)
 }
 
 function toggleMode(): void {
@@ -193,7 +143,7 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
 
   const voxelMesh = voxelMeshes.mesh
   sculpture.setPalette(nextPaletteKey)
-  updatePaletteUi()
+  ui.updatePalette(sculpture.styleId, sculpture.paletteKey)
 
   const build = sculpture.build
   if (!build || !voxelMesh || reducedMotion) {
