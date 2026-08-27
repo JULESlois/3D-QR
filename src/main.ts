@@ -162,6 +162,7 @@ exportGifButton.addEventListener('click', () => {
   const build = sculpture.build
   if (isExporting || !build) return
 
+  paletteTransitions.finish(voxelMeshes.mesh)
   void exportRevealGif({
     scene,
     camera,
@@ -182,6 +183,7 @@ exportPngButton.addEventListener('click', () => {
   const build = sculpture.build
   if (isExporting || !build) return
 
+  paletteTransitions.finish(voxelMeshes.mesh)
   void exportPngPair({
     scene,
     camera,
