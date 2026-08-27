@@ -16,6 +16,7 @@ type PaletteTransition = {
 export interface PaletteTransitionController {
   readonly active: boolean
   cancel(): void
+  finish(mesh: THREE.InstancedMesh | null): boolean
   start(
     mesh: THREE.InstancedMesh,
     build: SculptureBuild,
@@ -47,6 +48,21 @@ export function createPaletteTransitionController(
 
     cancel() {
       transition = null
+    },
+
+    finish(mesh) {
+      if (!transition) return false
+
+      const colors = mesh?.instanceColor?.array as Float32Array | undefined
+      if (!colors || colors.length !== transition.to.length) {
+        transition = null
+        return false
+      }
+
+      colors.set(transition.to)
+      mesh!.instanceColor!.needsUpdate = true
+      transition = null
+      return true
     },
 
     start(mesh, build, to, startedAt = performance.now()) {
