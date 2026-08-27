@@ -1,9 +1,12 @@
+import * as THREE from 'three'
 import {
   materialColorForTone,
   splitMaterialToneRamp,
   type MaterialTone,
 } from '../src/material-tones'
 import { PALETTE_KEYS, getPalette, type ScenePaletteDefinition } from '../src/palettes'
+import { createPaletteTransitionController } from '../src/palette-transition'
+import type { SculptureBuild } from '../src/sculpture'
 import { STYLES } from '../src/styles'
 
 const PAIRED_MATERIAL_KEYS = [
@@ -59,6 +62,55 @@ for (const style of STYLES) {
   }
 }
 
+const transitionBuild = {
+  voxels: [
+    { x: -1, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+  ],
+  pivotY: 0,
+} as SculptureBuild
+const transitionMesh = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshBasicMaterial(),
+  transitionBuild.voxels.length,
+)
+transitionMesh.setColorAt(0, new THREE.Color(0.1, 0.2, 0.3))
+transitionMesh.setColorAt(1, new THREE.Color(0.3, 0.2, 0.1))
+
+const transitionTarget = new Float32Array([
+  0.9, 0.8, 0.7,
+  0.6, 0.5, 0.4,
+])
+const transitions = createPaletteTransitionController()
+if (!transitions.start(transitionMesh, transitionBuild, transitionTarget, 0)) {
+  throw new Error('Palette transition smoke could not start.')
+}
+transitions.update(transitionMesh, 120)
+if (!transitions.active) {
+  throw new Error('Palette transition unexpectedly completed before finish().')
+}
+if (!transitions.finish(transitionMesh)) {
+  throw new Error('Palette transition finish() did not finalize an active transition.')
+}
+if (transitions.active) {
+  throw new Error('Palette transition remained active after finish().')
+}
+
+const finalized = transitionMesh.instanceColor?.array
+if (!finalized || finalized.length !== transitionTarget.length) {
+  throw new Error('Palette transition finish() did not preserve the instance color buffer.')
+}
+for (let i = 0; i < transitionTarget.length; i += 1) {
+  if (Math.abs(Number(finalized[i]) - transitionTarget[i]) > 1e-6) {
+    throw new Error(
+      `Palette transition finish() left color component ${i} at ${finalized[i]}; expected ${transitionTarget[i]}.`,
+    )
+  }
+}
+if (transitions.finish(transitionMesh)) {
+  throw new Error('Palette transition finish() reported an inactive transition as finalized.')
+}
+
 console.log(
-  `material tone smoke passed for ${rampCount} paired ramps and ${sampleCount} explicit tone/phase samples`,
+  `material tone smoke passed for ${rampCount} paired ramps, ${sampleCount} explicit tone/phase samples, and palette transition finalization`,
 )
