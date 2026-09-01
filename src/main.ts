@@ -1,8 +1,7 @@
 import './styles.css'
 import { isPaletteKey, type PaletteKey } from './palettes'
-import { getStyle, isStyleId, type StyleId } from './styles'
-import { exportRevealGif } from './gif-export'
-import { exportPngPair } from './png-export'
+import { isStyleId, type StyleId } from './styles'
+import { bindExportControls } from './export-controls'
 import { createPresentationController } from './presentation'
 import { createRenderRuntime } from './render-runtime'
 import { createVoxelMeshController } from './voxel-mesh'
@@ -158,47 +157,24 @@ function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
   }
 }
 
-exportGifButton.addEventListener('click', () => {
-  const build = sculpture.build
-  if (isExporting || !build) return
-
-  paletteTransitions.finish(voxelMeshes.mesh)
-  void exportRevealGif({
-    scene,
-    camera,
-    renderer,
-    presentationGroup,
-    sculptureRoot,
-    artQuaternion: presentation.artQuaternion,
-    qrQuaternion: presentation.qrQuaternion,
-    build,
-    styleId: sculpture.styleId,
-    button: exportGifButton,
-    meta,
-    setBusy: setExportUiBusy,
-  })
-})
-
-exportPngButton.addEventListener('click', () => {
-  const build = sculpture.build
-  if (isExporting || !build) return
-
-  paletteTransitions.finish(voxelMeshes.mesh)
-  void exportPngPair({
-    scene,
-    camera,
-    renderer,
-    presentationGroup,
-    sculptureRoot,
-    artQuaternion: presentation.artQuaternion,
-    qrQuaternion: presentation.qrQuaternion,
-    build,
-    voxelFill: getStyle(sculpture.styleId).appearance.voxelFill,
-    styleId: sculpture.styleId,
-    button: exportPngButton,
-    meta,
-    setBusy: setExportUiBusy,
-  })
+bindExportControls({
+  exportGifButton,
+  exportPngButton,
+  meta,
+  scene,
+  camera,
+  renderer,
+  presentationGroup,
+  sculptureRoot,
+  artQuaternion: presentation.artQuaternion,
+  qrQuaternion: presentation.qrQuaternion,
+  getBuild: () => sculpture.build,
+  getStyleId: () => sculpture.styleId,
+  isBusy: () => isExporting,
+  finishPaletteTransition: () => {
+    paletteTransitions.finish(voxelMeshes.mesh)
+  },
+  setBusy: setExportUiBusy,
 })
 
 renderer.domElement.addEventListener('click', toggleMode)
