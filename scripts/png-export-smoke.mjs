@@ -17,6 +17,7 @@ const downloadDir = resolve('png-export-smoke')
 const expectedFilename = '3d-qr-tree-art-qr.png'
 const expectedPayload = `https://example.invalid/high-density-qr?data=${'0123456789abcdef'.repeat(24)}`
 const minimumExpectedVersion = 18
+const transitionPalette = 'summer'
 
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
 
@@ -158,6 +159,18 @@ function decodeQrPanel(pair) {
   return decoded.data
 }
 
+function assertIdenticalPixels(immediatePair, settledPair) {
+  if (immediatePair.width !== settledPair.width || immediatePair.height !== settledPair.height) {
+    throw new Error(
+      `Immediate/settled palette exports have different dimensions: `
+        + `${immediatePair.width}×${immediatePair.height} vs ${settledPair.width}×${settledPair.height}`,
+    )
+  }
+  if (!immediatePair.data.equals(settledPair.data)) {
+    throw new Error('PNG export captured transitional palette colors instead of the selected settled palette')
+  }
+}
+
 let preview
 let chrome
 let socket
@@ -232,16 +245,22 @@ try {
   if (!Number.isFinite(qrVersion) || qrVersion < minimumExpectedVersion) {
     throw new Error(`PNG export smoke expected QR version >= ${minimumExpectedVersion}, got ${JSON.stringify(qrMeta)}`)
   }
-  await sleep(600)
 
-  await evaluateValue(send, `(() => {
+  const startedImmediateExport = await evaluateValue(send, `(() => {
+    const palette = document.querySelector('[data-palette="${transitionPalette}"]')
+    const exportButton = document.querySelector('#export-png')
+    if (!(palette instanceof HTMLButtonElement) || !(exportButton instanceof HTMLButtonElement)) return false
     window.__pngExportSmoke = null
     document.addEventListener('png-export-complete', (event) => {
       window.__pngExportSmoke = event.detail
     }, { once: true })
-    document.querySelector('#export-png')?.click()
-    return true
+    palette.click()
+    exportButton.click()
+    return palette.classList.contains('is-active')
   })()`)
+  if (!startedImmediateExport) {
+    throw new Error(`Could not start immediate PNG export for ${transitionPalette} palette`)
+  }
 
   const eventDetail = await waitForValue(
     send,
@@ -255,11 +274,11 @@ try {
     throw new Error(`PNG export used unexpected filename: ${download.filename}`)
   }
 
-  const pair = PNG.sync.read(await readFile(download.path))
-  if (pair.width !== 2048 || pair.height !== 1024) {
-    throw new Error(`PNG export has unexpected dimensions ${pair.width}×${pair.height}`)
+  const immediatePair = PNG.sync.read(await readFile(download.path))
+  if (immediatePair.width !== 2048 || immediatePair.height !== 1024) {
+    throw new Error(`PNG export has unexpected dimensions ${immediatePair.width}×${immediatePair.height}`)
   }
-  const decodedPayload = decodeQrPanel(pair)
+  const decodedPayload = decodeQrPanel(immediatePair)
 
   const restored = await waitForValue(
     send,
@@ -267,19 +286,34 @@ try {
       mode: document.body.dataset.mode,
       exporting: document.body.dataset.pngExporting ?? null,
       buttonDisabled: document.querySelector('#export-png')?.disabled ?? true,
-      inputDisabled: document.querySelector('#qr-input')?.disabled ?? true
+      inputDisabled: document.querySelector('#qr-input')?.disabled ?? true,
+      paletteActive: document.querySelector('[data-palette="${transitionPalette}"]')?.classList.contains('is-active') ?? false
     }))()`,
     (value) => value?.mode === 'art'
       && value?.exporting === null
       && value?.buttonDisabled === false
-      && value?.inputDisabled === false,
+      && value?.inputDisabled === false
+      && value?.paletteActive === true,
     'PNG export state restoration',
     8_000,
   )
 
+  await rm(download.path, { force: true })
+  await evaluateValue(send, `document.querySelector('[data-palette="blossom"]')?.click()`)
+  await sleep(650)
+  await evaluateValue(send, `document.querySelector('[data-palette="${transitionPalette}"]')?.click()`)
+  await sleep(650)
+  await evaluateValue(send, `document.querySelector('#export-png')?.click()`)
+
+  const settledDownload = await waitForDownload(8_000)
+  const settledPair = PNG.sync.read(await readFile(settledDownload.path))
+  assertIdenticalPixels(immediatePair, settledPair)
+  decodeQrPanel(settledPair)
+
   console.log(
-    `png export smoke: ${download.filename} / ${download.bytes} bytes / ${pair.width}×${pair.height} / `
-      + `QR V${qrVersion} / event ${eventDetail.bytes} bytes / direct jsQR decoded ${JSON.stringify(decodedPayload)} / restored ${restored.mode}`,
+    `png export smoke: ${download.filename} / ${download.bytes} bytes / ${immediatePair.width}×${immediatePair.height} / `
+      + `QR V${qrVersion} / event ${eventDetail.bytes} bytes / direct jsQR decoded ${JSON.stringify(decodedPayload)} / `
+      + `immediate ${transitionPalette} export matched settled palette pixels / restored ${restored.mode}`,
   )
 } finally {
   socket?.close()
