@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 const [
   html,
   main,
+  exportControls,
   appUi,
   uiControls,
   sceneSwipe,
@@ -15,6 +16,7 @@ const [
 ] = await Promise.all([
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
+  readFile('src/export-controls.ts', 'utf8'),
   readFile('src/app-ui.ts', 'utf8'),
   readFile('src/ui-controls.ts', 'utf8'),
   readFile('src/scene-swipe.ts', 'utf8'),
@@ -66,7 +68,12 @@ for (const id of ['export-gif', 'export-png', 'copy-share-link']) {
 
 // UI structure belongs in static HTML. Runtime scripts may bind state/events, but they
 // should not regress to rebuilding the shell or injecting style elements.
-for (const [source, label] of [[main, 'src/main.ts'], [appUi, 'src/app-ui.ts'], [uiControls, 'src/ui-controls.ts']]) {
+for (const [source, label] of [
+  [main, 'src/main.ts'],
+  [exportControls, 'src/export-controls.ts'],
+  [appUi, 'src/app-ui.ts'],
+  [uiControls, 'src/ui-controls.ts'],
+]) {
   forbidText(source, "document.createElement('button')", label)
   forbidText(source, 'document.createElement("button")', label)
   forbidText(source, "document.createElement('nav')", label)
@@ -98,11 +105,16 @@ forbidText(sceneSwipe, "document.addEventListener('keydown'", 'src/scene-swipe.t
 requireText(sceneSwipe, "sceneCurrent.addEventListener('pointerdown'", 'src/scene-swipe.ts')
 
 // Interactive/hash consumers request an exact Art/QR pose through a semantic command.
-// Exporters instead clone the current render hierarchy and mutate only that snapshot, so
-// capture can never corrupt the live presentation even if encoding fails part-way through.
+// Export controls settle transient palette state, then exporters clone the current render
+// hierarchy and mutate only that snapshot so capture cannot corrupt the live presentation.
 requireText(projectionView, "PROJECTION_VIEW_REQUEST_EVENT = 'projection-view-request'", 'src/projection-view.ts')
 requireText(main, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/main.ts')
-requireText(main, 'void exportPngPair({', 'src/main.ts')
+requireText(main, 'bindExportControls({', 'src/main.ts')
+forbidText(main, 'void exportPngPair({', 'src/main.ts')
+forbidText(main, 'void exportRevealGif({', 'src/main.ts')
+requireText(exportControls, 'context.finishPaletteTransition()', 'src/export-controls.ts')
+requireText(exportControls, 'void exportPngPair({', 'src/export-controls.ts')
+requireText(exportControls, 'void exportRevealGif({', 'src/export-controls.ts')
 requireText(exportScene, 'scene.clone(true)', 'src/export-scene.ts')
 requireText(exportScene, 'InstancedMesh.clone()', 'src/export-scene.ts')
 for (const [source, label] of [[pngExport, 'src/png-export.ts'], [gifExport, 'src/gif-export.ts']]) {
@@ -132,4 +144,4 @@ for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 's
   forbidText(source, 'new MouseEvent("click"', label)
 }
 
-console.log('ui architecture smoke: static shell, app UI ownership, scene interaction ownership, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')
+console.log('ui architecture smoke: static shell, app UI ownership, scene interaction ownership, export control ownership, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')
