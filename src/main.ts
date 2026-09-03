@@ -1,15 +1,11 @@
 import './styles.css'
-import type { PaletteKey } from './palettes'
 import type { StyleId } from './styles'
 import { bindAppInteractions } from './app-interactions'
 import { bindExportControls } from './export-controls'
 import { createPresentationController } from './presentation'
 import { createRenderRuntime } from './render-runtime'
 import { createVoxelMeshController } from './voxel-mesh'
-import {
-  applyPaletteColorBuffer,
-  computePaletteColors,
-} from './palette-rendering'
+import { createPaletteController } from './palette-controller'
 import { createPaletteTransitionController } from './palette-transition'
 import type { ProjectionView } from './projection-view'
 import { createSculptureController } from './sculpture-state'
@@ -44,9 +40,19 @@ const {
 } = runtime
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 const voxelMeshes = createVoxelMeshController(sculptureRoot)
-const paletteTransitions = createPaletteTransitionController()
 const sculpture = createSculptureController('tree')
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const palette = createPaletteController({
+  voxelMeshes,
+  transitions: createPaletteTransitionController(),
+  reducedMotion,
+  getBuild: () => sculpture.build,
+  getStyleId: () => sculpture.styleId,
+  getPaletteKey: () => sculpture.paletteKey,
+  setPaletteKey: (paletteKey) => sculpture.setPalette(paletteKey),
+  updateUi: (styleId, paletteKey) => ui.updatePalette(styleId, paletteKey),
+  isBusy: () => isExporting,
+})
 const viewTransitions = createViewTransitionController(
   sculptureRoot,
   presentation.artQuaternion,
@@ -55,20 +61,6 @@ const viewTransitions = createViewTransitionController(
 )
 
 let isExporting = false
-
-function applyPalette(): void {
-  paletteTransitions.cancel()
-  const voxelMesh = voxelMeshes.mesh
-  const build = sculpture.build
-  if (voxelMesh && build) {
-    applyPaletteColorBuffer(
-      voxelMesh,
-      build,
-      computePaletteColors(build, sculpture.styleId, sculpture.paletteKey),
-    )
-  }
-  ui.updatePalette(sculpture.styleId, sculpture.paletteKey)
-}
 
 function setExportUiBusy(busy: boolean): void {
   isExporting = busy
@@ -89,10 +81,10 @@ function rebuild(value: string): void {
   try {
     const { matrix, style, build } = sculpture.rebuild(content)
 
-    paletteTransitions.cancel()
+    palette.cancel()
     voxelMeshes.replace(build, style.appearance.voxelFill)
 
-    applyPalette()
+    palette.apply()
     presentation.updateComposition(
       stage.clientWidth,
       stage.clientHeight,
@@ -127,25 +119,6 @@ function requestStyleTransition(nextStyleId: StyleId): void {
   presentation.applyTransform()
 }
 
-function requestPaletteTransition(nextPaletteKey: PaletteKey): void {
-  if (isExporting || nextPaletteKey === sculpture.paletteKey) return
-
-  const voxelMesh = voxelMeshes.mesh
-  sculpture.setPalette(nextPaletteKey)
-  ui.updatePalette(sculpture.styleId, sculpture.paletteKey)
-
-  const build = sculpture.build
-  if (!build || !voxelMesh || reducedMotion) {
-    applyPalette()
-    return
-  }
-
-  const to = computePaletteColors(build, sculpture.styleId, sculpture.paletteKey)
-  if (!paletteTransitions.start(voxelMesh, build, to)) {
-    applyPaletteColorBuffer(voxelMesh, build, to)
-  }
-}
-
 bindExportControls({
   exportGifButton,
   exportPngButton,
@@ -161,7 +134,7 @@ bindExportControls({
   getStyleId: () => sculpture.styleId,
   isBusy: () => isExporting,
   finishPaletteTransition: () => {
-    paletteTransitions.finish(voxelMeshes.mesh)
+    palette.finish()
   },
   setBusy: setExportUiBusy,
 })
@@ -176,7 +149,7 @@ bindAppInteractions({
   getView: () => viewTransitions.view,
   setView: setMode,
   requestStyle: requestStyleTransition,
-  requestPalette: requestPaletteTransition,
+  requestPalette: palette.request,
   rebuild,
 })
 
@@ -191,7 +164,7 @@ const resizeObserver = new ResizeObserver(resize)
 resizeObserver.observe(stage)
 resize()
 updateStyleCopy()
-applyPalette()
+palette.apply()
 rebuild(input.value)
 setMode('art')
 
@@ -199,7 +172,7 @@ function animate(): void {
   const delta = clock.getDelta()
   const now = performance.now()
 
-  paletteTransitions.update(voxelMeshes.mesh, now)
+  palette.update(now)
   presentation.applyTransform()
   viewTransitions.update(delta)
   renderer.render(scene, camera)
