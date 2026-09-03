@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 const [
   html,
   main,
+  appInteractions,
   exportControls,
   appUi,
   uiControls,
@@ -16,6 +17,7 @@ const [
 ] = await Promise.all([
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
+  readFile('src/app-interactions.ts', 'utf8'),
   readFile('src/export-controls.ts', 'utf8'),
   readFile('src/app-ui.ts', 'utf8'),
   readFile('src/ui-controls.ts', 'utf8'),
@@ -70,6 +72,7 @@ for (const id of ['export-gif', 'export-png', 'copy-share-link']) {
 // should not regress to rebuilding the shell or injecting style elements.
 for (const [source, label] of [
   [main, 'src/main.ts'],
+  [appInteractions, 'src/app-interactions.ts'],
   [exportControls, 'src/export-controls.ts'],
   [appUi, 'src/app-ui.ts'],
   [uiControls, 'src/ui-controls.ts'],
@@ -82,9 +85,25 @@ for (const [source, label] of [
   forbidText(source, 'document.createElement("style")', label)
 }
 
-// main.ts owns orchestration; the app UI controller owns application-facing static DOM
-// bindings and presentation text/busy state. ui-controls.ts separately owns the overlay.
+// main.ts owns render/sculpture orchestration. app-interactions.ts owns application-level
+// DOM commands while app-ui.ts owns static DOM bindings and presentation/busy state.
 requireText(main, 'createAppUiController()', 'src/main.ts')
+requireText(main, 'bindAppInteractions({', 'src/main.ts')
+requireText(appInteractions, "context.pointerSurface.addEventListener('click'", 'src/app-interactions.ts')
+requireText(appInteractions, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/app-interactions.ts')
+requireText(appInteractions, "context.styleRow.addEventListener('click'", 'src/app-interactions.ts')
+requireText(appInteractions, "context.input.addEventListener('input'", 'src/app-interactions.ts')
+requireText(appInteractions, 'new AbortController()', 'src/app-interactions.ts')
+requireText(appInteractions, 'window.setTimeout(() => context.rebuild(context.input.value), 180)', 'src/app-interactions.ts')
+for (const text of [
+  "renderer.domElement.addEventListener('click'",
+  'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT',
+  "styleRow.addEventListener('click'",
+  "input.addEventListener('input'",
+  'let rebuildTimer =',
+]) {
+  forbidText(main, text, 'src/main.ts interaction ownership')
+}
 requireText(appUi, "requiredElement<HTMLButtonElement>('#export-gif')", 'src/app-ui.ts')
 requireText(appUi, "requiredElement<HTMLButtonElement>('#export-png')", 'src/app-ui.ts')
 requireText(appUi, "requiredElement<HTMLButtonElement>('#copy-share-link')", 'src/app-ui.ts')
@@ -108,7 +127,7 @@ requireText(sceneSwipe, "sceneCurrent.addEventListener('pointerdown'", 'src/scen
 // Export controls settle transient palette state, then exporters clone the current render
 // hierarchy and mutate only that snapshot so capture cannot corrupt the live presentation.
 requireText(projectionView, "PROJECTION_VIEW_REQUEST_EVENT = 'projection-view-request'", 'src/projection-view.ts')
-requireText(main, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/main.ts')
+requireText(appInteractions, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/app-interactions.ts')
 requireText(main, 'bindExportControls({', 'src/main.ts')
 forbidText(main, 'void exportPngPair({', 'src/main.ts')
 forbidText(main, 'void exportRevealGif({', 'src/main.ts')
@@ -144,4 +163,4 @@ for (const [source, label] of [[pngExport, 'src/png-export.ts'], [shareState, 's
   forbidText(source, 'new MouseEvent("click"', label)
 }
 
-console.log('ui architecture smoke: static shell, app UI ownership, scene interaction ownership, export control ownership, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')
+console.log('ui architecture smoke: static shell, app UI ownership, app interaction ownership, scene interaction ownership, export control ownership, export hierarchy, stylesheet ownership, projection commands, and isolated export scene ownership passed')

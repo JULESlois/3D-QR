@@ -1,6 +1,7 @@
 import './styles.css'
-import { isPaletteKey, type PaletteKey } from './palettes'
-import { isStyleId, type StyleId } from './styles'
+import type { PaletteKey } from './palettes'
+import type { StyleId } from './styles'
+import { bindAppInteractions } from './app-interactions'
 import { bindExportControls } from './export-controls'
 import { createPresentationController } from './presentation'
 import { createRenderRuntime } from './render-runtime'
@@ -10,12 +11,7 @@ import {
   computePaletteColors,
 } from './palette-rendering'
 import { createPaletteTransitionController } from './palette-transition'
-import {
-  PROJECTION_VIEW_REQUEST_EVENT,
-  isProjectionView,
-  type ProjectionView,
-  type ProjectionViewRequestDetail,
-} from './projection-view'
+import type { ProjectionView } from './projection-view'
 import { createSculptureController } from './sculpture-state'
 import { createViewTransitionController } from './view-transition'
 import { createAppUiController } from './app-ui'
@@ -32,7 +28,6 @@ const {
   input,
   meta,
   styleRow,
-  styleButtons,
   paletteButtons,
   exportGifButton,
   exportPngButton,
@@ -59,7 +54,6 @@ const viewTransitions = createViewTransitionController(
   reducedMotion,
 )
 
-let rebuildTimer = 0
 let isExporting = false
 
 function applyPalette(): void {
@@ -120,11 +114,6 @@ function setMode(next: ProjectionView): void {
   ui.updateProjection(sculpture.styleId, next)
 }
 
-function toggleMode(): void {
-  if (isExporting) return
-  setMode(viewTransitions.view === 'art' ? 'qr' : 'art')
-}
-
 function switchStyleImmediately(nextStyleId: StyleId): void {
   sculpture.setStyle(nextStyleId)
   updateStyleCopy()
@@ -177,37 +166,18 @@ bindExportControls({
   setBusy: setExportUiBusy,
 })
 
-renderer.domElement.addEventListener('click', toggleMode)
-
-document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT, (event) => {
-  const request = event as CustomEvent<ProjectionViewRequestDetail>
-  if (!request.detail || !isProjectionView(request.detail.view)) return
-  setMode(request.detail.view)
-})
-
-styleRow.addEventListener('click', (event) => {
-  const target = event.target
-  if (!(target instanceof Element)) return
-  const button = target.closest<HTMLButtonElement>('[data-style]')
-  if (!button || button.disabled || !styleRow.contains(button)) return
-  const requested = button.dataset.style
-  if (!requested || !isStyleId(requested)) return
-  requestStyleTransition(requested)
-})
-
-paletteButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    const requested = button.dataset.palette
-    if (!requested || !isPaletteKey(requested)) return
-    requestPaletteTransition(requested)
-  })
-})
-
-input.addEventListener('input', () => {
-  if (isExporting) return
-  window.clearTimeout(rebuildTimer)
-  meta.textContent = 'REBUILDING VOXEL FIELD…'
-  rebuildTimer = window.setTimeout(() => rebuild(input.value), 180)
+bindAppInteractions({
+  pointerSurface: renderer.domElement,
+  input,
+  meta,
+  styleRow,
+  paletteButtons,
+  isBusy: () => isExporting,
+  getView: () => viewTransitions.view,
+  setView: setMode,
+  requestStyle: requestStyleTransition,
+  requestPalette: requestPaletteTransition,
+  rebuild,
 })
 
 function resize(): void {
