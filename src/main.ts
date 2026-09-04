@@ -9,6 +9,7 @@ import { createPaletteController } from './palette-controller'
 import { createPaletteTransitionController } from './palette-transition'
 import type { ProjectionView } from './projection-view'
 import { createSculptureController } from './sculpture-state'
+import { bindShareState } from './share-state'
 import { createViewTransitionController } from './view-transition'
 import { createAppUiController } from './app-ui'
 
@@ -167,6 +168,7 @@ updateStyleCopy()
 palette.apply()
 rebuild(input.value)
 setMode('art')
+bindShareState()
 
 function animate(): void {
   const delta = clock.getDelta()
