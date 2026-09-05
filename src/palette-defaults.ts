@@ -16,6 +16,7 @@ const PAIRED_MATERIAL_KEYS = [
   'stone',
   'plaster',
   'glass',
+  'metal',
   'water',
   'crystal',
 ] as const satisfies readonly (keyof ScenePaletteDefinition)[]

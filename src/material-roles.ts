@@ -9,7 +9,7 @@ const ROLE_MATERIALS = {
   // as blue-steel instead of collapsing into the same neutral stone as platforms.
   // Keeping the role indirection lets a future renderer promote metal to dedicated PBR
   // properties without revisiting scene generators.
-  metal: 'glass',
+  metal: 'metal',
   // Roof planes use the darker structural/foundation family rather than the same stone
   // ramp as walls, courts, and plinths. This gives House, Pagoda, Temple, and Lighthouse
   // roofs a clearer silhouette while retaining each palette's authored hue relationship.
