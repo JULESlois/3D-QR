@@ -35,8 +35,8 @@ for (const style of STYLES) {
       if (!Array.isArray(colors)) continue
 
       const ramp = splitMaterialToneRamp(colors)
-      if (ramp.dark.length !== ramp.light.length || ramp.dark.length * 2 !== colors.length) {
-        throw new Error(`${style.id}/${paletteKey}/${material} produced mismatched tone ramps.`)
+      if (!ramp.dark.length || !ramp.light.length || ramp.dark.length + ramp.light.length !== colors.length) {
+        throw new Error(`${style.id}/${paletteKey}/${material} produced an invalid explicit tone ramp.`)
       }
 
       for (const tone of TONES) {
@@ -46,7 +46,7 @@ for (const style of STYLES) {
             expectedRamp.length - 1,
             Math.floor(Math.max(0, Math.min(0.999999, phase)) * expectedRamp.length),
           )
-          const actual = materialColorForTone(colors, tone, phase)
+          const actual = materialColorForTone(ramp, tone, phase)
           const expected = expectedRamp[expectedIndex]
           if (actual !== expected) {
             throw new Error(
@@ -112,5 +112,5 @@ if (transitions.finish(transitionMesh)) {
 }
 
 console.log(
-  `material tone smoke passed for ${rampCount} paired ramps, ${sampleCount} explicit tone/phase samples, and palette transition finalization`,
+  `material tone smoke passed for ${rampCount} explicit ramps, ${sampleCount} explicit tone/phase samples, and palette transition finalization`,
 )
