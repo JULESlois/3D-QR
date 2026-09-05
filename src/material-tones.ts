@@ -24,20 +24,13 @@ export function splitMaterialToneRamp(colors: readonly string[]): MaterialToneRa
   }
 }
 
-export function materialColorsForTone(
-  colors: readonly string[],
-  tone: MaterialTone,
-): readonly string[] {
-  return splitMaterialToneRamp(colors)[tone]
-}
-
 export function materialColorForTone(
-  colors: readonly string[],
+  ramp: MaterialToneRamp,
   tone: MaterialTone,
   colorPhase: number,
 ): string {
-  const ramp = materialColorsForTone(colors, tone)
+  const colors = ramp[tone]
   const phase = Math.max(0, Math.min(0.999999, colorPhase))
-  const index = Math.min(ramp.length - 1, Math.floor(phase * ramp.length))
-  return ramp[index]
+  const index = Math.min(colors.length - 1, Math.floor(phase * colors.length))
+  return colors[index]
 }
