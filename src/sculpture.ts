@@ -14,6 +14,7 @@ export type VoxelKind =
   | 'plaster'
   | 'glass'
   | 'metal'
+  | 'roof'
   | 'water'
   | 'crystal'
 

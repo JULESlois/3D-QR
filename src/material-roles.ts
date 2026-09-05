@@ -10,12 +10,11 @@ const ROLE_MATERIALS = {
   // Keeping the role indirection lets a future renderer promote metal to dedicated PBR
   // properties without revisiting scene generators.
   metal: 'metal',
-  // Roof planes use the darker structural/foundation family rather than the same stone
-  // ramp as walls, courts, and plinths. This gives House, Pagoda, Temple, and Lighthouse
-  // roofs a clearer silhouette while retaining each palette's authored hue relationship.
-  // Foundation ramps are already paired for projectionTone, so scanner polarity remains
-  // explicit and no black/white scanner cap is introduced.
-  roof: 'foundation',
+  // Roof planes keep their own semantic color family instead of borrowing foundation.
+  // House, Pagoda, Temple, and Lighthouse can now share roof behavior while palettes gain
+  // independent control over silhouette contrast. Projection polarity remains explicit
+  // because roof ramps are normalized through the same dark/light material pipeline.
+  roof: 'roof',
   // Paths and processional approaches use the plaster family so paved circulation reads
   // lighter than retaining walls, plinths, and other stonework. The paired plaster ramps
   // still preserve dark/light projection polarity on scanner-facing surfaces.

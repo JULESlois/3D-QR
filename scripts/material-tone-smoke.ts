@@ -4,6 +4,7 @@ import {
   splitMaterialToneRamp,
   type MaterialTone,
 } from '../src/material-tones'
+import { materialForRole } from '../src/material-roles'
 import { PALETTE_KEYS, getPalette, type ScenePaletteDefinition } from '../src/palettes'
 import { createPaletteTransitionController } from '../src/palette-transition'
 import type { SculptureBuild } from '../src/sculpture'
@@ -16,12 +17,21 @@ const PAIRED_MATERIAL_KEYS = [
   'stone',
   'plaster',
   'glass',
+  'metal',
+  'roof',
   'water',
   'crystal',
 ] as const satisfies readonly (keyof ScenePaletteDefinition)[]
 
 const SAMPLE_PHASES = [0, 0.24, 0.5, 0.74, 0.999999] as const
 const TONES = ['dark', 'light'] as const satisfies readonly MaterialTone[]
+
+if (materialForRole('metal') !== 'metal') {
+  throw new Error('Metal semantic role no longer resolves to the dedicated metal material.')
+}
+if (materialForRole('roof') !== 'roof') {
+  throw new Error('Roof semantic role no longer resolves to the dedicated roof material.')
+}
 
 let rampCount = 0
 let sampleCount = 0

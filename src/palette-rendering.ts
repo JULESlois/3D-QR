@@ -13,6 +13,7 @@ const fallbackStone = ['#505650', '#626861', '#73786f', '#85897e', '#999b8d', '#
 const fallbackPlaster = ['#9f927e', '#b2a38b', '#c4b49a', '#d8cbb4', '#e7dbc5', '#eee6d8'] as const
 const fallbackGlass = ['#3c626c', '#4c7580', '#5e8790', '#83a7aa', '#9bbabd', '#b2cccd'] as const
 const fallbackMetal = ['#30424b', '#3f5560', '#506975', '#76909a', '#91a9b1', '#acbec4'] as const
+const fallbackRoof = ['#3d3130', '#51413b', '#665149', '#8a7164', '#a28b7d', '#b9a598'] as const
 
 // Three.Color stores linear RGB values after parsing authored sRGB palette colors, so this
 // is the same relative-luminance space that a thresholding scanner effectively needs.
@@ -131,6 +132,8 @@ function colorForVoxel(
       return materialVoxelColor(palette.glass ?? fallbackGlass, voxel, target)
     case 'metal':
       return materialVoxelColor(palette.metal ?? fallbackMetal, voxel, target)
+    case 'roof':
+      return materialVoxelColor(palette.roof ?? fallbackRoof, voxel, target)
     case 'primary':
     default:
       return materialVoxelColor(palette.colors, voxel, target)
