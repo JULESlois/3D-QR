@@ -1,5 +1,9 @@
 import * as THREE from 'three'
-import { materialColorForTone } from './material-tones'
+import {
+  materialColorForTone,
+  splitMaterialToneRamp,
+  type MaterialToneRamp,
+} from './material-tones'
 import { getPalette, type PaletteKey } from './palettes'
 import type { ProjectionTone, SculptureBuild, SculptureVoxel } from './sculpture'
 import { getStyle, type StyleId } from './styles'
@@ -15,6 +19,17 @@ const fallbackGlass = ['#3c626c', '#4c7580', '#5e8790', '#83a7aa', '#9bbabd', '#
 // material's locally-paired dark/light ramps are mutually separable from other materials.
 const DARK_PROJECTION_MAX_LUMINANCE = 0.1
 const LIGHT_PROJECTION_MIN_LUMINANCE = 0.62
+
+const materialToneRampCache = new WeakMap<readonly string[], MaterialToneRamp>()
+
+function explicitMaterialToneRamp(colors: readonly string[]): MaterialToneRamp {
+  const cached = materialToneRampCache.get(colors)
+  if (cached) return cached
+
+  const ramp = splitMaterialToneRamp(colors)
+  materialToneRampCache.set(colors, ramp)
+  return ramp
+}
 
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1)
@@ -66,7 +81,9 @@ function materialVoxelColor(
   target: THREE.Color,
 ): THREE.Color {
   if (voxel.projectionTone) {
-    target.set(materialColorForTone(colors, voxel.projectionTone, voxel.colorPhase))
+    target.set(
+      materialColorForTone(explicitMaterialToneRamp(colors), voxel.projectionTone, voxel.colorPhase),
+    )
     return enforceProjectionContrast(target, voxel.projectionTone)
   }
   return indexedHexColor(colors, voxel.colorPhase, target)
