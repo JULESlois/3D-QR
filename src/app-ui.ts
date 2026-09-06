@@ -45,12 +45,9 @@ export interface AppUiController {
 export function createAppUiController(): AppUiController {
   const input = requiredElement<HTMLInputElement>('#qr-input')
   const meta = requiredElement<HTMLElement>('#qr-meta')
-  const modeReadout = requiredElement<HTMLElement>('#mode-readout')
-  const stageHint = requiredElement<HTMLElement>('#stage-hint')
   const eyebrow = requiredElement<HTMLElement>('#style-eyebrow')
   const headline = requiredElement<HTMLElement>('#style-headline')
   const lede = requiredElement<HTMLElement>('#style-lede')
-  const specimen = requiredElement<HTMLElement>('#style-specimen')
   const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
   const styleRow = requiredElement<HTMLElement>('.style-row')
   const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
@@ -88,15 +85,7 @@ export function createAppUiController(): AppUiController {
     })
   }
 
-  function updateProjection(styleId: StyleId, view: ProjectionView): void {
-    const showQr = view === 'qr'
-    const style = getStyle(styleId)
-    modeReadout.textContent = showQr
-      ? `QR / ${style.projectionLabel}`
-      : `${style.label.toUpperCase()} / ISOMETRIC`
-    stageHint.textContent = showQr
-      ? `CLICK TO RETURN · ${style.specimen}`
-      : 'CLICK TO ROTATE · FULL-SCENE QR POLARITY / SAME PROJECTION'
+  function updateProjection(_styleId: StyleId, view: ProjectionView): void {
     document.body.dataset.mode = view
   }
 
@@ -105,7 +94,6 @@ export function createAppUiController(): AppUiController {
     eyebrow.textContent = style.eyebrow
     headline.textContent = style.headline
     lede.textContent = style.description
-    specimen.textContent = style.specimen
     styleButtons.forEach((button) => {
       button.classList.toggle('is-active', button.dataset.style === styleId)
     })
