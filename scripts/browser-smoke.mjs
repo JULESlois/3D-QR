@@ -420,6 +420,10 @@ try {
   await navigate(send, 390, 844)
   const mobileState = await exerciseMobileUi(send)
   const mobileBytes = await capture(send, 'mobile-art')
+  await switchToQr(send)
+  await isolateQrProjection(send)
+  const mobileQrBytes = await capture(send, 'mobile-qr-view')
+  const mobileDecodedPayload = decodeQrScreenshot(mobileQrBytes)
 
   await navigate(send, 1024, 1024)
   await switchToQr(send)
@@ -428,8 +432,9 @@ try {
   const decodedPayload = decodeQrScreenshot(qrBytes)
 
   console.log(
-    `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes (${mobileState.style}/${mobileState.palette}) / QR ${qrBytes.length} bytes / `
-      + `jsQR decoded ${JSON.stringify(decodedPayload)}`,
+    `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes (${mobileState.style}/${mobileState.palette}) / `
+      + `mobile QR ${mobileQrBytes.length} bytes / QR ${qrBytes.length} bytes / `
+      + `jsQR decoded mobile ${JSON.stringify(mobileDecodedPayload)} and square ${JSON.stringify(decodedPayload)}`,
   )
 } finally {
   socket?.close()
