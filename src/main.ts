@@ -7,6 +7,7 @@ import { createRenderRuntime } from './render-runtime'
 import { createVoxelMeshController } from './voxel-mesh'
 import { createPaletteController } from './palette-controller'
 import { createPaletteTransitionController } from './palette-transition'
+import { createQrBuildController } from './qr-build-controller'
 import type { ProjectionView } from './projection-view'
 import { createSculptureController } from './sculpture-state'
 import { bindShareState } from './share-state'
@@ -72,34 +73,14 @@ function updateStyleCopy(): void {
   ui.updateStyle(sculpture.styleId, viewTransitions.view)
 }
 
-function rebuild(value: string): void {
-  const content = value.trim()
-  if (!content) {
-    meta.textContent = 'ENTER A URL OR TEXT TO BUILD A QR SCULPTURE.'
-    return
-  }
-
-  try {
-    const { matrix, style, build } = sculpture.rebuild(content)
-
-    palette.cancel()
-    voxelMeshes.replace(build, style.appearance.voxelFill)
-
-    palette.apply()
-    presentation.updateComposition(
-      stage.clientWidth,
-      stage.clientHeight,
-      build,
-      true,
-    )
-
-    const detail = build.detail ? ` · ${build.detail}` : ''
-    meta.textContent = `QR V${matrix.version} · ${matrix.size}×${matrix.size} · ${style.label.toUpperCase()} ${build.liftedModuleCount} · PAD D${build.baseDarkCount}/L${build.baseLightCount} · F${build.foundationVoxelCount} · ${style.projectionLabel}${detail}`
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown QR error'
-    meta.textContent = `QR ERROR · ${message}`
-  }
-}
+const { rebuild } = createQrBuildController({
+  stage,
+  meta,
+  sculpture,
+  voxelMeshes,
+  palette,
+  presentation,
+})
 
 function setMode(next: ProjectionView): void {
   voxelMeshes.setScannerFacing(next === 'qr')
