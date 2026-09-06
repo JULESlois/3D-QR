@@ -397,26 +397,7 @@ body[data-mode='qr'] .control-panel {
   font-weight: 590;
 }
 
-.description-toggle {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-top: 1px;
-  border: 1px solid rgba(32, 35, 31, .22);
-  color: rgba(32, 35, 31, .64);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1;
-  transition: border-color 160ms ease, color 160ms ease, transform 220ms ease;
-}
 
-
-
-.description-toggle::before {
-  content: '+';
-}
 
 
 
@@ -519,10 +500,6 @@ body[data-mode='qr'] .control-panel {
     line-height: .96;
   }
 
-  .description-toggle {
-    width: 30px;
-    height: 30px;
-  }
 
   
 
@@ -560,11 +537,6 @@ body[data-mode='qr'] .control-panel {
   
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .description-toggle {
-    transition: none;
-  }
-}
 
 /* Runtime-independent interaction and transition shell. These rules were previously
    injected by ui-controls.ts; keeping them here makes the final visual contract static. */
@@ -756,11 +728,7 @@ body[data-mode='qr'] .scene-window {
     transform 200ms cubic-bezier(.22,.72,.22,1);
 }
 
-body[data-controls-phase='closing'] .scene-copy,
-body[data-controls-phase='opening'] .scene-copy,
 body[data-controls-phase='collapsed'] .scene-copy,
-body[data-controls-phase='closing'] .control-panel > :not(.control-copy),
-body[data-controls-phase='opening'] .control-panel > :not(.control-copy),
 body[data-controls-phase='collapsed'] .control-panel > :not(.control-copy) {
   opacity: 0;
   transform: translateX(-18px);
@@ -812,8 +780,7 @@ body[data-controls='collapsed'] .panel-collapse-toggle {
   -webkit-backdrop-filter: blur(14px) saturate(.9);
 }
 
-body[data-controls='collapsed'] .panel-collapse-toggle::before,
-body[data-controls-phase='opening'] .panel-collapse-toggle::before {
+body[data-controls='collapsed'] .panel-collapse-toggle::before {
   content: '+' !important;
 }
 
