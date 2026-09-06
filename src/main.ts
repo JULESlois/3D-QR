@@ -1,5 +1,4 @@
 import './styles.css'
-import type { StyleId } from './styles'
 import { bindAppInteractions } from './app-interactions'
 import { bindExportControls } from './export-controls'
 import { createPresentationController } from './presentation'
@@ -8,11 +7,11 @@ import { createVoxelMeshController } from './voxel-mesh'
 import { createPaletteController } from './palette-controller'
 import { createPaletteTransitionController } from './palette-transition'
 import { createQrBuildController } from './qr-build-controller'
-import type { ProjectionView } from './projection-view'
 import { createSculptureController } from './sculpture-state'
 import { bindShareState } from './share-state'
 import { createViewTransitionController } from './view-transition'
 import { createAppUiController } from './app-ui'
+import { createAppNavigationController } from './app-navigation-controller'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -69,10 +68,6 @@ function setExportUiBusy(busy: boolean): void {
   ui.setExportBusy(busy, renderer.domElement)
 }
 
-function updateStyleCopy(): void {
-  ui.updateStyle(sculpture.styleId, viewTransitions.view)
-}
-
 const { rebuild } = createQrBuildController({
   stage,
   meta,
@@ -82,24 +77,16 @@ const { rebuild } = createQrBuildController({
   presentation,
 })
 
-function setMode(next: ProjectionView): void {
-  voxelMeshes.setScannerFacing(next === 'qr')
-  viewTransitions.setView(next)
-  ui.updateProjection(sculpture.styleId, next)
-}
-
-function switchStyleImmediately(nextStyleId: StyleId): void {
-  sculpture.setStyle(nextStyleId)
-  updateStyleCopy()
-  rebuild(input.value)
-}
-
-function requestStyleTransition(nextStyleId: StyleId): void {
-  if (isExporting || nextStyleId === sculpture.styleId) return
-
-  switchStyleImmediately(nextStyleId)
-  presentation.applyTransform()
-}
+const navigation = createAppNavigationController({
+  sculpture,
+  voxelMeshes,
+  viewTransitions,
+  ui,
+  presentation,
+  rebuild,
+  getInputValue: () => input.value,
+  isBusy: () => isExporting,
+})
 
 bindExportControls({
   exportGifButton,
@@ -129,8 +116,8 @@ bindAppInteractions({
   paletteButtons,
   isBusy: () => isExporting,
   getView: () => viewTransitions.view,
-  setView: setMode,
-  requestStyle: requestStyleTransition,
+  setView: navigation.setMode,
+  requestStyle: navigation.requestStyle,
   requestPalette: palette.request,
   rebuild,
 })
@@ -145,10 +132,10 @@ function resize(): void {
 const resizeObserver = new ResizeObserver(resize)
 resizeObserver.observe(stage)
 resize()
-updateStyleCopy()
+navigation.updateStyleCopy()
 palette.apply()
 rebuild(input.value)
-setMode('art')
+navigation.setMode('art')
 bindShareState()
 
 function animate(): void {
