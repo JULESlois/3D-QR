@@ -12,6 +12,7 @@ import { bindShareState } from './share-state'
 import { createViewTransitionController } from './view-transition'
 import { createAppUiController } from './app-ui'
 import { createAppNavigationController } from './app-navigation-controller'
+import { createAppRenderController } from './app-render-controller'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -37,7 +38,6 @@ const {
   renderer,
   presentationGroup,
   sculptureRoot,
-  clock,
 } = runtime
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 const voxelMeshes = createVoxelMeshController(sculptureRoot)
@@ -122,30 +122,18 @@ bindAppInteractions({
   rebuild,
 })
 
-function resize(): void {
-  const width = Math.max(1, stage.clientWidth)
-  const height = Math.max(1, stage.clientHeight)
-  runtime.resize(width, height)
-  presentation.updateComposition(width, height, sculpture.build, true)
-}
+const renderController = createAppRenderController({
+  stage,
+  runtime,
+  presentation,
+  sculpture,
+  palette,
+  viewTransitions,
+})
 
-const resizeObserver = new ResizeObserver(resize)
-resizeObserver.observe(stage)
-resize()
+renderController.start()
 navigation.updateStyleCopy()
 palette.apply()
 rebuild(input.value)
 navigation.setMode('art')
 bindShareState()
-
-function animate(): void {
-  const delta = clock.getDelta()
-  const now = performance.now()
-
-  palette.update(now)
-  presentation.applyTransform()
-  viewTransitions.update(delta)
-  renderer.render(scene, camera)
-}
-
-renderer.setAnimationLoop(animate)
