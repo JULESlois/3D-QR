@@ -5,6 +5,7 @@ const [
   main,
   appInteractions,
   exportControls,
+  exportStatus,
   appUi,
   uiControls,
   sceneSwipe,
@@ -19,6 +20,7 @@ const [
   readFile('src/main.ts', 'utf8'),
   readFile('src/app-interactions.ts', 'utf8'),
   readFile('src/export-controls.ts', 'utf8'),
+  readFile('src/export-status.ts', 'utf8'),
   readFile('src/app-ui.ts', 'utf8'),
   readFile('src/ui-controls.ts', 'utf8'),
   readFile('src/scene-swipe.ts', 'utf8'),
@@ -134,6 +136,16 @@ forbidText(main, 'void exportRevealGif({', 'src/main.ts')
 requireText(exportControls, 'context.finishPaletteTransition()', 'src/export-controls.ts')
 requireText(exportControls, 'void exportPngPair({', 'src/export-controls.ts')
 requireText(exportControls, 'void exportRevealGif({', 'src/export-controls.ts')
+requireText(exportControls, 'onStatus: publishGifExportStatus', 'src/export-controls.ts')
+requireText(exportStatus, "GIF_EXPORT_STATUS_EVENT = 'gif-export-status'", 'src/export-status.ts')
+requireText(gifExport, "onStatus({ phase: 'preparing' })", 'src/gif-export.ts')
+requireText(gifExport, "onStatus({ phase: 'encoding'", 'src/gif-export.ts')
+requireText(gifExport, "onStatus({ phase: 'complete' })", 'src/gif-export.ts')
+requireText(gifExport, "onStatus({ phase: 'error', message })", 'src/gif-export.ts')
+requireText(uiControls, 'document.addEventListener(GIF_EXPORT_STATUS_EVENT', 'src/ui-controls.ts')
+forbidText(uiControls, 'syncExportOverlayFromButton', 'src/ui-controls.ts')
+forbidText(uiControls, 'exportObserver', 'src/ui-controls.ts')
+forbidText(uiControls, "exportButton.addEventListener('click', showExportOverlay)", 'src/ui-controls.ts')
 requireText(exportScene, 'scene.clone(true)', 'src/export-scene.ts')
 requireText(exportScene, 'InstancedMesh.clone()', 'src/export-scene.ts')
 for (const [source, label] of [[pngExport, 'src/png-export.ts'], [gifExport, 'src/gif-export.ts']]) {

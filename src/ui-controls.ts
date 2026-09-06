@@ -1,3 +1,5 @@
+import { GIF_EXPORT_STATUS_EVENT, type GifExportStatus } from './export-status'
+
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
   if (!element) throw new Error(`Required UI element is missing: ${selector}`)
@@ -296,23 +298,20 @@ function hideExportOverlay(delay = 0): void {
   }, delay)
 }
 
-function syncExportOverlayFromButton(): void {
-  const label = exportButton.textContent?.trim() ?? ''
-
-  if (label.startsWith('PREPARING')) {
+function handleGifExportStatus(status: GifExportStatus): void {
+  if (status.phase === 'preparing') {
     showExportOverlay()
     return
   }
 
-  const progressMatch = label.match(/^GIF\s+(\d+)%$/)
-  if (progressMatch) {
+  if (status.phase === 'encoding') {
     exportTitle.textContent = 'Rendering reveal.'
     exportDetail.textContent = 'Encoding the sculpture-to-QR loop.'
-    setExportProgress(Number(progressMatch[1]) / 100)
+    setExportProgress(status.progress)
     return
   }
 
-  if (label.startsWith('EXPORTED')) {
+  if (status.phase === 'complete') {
     exportTitle.textContent = 'GIF ready.'
     exportDetail.textContent = 'The download has started.'
     setExportProgress(1)
@@ -320,25 +319,12 @@ function syncExportOverlayFromButton(): void {
     return
   }
 
-  if (label.startsWith('EXPORT FAILED')) {
-    exportTitle.textContent = 'Export failed.'
-    exportDetail.textContent = exportButton.title || 'The GIF encoder could not finish this export.'
-    setExportProgress(0)
-    hideExportOverlay(1700)
-    return
-  }
-
-  if (label === 'EXPORT GIF' && !exportButton.disabled && exportOverlay.dataset.open === 'true') {
-    hideExportOverlay(120)
-  }
+  exportTitle.textContent = 'Export failed.'
+  exportDetail.textContent = status.message
+  setExportProgress(0)
+  hideExportOverlay(1700)
 }
 
-exportButton.addEventListener('click', showExportOverlay)
-const exportObserver = new MutationObserver(syncExportOverlayFromButton)
-exportObserver.observe(exportButton, {
-  attributes: true,
-  attributeFilter: ['disabled', 'title'],
-  childList: true,
-  characterData: true,
-  subtree: true,
+document.addEventListener(GIF_EXPORT_STATUS_EVENT, (event) => {
+  handleGifExportStatus((event as CustomEvent<GifExportStatus>).detail)
 })

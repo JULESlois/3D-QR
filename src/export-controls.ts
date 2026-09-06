@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { exportRevealGif } from './gif-export'
+import { publishGifExportStatus } from './export-status'
 import { exportPngPair } from './png-export'
 import type { SculptureBuild } from './sculpture'
 import { getStyle, type StyleId } from './styles'
@@ -69,6 +70,7 @@ export function bindExportControls(context: ExportControlsContext): void {
       button: exportGifButton,
       meta,
       setBusy,
+      onStatus: publishGifExportStatus,
     })
   })
 

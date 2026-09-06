@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { SculptureBuild } from './sculpture'
 import { createExportSceneSnapshot } from './export-scene'
+import type { GifExportStatus } from './export-status'
 
 const EXPORT_SIZE = 512
 const EXPORT_FPS = 18
@@ -20,6 +21,7 @@ export interface GifExportContext {
   button: HTMLButtonElement
   meta: HTMLElement
   setBusy: (busy: boolean) => void
+  onStatus: (status: GifExportStatus) => void
 }
 
 function clamp01(value: number): number {
@@ -66,6 +68,7 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
     button,
     meta,
     setBusy,
+    onStatus,
   } = context
 
   const previousMeta = meta.textContent
@@ -73,6 +76,7 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
   setBusy(true)
   button.textContent = 'PREPARING…'
   button.title = 'Preparing GIF export'
+  onStatus({ phase: 'preparing' })
 
   let exportRenderer: THREE.WebGLRenderer | null = null
   let feedback: { label: string; title: string } | null = null
@@ -144,6 +148,7 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
       const percent = Math.round(((frame + 1) / EXPORT_FRAME_COUNT) * 100)
       button.textContent = `GIF ${percent}%`
       meta.textContent = `ENCODING REVEAL · ${percent}% · ${EXPORT_SIZE}×${EXPORT_SIZE} · ${EXPORT_FPS} FPS`
+      onStatus({ phase: 'encoding', progress: (frame + 1) / EXPORT_FRAME_COUNT })
 
       if (frame % 2 === 1) {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
@@ -166,10 +171,12 @@ export async function exportRevealGif(context: GifExportContext): Promise<void> 
 
     meta.textContent = `GIF EXPORTED · ${EXPORT_SIZE}×${EXPORT_SIZE} · ${EXPORT_FPS} FPS · ${(EXPORT_FRAME_COUNT / EXPORT_FPS).toFixed(1)}S LOOP`
     feedback = { label: 'EXPORTED ✓', title: 'GIF saved' }
+    onStatus({ phase: 'complete' })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown export error'
     meta.textContent = `GIF EXPORT ERROR · ${message}`
     feedback = { label: 'EXPORT FAILED', title: message }
+    onStatus({ phase: 'error', message })
   } finally {
     exportRenderer?.dispose()
     setBusy(false)
