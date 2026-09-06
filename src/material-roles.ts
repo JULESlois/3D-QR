@@ -15,10 +15,10 @@ const ROLE_MATERIALS = {
   // independent control over silhouette contrast. Projection polarity remains explicit
   // because roof ramps are normalized through the same dark/light material pipeline.
   roof: 'roof',
-  // Paths and processional approaches use the plaster family so paved circulation reads
-  // lighter than retaining walls, plinths, and other stonework. The paired plaster ramps
-  // still preserve dark/light projection polarity on scanner-facing surfaces.
-  path: 'plaster',
+  // Paths and processional approaches keep a dedicated shared color family instead of
+  // borrowing wall plaster. Temple, House, and Castle can therefore tune circulation
+  // independently from facades while projectionTone still chooses explicit dark/light ramps.
+  path: 'path',
 } as const satisfies Record<SemanticMaterialRole, VoxelKind>
 
 export function materialForRole(role: SemanticMaterialRole): VoxelKind {

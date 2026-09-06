@@ -19,6 +19,7 @@ const PAIRED_MATERIAL_KEYS = [
   'glass',
   'metal',
   'roof',
+  'path',
   'water',
   'crystal',
 ] as const satisfies readonly (keyof ScenePaletteDefinition)[]
@@ -31,6 +32,9 @@ if (materialForRole('metal') !== 'metal') {
 }
 if (materialForRole('roof') !== 'roof') {
   throw new Error('Roof semantic role no longer resolves to the dedicated roof material.')
+}
+if (materialForRole('path') !== 'path') {
+  throw new Error('Path semantic role no longer resolves to the dedicated path material.')
 }
 
 let rampCount = 0

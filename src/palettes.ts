@@ -28,6 +28,7 @@ export interface ScenePaletteDefinition {
   glass?: readonly string[]
   metal?: readonly string[]
   roof?: readonly string[]
+  path?: readonly string[]
   water?: readonly string[]
   crystal?: readonly string[]
 }
