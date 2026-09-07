@@ -224,6 +224,15 @@ export function bindShareState(): () => void {
     })
   }, { signal })
 
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    const target = event.target
+    if (!(target instanceof Element) || !target.matches('#stage canvas')) return
+    queueMicrotask(() => {
+      if (!signal.aborted) replaceShareHash()
+    })
+  }, { signal })
+
   document.querySelector<HTMLButtonElement>('#copy-share-link')?.addEventListener('click', (event) => {
     void copyShareLink(event.currentTarget as HTMLButtonElement)
   }, { signal })
