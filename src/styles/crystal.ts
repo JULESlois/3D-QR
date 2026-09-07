@@ -78,11 +78,10 @@ function buildSanctumFrame(
           ? 3
           : 2
 
-      // Functional QR zones stay deliberately low. The frame remains continuous at
-      // slab height, but alignment / format / version / timing / finder modules are
-      // never promoted into the taller rear wall or outer parapet.
-      const safeTopLevel = cell.zone === 'data' ? topLevel : Math.min(topLevel, 2)
-      pushProjectedColumn(voxels, cell, matrix.size, 1, safeTopLevel, 'stone', random)
+      // QR function-zone metadata still guides composition, but projected column height
+      // does not need a scanner-specific cap: pushProjectedColumn preserves the cell's
+      // dark/light projection tone on whichever level becomes the visible top surface.
+      pushProjectedColumn(voxels, cell, matrix.size, 1, topLevel, 'stone', random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
