@@ -30,9 +30,21 @@ export function bindAppInteractions(context: AppInteractionContext): () => void 
   const { signal } = abortController
   let rebuildTimer = 0
 
-  context.pointerSurface.addEventListener('click', () => {
+  const toggleProjectionView = (): void => {
     if (context.isBusy()) return
     context.setView(context.getView() === 'art' ? 'qr' : 'art')
+  }
+
+  context.pointerSurface.tabIndex = 0
+  context.pointerSurface.setAttribute('role', 'button')
+  context.pointerSurface.setAttribute('aria-label', 'Toggle Art and QR projection view')
+  context.pointerSurface.setAttribute('aria-keyshortcuts', 'Enter Space')
+
+  context.pointerSurface.addEventListener('click', toggleProjectionView, { signal })
+  context.pointerSurface.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    toggleProjectionView()
   }, { signal })
 
   document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT, (event) => {
