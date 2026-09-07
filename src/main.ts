@@ -1,6 +1,5 @@
 import './styles.css'
 import { bindAppInteractions } from './app-interactions'
-import { bindExportControls } from './export-controls'
 import { createPresentationController } from './presentation'
 import { createRenderRuntime } from './render-runtime'
 import { createVoxelMeshController } from './voxel-mesh'
@@ -13,6 +12,7 @@ import { createViewTransitionController } from './view-transition'
 import { createAppUiController } from './app-ui'
 import { createAppNavigationController } from './app-navigation-controller'
 import { createAppRenderController } from './app-render-controller'
+import { createAppExportController } from './app-export-controller'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -27,13 +27,10 @@ const {
   meta,
   styleRow,
   paletteButtons,
-  exportGifButton,
-  exportPngButton,
 } = ui
 
 const runtime = createRenderRuntime(stage)
 const {
-  scene,
   camera,
   renderer,
   presentationGroup,
@@ -42,6 +39,12 @@ const {
 const presentation = createPresentationController(camera, presentationGroup, sculptureRoot)
 const voxelMeshes = createVoxelMeshController(sculptureRoot)
 const sculpture = createSculptureController('tree')
+const exportController = createAppExportController({
+  ui,
+  runtime,
+  presentation,
+  sculpture,
+})
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const palette = createPaletteController({
   voxelMeshes,
@@ -52,7 +55,7 @@ const palette = createPaletteController({
   getPaletteKey: () => sculpture.paletteKey,
   setPaletteKey: (paletteKey) => sculpture.setPalette(paletteKey),
   updateUi: (styleId, paletteKey) => ui.updatePalette(styleId, paletteKey),
-  isBusy: () => isExporting,
+  isBusy: exportController.isBusy,
 })
 const viewTransitions = createViewTransitionController(
   sculptureRoot,
@@ -60,13 +63,6 @@ const viewTransitions = createViewTransitionController(
   presentation.qrQuaternion,
   reducedMotion,
 )
-
-let isExporting = false
-
-function setExportUiBusy(busy: boolean): void {
-  isExporting = busy
-  ui.setExportBusy(busy, renderer.domElement)
-}
 
 const { rebuild } = createQrBuildController({
   stage,
@@ -85,27 +81,11 @@ const navigation = createAppNavigationController({
   presentation,
   rebuild,
   getInputValue: () => input.value,
-  isBusy: () => isExporting,
+  isBusy: exportController.isBusy,
 })
 
-bindExportControls({
-  exportGifButton,
-  exportPngButton,
-  meta,
-  scene,
-  camera,
-  renderer,
-  presentationGroup,
-  sculptureRoot,
-  artQuaternion: presentation.artQuaternion,
-  qrQuaternion: presentation.qrQuaternion,
-  getBuild: () => sculpture.build,
-  getStyleId: () => sculpture.styleId,
-  isBusy: () => isExporting,
-  finishPaletteTransition: () => {
-    palette.finish()
-  },
-  setBusy: setExportUiBusy,
+exportController.start(() => {
+  palette.finish()
 })
 
 bindAppInteractions({
@@ -114,7 +94,7 @@ bindAppInteractions({
   meta,
   styleRow,
   paletteButtons,
-  isBusy: () => isExporting,
+  isBusy: exportController.isBusy,
   getView: () => viewTransitions.view,
   setView: navigation.setMode,
   requestStyle: navigation.requestStyle,
