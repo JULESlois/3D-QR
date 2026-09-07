@@ -128,14 +128,14 @@ async function waitForValue(send, expression, expected, label, timeoutMs = 4_000
   throw new Error(`${label} did not settle to ${JSON.stringify(expected)}; got ${JSON.stringify(current)}`)
 }
 
-async function navigate(send, width, height) {
+async function navigate(send, width, height, url = baseUrl) {
   await send('Emulation.setDeviceMetricsOverride', {
     width,
     height,
     deviceScaleFactor: 1,
     mobile: width < 600,
   })
-  await send('Page.navigate', { url: baseUrl })
+  await send('Page.navigate', { url })
   await waitForPage(send)
   await sleep(700)
 
@@ -230,6 +230,20 @@ async function exerciseMobileUi(send) {
   return finalState
 }
 
+async function exerciseShareRestore(send) {
+  const payload = 'https://example.com/3d-qr-shared-state'
+  const params = new URLSearchParams({ q: payload, s: 'city', p: 'spectrum', v: 'qr' })
+  await navigate(send, 1024, 1024, `${baseUrl}#${params.toString()}`)
+  await waitForValue(send, `document.querySelector('#qr-input')?.value`, payload, 'Shared payload restore')
+  await waitForValue(send, `document.body.dataset.style`, 'city', 'Shared scene restore')
+  await waitForValue(send, `document.querySelector('.palette-swatch.is-active')?.dataset.palette`, 'spectrum', 'Shared palette restore')
+  await waitForValue(send, `document.body.dataset.mode`, 'qr', 'Shared projection restore')
+  await sleep(2_600)
+  await isolateQrProjection(send)
+  const bytes = await capture(send, 'shared-qr-view')
+  const decodedPayload = decodeQrScreenshot(bytes, payload)
+  return { bytes, decodedPayload }
+}
 async function capture(send, name) {
   const result = await send('Page.captureScreenshot', {
     format: 'png',
@@ -352,7 +366,7 @@ function closeVoxelGaps(png) {
   return output
 }
 
-function decodeQrScreenshot(bytes) {
+function decodeQrScreenshot(bytes, expectedPayload = expectedQrPayload) {
   const png = PNG.sync.read(bytes)
   const pixels = new Uint8ClampedArray(
     png.data.buffer,
@@ -365,7 +379,7 @@ function decodeQrScreenshot(bytes) {
   if (!decoded) {
     throw new Error(`jsQR could not decode the ${png.width}×${png.height} QR projection screenshot`)
   }
-  if (decoded.data !== expectedQrPayload) {
+  if (decoded.data !== expectedPayload) {
     throw new Error(`QR projection decoded unexpected payload: ${JSON.stringify(decoded.data)}`)
   }
 
@@ -430,11 +444,12 @@ try {
   await isolateQrProjection(send)
   const qrBytes = await capture(send, 'qr-view')
   const decodedPayload = decodeQrScreenshot(qrBytes)
+  const shared = await exerciseShareRestore(send)
 
   console.log(
     `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes (${mobileState.style}/${mobileState.palette}) / `
-      + `mobile QR ${mobileQrBytes.length} bytes / QR ${qrBytes.length} bytes / `
-      + `jsQR decoded mobile ${JSON.stringify(mobileDecodedPayload)} and square ${JSON.stringify(decodedPayload)}`,
+      + `mobile QR ${mobileQrBytes.length} bytes / QR ${qrBytes.length} bytes / shared QR ${shared.bytes.length} bytes / `
+      + `jsQR decoded mobile ${JSON.stringify(mobileDecodedPayload)}, square ${JSON.stringify(decodedPayload)}, and shared ${JSON.stringify(shared.decodedPayload)}`,
   )
 } finally {
   socket?.close()
