@@ -4,6 +4,7 @@ const [
   html,
   main,
   appInteractions,
+  appExportController,
   exportControls,
   exportStatus,
   appUi,
@@ -19,6 +20,7 @@ const [
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
   readFile('src/app-interactions.ts', 'utf8'),
+  readFile('src/app-export-controller.ts', 'utf8'),
   readFile('src/export-controls.ts', 'utf8'),
   readFile('src/export-status.ts', 'utf8'),
   readFile('src/app-ui.ts', 'utf8'),
@@ -91,6 +93,8 @@ for (const [source, label] of [
 // DOM commands while app-ui.ts owns static DOM bindings and presentation/busy state.
 requireText(main, 'createAppUiController()', 'src/main.ts')
 requireText(main, 'bindAppInteractions({', 'src/main.ts')
+requireText(main, 'createAppExportController({', 'src/main.ts')
+requireText(main, 'exportController.start(() => {', 'src/main.ts')
 requireText(appInteractions, "context.pointerSurface.addEventListener('click'", 'src/app-interactions.ts')
 requireText(appInteractions, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/app-interactions.ts')
 requireText(appInteractions, "context.styleRow.addEventListener('click'", 'src/app-interactions.ts')
@@ -130,7 +134,10 @@ requireText(sceneSwipe, "sceneCurrent.addEventListener('pointerdown'", 'src/scen
 // hierarchy and mutate only that snapshot so capture cannot corrupt the live presentation.
 requireText(projectionView, "PROJECTION_VIEW_REQUEST_EVENT = 'projection-view-request'", 'src/projection-view.ts')
 requireText(appInteractions, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/app-interactions.ts')
-requireText(main, 'bindExportControls({', 'src/main.ts')
+forbidText(main, 'bindExportControls({', 'src/main.ts export ownership')
+requireText(appExportController, 'bindExportControls({', 'src/app-export-controller.ts')
+requireText(appExportController, 'isBusy(): boolean', 'src/app-export-controller.ts')
+requireText(appExportController, 'ui.setExportBusy(nextBusy, runtime.renderer.domElement)', 'src/app-export-controller.ts')
 forbidText(main, 'void exportPngPair({', 'src/main.ts')
 forbidText(main, 'void exportRevealGif({', 'src/main.ts')
 requireText(exportControls, 'context.finishPaletteTransition()', 'src/export-controls.ts')
