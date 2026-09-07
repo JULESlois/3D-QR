@@ -177,6 +177,39 @@ async function assertExportActionHierarchy(send) {
   }
 }
 
+async function exerciseKeyboardProjectionToggle(send) {
+  const semantics = await evaluateValue(send, `(() => {
+    const canvas = document.querySelector('#stage canvas')
+    return {
+      role: canvas?.getAttribute('role'),
+      tabIndex: canvas?.tabIndex,
+      label: canvas?.getAttribute('aria-label'),
+      shortcuts: canvas?.getAttribute('aria-keyshortcuts')
+    }
+  })()`)
+
+  if (
+    semantics?.role !== 'button'
+    || semantics.tabIndex !== 0
+    || semantics.label !== 'Toggle Art and QR projection view'
+    || semantics.shortcuts !== 'Enter Space'
+  ) {
+    throw new Error(`Canvas keyboard projection semantics are invalid: ${JSON.stringify(semantics)}`)
+  }
+
+  await evaluateValue(send, `(() => {
+    const canvas = document.querySelector('#stage canvas')
+    canvas?.focus()
+    canvas?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })()`)
+  await waitForValue(send, `document.body.dataset.mode`, 'qr', 'Enter projection toggle')
+
+  await evaluateValue(send, `document.querySelector('#stage canvas')?.dispatchEvent(
+    new KeyboardEvent('keydown', { key: ' ', bubbles: true })
+  )`)
+  await waitForValue(send, `document.body.dataset.mode`, 'art', 'Space projection toggle')
+}
+
 async function exerciseMobileUi(send) {
   const initial = await evaluateValue(send, `(() => ({
     style: document.body.dataset.style,
@@ -429,6 +462,7 @@ try {
 
   await navigate(send, 1440, 900)
   await assertExportActionHierarchy(send)
+  await exerciseKeyboardProjectionToggle(send)
   const desktopBytes = await capture(send, 'desktop-art')
 
   await navigate(send, 390, 844)
