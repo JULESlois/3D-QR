@@ -11,6 +11,7 @@
     "test:share": "tsx scripts/share-state-smoke.ts",
     "test:ui-architecture": "node scripts/ui-architecture-smoke.mjs",
     "test:gif": "tsx scripts/gif-smoke.ts",
+    "test:browser": "node scripts/browser-smoke.mjs",
     "build": "npm run test:projection && npm run test:material && npm run test:share && npm run test:ui-architecture && npm run test:gif && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
