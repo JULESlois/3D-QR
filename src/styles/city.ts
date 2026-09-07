@@ -375,7 +375,7 @@ export function generateCity(matrix: QRMatrixData, seedText: string): SculptureB
     // Roads may cross both dark and light QR cells. pushProjectedColumn preserves
     // that polarity on the visible surface, so asphalt/sidewalk remains a coherent
     // material system without forcing the street network back to black-and-white.
-    const material: VoxelKind = role === 'lane' ? 'stone' : 'plaster'
+    const material: VoxelKind = role === 'sidewalk' ? 'plaster' : materialForRole('path')
     pushProjectedColumn(voxels, cell, matrix.size, 1, 1, material, random)
     lifted.add(cellKey(cell.row, cell.col))
     streetCount += 1
