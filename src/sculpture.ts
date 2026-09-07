@@ -9,6 +9,7 @@ export type VoxelKind =
   | 'floor-dark'
   | 'foundation'
   | 'primary'
+  | 'foliage'
   | 'wood'
   | 'stone'
   | 'plaster'

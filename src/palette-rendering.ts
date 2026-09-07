@@ -137,6 +137,8 @@ function colorForVoxel(
       return materialVoxelColor(palette.roof ?? fallbackRoof, voxel, target)
     case 'path':
       return materialVoxelColor(palette.path ?? fallbackPath, voxel, target)
+    case 'foliage':
+      return materialVoxelColor(palette.colors, voxel, target)
     case 'primary':
     default:
       return materialVoxelColor(palette.colors, voxel, target)

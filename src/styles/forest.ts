@@ -1,4 +1,5 @@
 import type { QRCell, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -388,7 +389,7 @@ function buildCanopy(
         column.cell,
         matrix.size,
         level,
-        'primary',
+        materialForRole('foliage'),
         (localNoise(seedText, column.cell.row, column.cell.col, `leaf-${column.treeIndex}-${level}`) * 0.72 + level * 0.033) % 1,
         level === column.topLevel ? projectionToneForCell(column.cell) : undefined,
       )
@@ -436,7 +437,7 @@ function buildUnderstory(
     const noise = localNoise(seedText, cell.row, cell.col, 'understory')
     if (noise < 0.965) continue
 
-    pushProjectedColumn(voxels, cell, matrix.size, 1, noise > 0.992 ? 4 : 3, 'primary', random)
+    pushProjectedColumn(voxels, cell, matrix.size, 1, noise > 0.992 ? 4 : 3, materialForRole('foliage'), random)
     lifted.add(cellKey(cell.row, cell.col))
     shrubCount += 1
     if (shrubCount >= shrubLimit) break

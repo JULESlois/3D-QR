@@ -1,4 +1,5 @@
 import type { DarkModule, QRMatrixData } from '../qr'
+import { materialForRole } from '../material-roles'
 import {
   cellKey,
   createBaseVoxels,
@@ -192,7 +193,7 @@ export function generateTree(matrix: QRMatrixData, seedText: string): SculptureB
         module,
         matrix.size,
         level,
-        'primary',
+        materialForRole('foliage'),
         (random() * 0.52 + dome * 0.34 + sample.lobe * 0.11 + level * 0.031) % 1,
         level === topLevel ? projectionToneForCell(module) : undefined,
       )

@@ -1,6 +1,6 @@
 import type { VoxelKind } from './sculpture'
 
-export type SemanticMaterialRole = 'metal' | 'roof' | 'path'
+export type SemanticMaterialRole = 'metal' | 'roof' | 'path' | 'foliage'
 
 const ROLE_MATERIALS = {
   // Architectural metal now uses the cool glass color family rather than the masonry
@@ -19,6 +19,10 @@ const ROLE_MATERIALS = {
   // borrowing wall plaster. Temple, House, and Castle can therefore tune circulation
   // independently from facades while projectionTone still chooses explicit dark/light ramps.
   path: 'path',
+  // Tree crowns and understory share a foliage role instead of overloading primary. This
+  // keeps botanical surfaces reusable across Tree and Forest while preserving each scene's
+  // authored palette colors and the same projection-tone ramp selection on QR-facing tops.
+  foliage: 'foliage',
 } as const satisfies Record<SemanticMaterialRole, VoxelKind>
 
 export function materialForRole(role: SemanticMaterialRole): VoxelKind {
