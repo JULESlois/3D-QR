@@ -11,11 +11,13 @@
     "test:share": "tsx scripts/share-state-smoke.ts",
     "test:ui-architecture": "node scripts/ui-architecture-smoke.mjs",
     "test:gif": "tsx scripts/gif-smoke.ts",
-    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:browser": "npm run build && node scripts/run-browser-smoke-ci.mjs scripts/browser-smoke.mjs",
     "build": "npm run test:projection && npm run test:material && npm run test:share && npm run test:ui-architecture && npm run test:gif && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
-  "engines": { "node": ">=20.19.0" },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "dependencies": {
     "gifenc": "1.0.3",
     "qrcode": "^1.5.4",
