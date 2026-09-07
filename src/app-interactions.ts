@@ -30,15 +30,22 @@ export function bindAppInteractions(context: AppInteractionContext): () => void 
   const { signal } = abortController
   let rebuildTimer = 0
 
+  const syncProjectionSemantics = (view: ProjectionView): void => {
+    context.pointerSurface.setAttribute('aria-pressed', view === 'qr' ? 'true' : 'false')
+  }
+
   const toggleProjectionView = (): void => {
     if (context.isBusy()) return
-    context.setView(context.getView() === 'art' ? 'qr' : 'art')
+    const nextView = context.getView() === 'art' ? 'qr' : 'art'
+    context.setView(nextView)
+    syncProjectionSemantics(nextView)
   }
 
   context.pointerSurface.tabIndex = 0
   context.pointerSurface.setAttribute('role', 'button')
   context.pointerSurface.setAttribute('aria-label', 'Toggle Art and QR projection view')
   context.pointerSurface.setAttribute('aria-keyshortcuts', 'Enter Space')
+  syncProjectionSemantics(context.getView())
 
   context.pointerSurface.addEventListener('click', toggleProjectionView, { signal })
   context.pointerSurface.addEventListener('keydown', (event) => {
@@ -51,6 +58,7 @@ export function bindAppInteractions(context: AppInteractionContext): () => void 
     const request = event as CustomEvent<ProjectionViewRequestDetail>
     if (!request.detail || !isProjectionView(request.detail.view)) return
     context.setView(request.detail.view)
+    syncProjectionSemantics(request.detail.view)
   }, { signal })
 
   context.styleRow.addEventListener('click', (event) => {
