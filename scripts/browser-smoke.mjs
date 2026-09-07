@@ -184,7 +184,8 @@ async function exerciseKeyboardProjectionToggle(send) {
       role: canvas?.getAttribute('role'),
       tabIndex: canvas?.tabIndex,
       label: canvas?.getAttribute('aria-label'),
-      shortcuts: canvas?.getAttribute('aria-keyshortcuts')
+      shortcuts: canvas?.getAttribute('aria-keyshortcuts'),
+      pressed: canvas?.getAttribute('aria-pressed')
     }
   })()`)
 
@@ -193,6 +194,7 @@ async function exerciseKeyboardProjectionToggle(send) {
     || semantics.tabIndex !== 0
     || semantics.label !== 'Toggle Art and QR projection view'
     || semantics.shortcuts !== 'Enter Space'
+    || semantics.pressed !== 'false'
   ) {
     throw new Error(`Canvas keyboard projection semantics are invalid: ${JSON.stringify(semantics)}`)
   }
@@ -203,11 +205,35 @@ async function exerciseKeyboardProjectionToggle(send) {
     canvas?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   })()`)
   await waitForValue(send, `document.body.dataset.mode`, 'qr', 'Enter projection toggle')
+  await waitForValue(
+    send,
+    `document.querySelector('#stage canvas')?.getAttribute('aria-pressed')`,
+    'true',
+    'Enter projection pressed state',
+  )
+  await waitForValue(
+    send,
+    `new URLSearchParams(window.location.hash.slice(1)).get('v')`,
+    'qr',
+    'Enter projection share state',
+  )
 
   await evaluateValue(send, `document.querySelector('#stage canvas')?.dispatchEvent(
     new KeyboardEvent('keydown', { key: ' ', bubbles: true })
   )`)
   await waitForValue(send, `document.body.dataset.mode`, 'art', 'Space projection toggle')
+  await waitForValue(
+    send,
+    `document.querySelector('#stage canvas')?.getAttribute('aria-pressed')`,
+    'false',
+    'Space projection pressed state',
+  )
+  await waitForValue(
+    send,
+    `new URLSearchParams(window.location.hash.slice(1)).get('v')`,
+    'art',
+    'Space projection share state',
+  )
 }
 
 async function exerciseMobileUi(send) {
