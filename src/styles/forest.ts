@@ -413,7 +413,7 @@ function buildForestPath(
     for (const col of [pathCol - 1, pathCol]) {
       const cell = getCell(matrix, row, col)
       if (!cell || cell.zone === 'finder' || canopy.has(cellKey(cell.row, cell.col))) continue
-      pushProjectedColumn(voxels, cell, matrix.size, 1, 2, 'stone', random)
+      pushProjectedColumn(voxels, cell, matrix.size, 1, 2, 'path', random)
       lifted.add(cellKey(cell.row, cell.col))
     }
   }
