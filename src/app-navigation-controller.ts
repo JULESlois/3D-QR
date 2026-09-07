@@ -1,6 +1,9 @@
 import type { AppUiController } from './app-ui'
 import type { PresentationController } from './presentation'
-import type { ProjectionView } from './projection-view'
+import {
+  notifyProjectionViewChanged,
+  type ProjectionView,
+} from './projection-view'
 import type { QrBuildController } from './qr-build-controller'
 import type { SculptureController } from './sculpture-state'
 import type { StyleId } from './styles'
@@ -43,9 +46,11 @@ export function createAppNavigationController(
   }
 
   function setMode(next: ProjectionView): void {
+    const previous = viewTransitions.view
     voxelMeshes.setScannerFacing(next === 'qr')
     viewTransitions.setView(next)
     ui.updateProjection(sculpture.styleId, next)
+    if (previous !== next) notifyProjectionViewChanged(next)
   }
 
   function requestStyle(nextStyleId: StyleId): void {

@@ -1,8 +1,10 @@
 import { isPaletteKey, type PaletteKey } from './palettes'
 import {
+  PROJECTION_VIEW_CHANGE_EVENT,
   isProjectionView,
   requestProjectionView,
   type ProjectionView,
+  type ProjectionViewChangeDetail,
 } from './projection-view'
 import { isStyleId, type StyleId } from './styles'
 
@@ -117,11 +119,6 @@ function fallbackCopyText(value: string): boolean {
   }
 }
 
-/**
- * Bind URL/hash sharing as an explicit application lifecycle instead of module-import side effects.
- * The disposer aborts DOM listeners and clears pending timers so tests or future remounts cannot
- * leave duplicate hash synchronization behind.
- */
 export function bindShareState(): () => void {
   const abortController = new AbortController()
   const { signal } = abortController
@@ -218,16 +215,15 @@ export function bindShareState(): () => void {
   document.addEventListener('click', (event) => {
     const target = event.target
     if (!(target instanceof Element)) return
-    if (!target.closest('[data-style], [data-palette], #stage canvas')) return
+    if (!target.closest('[data-style], [data-palette]')) return
     queueMicrotask(() => {
       if (!signal.aborted) replaceShareHash()
     })
   }, { signal })
 
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    const target = event.target
-    if (!(target instanceof Element) || !target.matches('#stage canvas')) return
+  document.addEventListener(PROJECTION_VIEW_CHANGE_EVENT, (event) => {
+    const change = event as CustomEvent<ProjectionViewChangeDetail>
+    if (!change.detail || !isProjectionView(change.detail.view)) return
     queueMicrotask(() => {
       if (!signal.aborted) replaceShareHash()
     })
