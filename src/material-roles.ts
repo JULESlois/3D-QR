@@ -1,6 +1,6 @@
 import type { VoxelKind } from './sculpture'
 
-export type SemanticMaterialRole = 'metal' | 'roof' | 'path' | 'foliage'
+export type SemanticMaterialRole = 'metal' | 'roof' | 'path' | 'foliage' | 'terrain'
 
 const ROLE_MATERIALS = {
   // Architectural metal now uses the cool glass color family rather than the masonry
@@ -23,6 +23,10 @@ const ROLE_MATERIALS = {
   // keeps botanical surfaces reusable across Tree and Forest while preserving each scene's
   // authored palette colors and the same projection-tone ramp selection on QR-facing tops.
   foliage: 'foliage',
+  // Ground relief uses a terrain role instead of borrowing primary. Mountain foothills can
+  // therefore evolve independently from scene accents while keeping projection polarity
+  // governed by the shared dark/light material-ramp pipeline.
+  terrain: 'terrain',
 } as const satisfies Record<SemanticMaterialRole, VoxelKind>
 
 export function materialForRole(role: SemanticMaterialRole): VoxelKind {

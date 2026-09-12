@@ -1,3 +1,4 @@
+import { materialForRole } from '../material-roles'
 import type { QRCell, QRMatrixData } from '../qr'
 import {
   cellKey,
@@ -238,7 +239,7 @@ function terrainKind(
 
   const rockScar = Math.sin(cell.row * 0.72 + cell.col * 0.31) * 0.5 + 0.5
   if (height >= 6 && (rockScar > 0.34 || !windward)) return 'stone'
-  return 'primary'
+  return materialForRole('terrain')
 }
 
 export function generateMountain(matrix: QRMatrixData, seedText: string): SculptureBuild {

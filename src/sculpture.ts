@@ -10,6 +10,7 @@ export type VoxelKind =
   | 'foundation'
   | 'primary'
   | 'foliage'
+  | 'terrain'
   | 'wood'
   | 'stone'
   | 'plaster'
@@ -56,7 +57,7 @@ export interface SculptureVoxel {
   colorPhase: number
   /**
    * QR polarity of this visible surface. It deliberately does not replace material kind:
-   * water stays water, stone stays stone, foliage stays primary, etc. Palette rendering
+   * water stays water, stone stays stone, foliage stays foliage, terrain stays terrain, etc. Palette rendering
    * selects the explicit dark or light material ramp from this field.
    */
   projectionTone?: ProjectionTone
