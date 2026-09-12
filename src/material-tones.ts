@@ -41,6 +41,14 @@ export function splitMaterialToneRamp(colors: readonly string[]): MaterialToneRa
     throw new Error(`Material palette must contain at least two colors; received ${colors.length}.`)
   }
 
+  if (colors.length % 2 === 0) {
+    const midpoint = colors.length / 2
+    return {
+      dark: colors.slice(0, midpoint),
+      light: colors.slice(midpoint),
+    }
+  }
+
   const ranked = colors
     .map((color, index) => ({ color, index, luminance: authoredColorLuminance(color) }))
     .sort((a, b) => a.luminance - b.luminance || a.index - b.index)
