@@ -93,17 +93,6 @@ body[data-mode='qr'] .control-panel {
   font-weight: 700;
   letter-spacing: .15em;
 }
-.control-copy h1 {
-  margin: 0;
-  font-size: clamp(34px, 4.4vw, 52px);
-  line-height: .94;
-  letter-spacing: -.05em;
-  font-weight: 590;
-}
-
-/* Scene descriptions remain in metadata, but not in the control surface. */
-.lede { display: none; }
-
 .url-field {
   display: block;
   margin-top: 18px;
@@ -246,12 +235,6 @@ body[data-mode='qr'] .control-panel {
     font-size: 7.5px;
     letter-spacing: .12em;
   }
-  .control-copy h1 {
-    max-width: 100%;
-    font-size: clamp(27px, 9vw, 34px);
-    line-height: .96;
-  }
-
   .url-field {
     margin-top: 13px;
     padding-bottom: 5px;
@@ -297,7 +280,6 @@ body[data-mode='qr'] .control-panel {
     bottom: max(8px, env(safe-area-inset-bottom));
     padding: 12px;
   }
-  .control-copy h1 { font-size: clamp(25px, 8.5vw, 30px); }
   .url-field { margin-top: 11px; }
   .style-chip { min-height: 32px; padding: 8px; }
   .palette-swatch { width: 26px; height: 26px; }
@@ -313,10 +295,6 @@ body[data-mode='qr'] .control-panel {
     padding: 12px 14px;
   }
   .eyebrow { display: none; }
-  .control-copy h1 {
-    font-size: 28px;
-    line-height: .95;
-  }
   .url-field { margin-top: 10px; }
   
   
@@ -341,68 +319,6 @@ body[data-mode='qr'] .control-panel {
     animation-iteration-count: 1 !important;
   }
 }
-
-/* Final control-shell rules live with the rest of the static stylesheet instead of index.html. */
-
-
-
-
-
-
-
-
-
-
-.control-copy-heading {
-  display: block;
-  margin: 0;
-  font-size: clamp(34px, 4.4vw, 52px);
-  line-height: .94;
-  letter-spacing: -.05em;
-  font-weight: 590;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Scene switching is a primary browsing action, so keep it independent of the
-   collapsible information card. The dock stays available in immersive view. */
-
-
-
-
-
-
-
-
-
 
 .control-panel > .palette-control {
   display: grid;
@@ -441,49 +357,8 @@ body[data-mode='qr'] .control-panel {
   white-space: nowrap;
 }
 
-@media (max-width: 760px) {
-  .control-copy-heading {
-    max-width: 100%;
-    font-size: clamp(27px, 9vw, 34px);
-    line-height: .96;
-  }
-
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-}
-
-@media (max-width: 420px) {
-  .control-copy-heading {
-    font-size: clamp(25px, 8.5vw, 30px);
-  }
-}
-
-@media (max-height: 600px) and (min-width: 600px) {
-  .control-copy-heading {
-    font-size: 28px;
-    line-height: .95;
-  }
-
-  
-}
-
-
-/* Runtime-independent interaction and transition shell. These rules were previously
-   injected by ui-controls.ts; keeping them here makes the final visual contract static. */
+/* Scene switching stays independent of the collapsible information card, and the
+   final interaction/transition shell remains static rather than runtime-injected. */
 .scene-dock {
   position: fixed;
   z-index: 40;
