@@ -7,7 +7,7 @@ import {
   type ProjectionViewChangeDetail,
 } from './projection-view'
 import {
-  STYLE_REQUEST_EVENT,
+  STYLE_CHANGE_EVENT,
   isStyleRequestDetail,
   requestStyle,
   type StyleRequestDetail,
@@ -223,7 +223,7 @@ export function bindShareState(): () => void {
     })
   }, { signal })
 
-  document.addEventListener(STYLE_REQUEST_EVENT, (event) => {
+  document.addEventListener(STYLE_CHANGE_EVENT, (event) => {
     const request = event as CustomEvent<StyleRequestDetail>
     if (!isStyleRequestDetail(request.detail)) return
     queueMicrotask(() => {

@@ -5,6 +5,7 @@ import {
   type ProjectionView,
 } from './projection-view'
 import type { QrBuildController } from './qr-build-controller'
+import { notifyStyleChanged } from './style-request'
 import type { SculptureController } from './sculpture-state'
 import type { StyleId } from './styles'
 import type { ViewTransitionController } from './view-transition'
@@ -60,6 +61,7 @@ export function createAppNavigationController(
     updateStyleCopy()
     rebuild(getInputValue())
     presentation.applyTransform()
+    notifyStyleChanged(nextStyleId)
   }
 
   return { updateStyleCopy, setMode, requestStyle }
