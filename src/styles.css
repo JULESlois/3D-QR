@@ -151,21 +151,6 @@ body[data-mode='qr'] .control-panel {
   flex-wrap: wrap;
   gap: 9px;
 }
-.style-row {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  min-width: 0;
-  gap: 5px;
-  overflow: visible;
-  padding: 0;
-  touch-action: auto;
-}
-.style-row .style-chip {
-  width: 100%;
-  min-width: 0;
-  padding-inline: 4px;
-  text-align: center;
-}
 .style-chip {
   flex: 0 0 auto;
   min-height: 28px;
@@ -287,25 +272,6 @@ body[data-mode='qr'] .control-panel {
   
   
   .palette-control { padding: 9px 0 11px; }
-  .style-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    margin-right: -14px;
-    padding: 0 14px 3px 0;
-    overscroll-behavior-inline: contain;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-    touch-action: pan-x;
-  }
-  .style-row::-webkit-scrollbar { display: none; }
-  .style-row .style-chip {
-    width: auto;
-    min-width: max-content;
-    padding-inline: 9px;
-  }
   .style-chip {
     min-height: 34px;
     padding: 9px 9px;
@@ -856,10 +822,6 @@ body[data-controls-phase='collapsed'] .panel-restore-toggle {
   margin: 0 !important;
   padding: 0 !important;
   touch-action: manipulation !important;
-}
-
-.scene-options {
-  display: none !important;
 }
 
 .scene-arrow {
