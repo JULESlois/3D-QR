@@ -1,4 +1,5 @@
 import { GIF_EXPORT_STATUS_EVENT, type GifExportStatus } from './export-status'
+import { STYLES, type StyleId } from './styles'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -7,8 +8,6 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const controlPanel = requiredElement<HTMLElement>('.control-panel')
-const styleRow = requiredElement<HTMLElement>('.style-row')
-const sceneButtons = Array.from(styleRow.querySelectorAll<HTMLButtonElement>('[data-style]'))
 const exportButton = requiredElement<HTMLButtonElement>('#export-gif')
 
 // The scene window and dock are part of the static page contract. Failing fast here keeps
@@ -150,21 +149,23 @@ const sceneCurrentLabel = requiredElement<HTMLElement>('.scene-current-label')
 
 function currentSceneIndex(): number {
   const styleId = document.body.dataset.style
-  const index = sceneButtons.findIndex((button) => button.dataset.style === styleId)
+  const index = STYLES.findIndex((style) => style.id === styleId)
   return index >= 0 ? index : 0
 }
 
+function sceneButtonFor(styleId: StyleId): HTMLButtonElement {
+  return requiredElement<HTMLButtonElement>(`.scene-options [data-style="${styleId}"]`)
+}
+
 function syncSceneStepper(): void {
-  if (sceneButtons.length === 0) return
-
   const index = currentSceneIndex()
-  const current = sceneButtons[index]
-  const previous = sceneButtons[(index - 1 + sceneButtons.length) % sceneButtons.length]
-  const next = sceneButtons[(index + 1) % sceneButtons.length]
+  const current = STYLES[index]
+  const previous = STYLES[(index - 1 + STYLES.length) % STYLES.length]
+  const next = STYLES[(index + 1) % STYLES.length]
 
-  sceneCurrentLabel.textContent = current.textContent?.trim() || current.dataset.style?.toUpperCase() || 'SCENE'
-  scenePrevButton.setAttribute('aria-label', `Previous scene: ${previous.textContent?.trim() || 'previous'}`)
-  sceneNextButton.setAttribute('aria-label', `Next scene: ${next.textContent?.trim() || 'next'}`)
+  sceneCurrentLabel.textContent = current.label.toUpperCase()
+  scenePrevButton.setAttribute('aria-label', `Previous scene: ${previous.label}`)
+  sceneNextButton.setAttribute('aria-label', `Next scene: ${next.label}`)
 }
 
 function isAppBusy(): boolean {
@@ -201,18 +202,18 @@ function settleSceneWindow(): void {
 }
 
 function changeSceneBy(delta: number): void {
-  if (sceneButtons.length < 2 || sceneChanging || isAppBusy()) return
+  if (STYLES.length < 2 || sceneChanging || isAppBusy()) return
 
   const fromIndex = currentSceneIndex()
-  const targetIndex = (fromIndex + delta + sceneButtons.length) % sceneButtons.length
-  const target = sceneButtons[targetIndex]
-  if (!target || target.dataset.style === document.body.dataset.style) return
+  const targetIndex = (fromIndex + delta + STYLES.length) % STYLES.length
+  const target = STYLES[targetIndex]
+  if (!target || target.id === document.body.dataset.style) return
 
   const direction: SceneDirection = delta > 0 ? 'next' : 'prev'
   pulseArrow(direction)
 
   if (reducedMotion) {
-    target.click()
+    sceneButtonFor(target.id).click()
     syncSceneStepper()
     return
   }
@@ -225,7 +226,7 @@ function changeSceneBy(delta: number): void {
   // The complete visible page leaves first. Scene text, model and panel geometry therefore
   // never rebind or reflow in front of the user.
   sceneTimer = window.setTimeout(() => {
-    target.click()
+    sceneButtonFor(target.id).click()
     syncSceneStepper()
 
     // Reposition the newly bound page to the opposite side without animation.
