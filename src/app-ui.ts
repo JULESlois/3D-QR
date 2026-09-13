@@ -30,7 +30,6 @@ function setDocumentExportBusy(busy: boolean): void {
 export interface AppUiController {
   readonly input: HTMLInputElement
   readonly meta: HTMLElement
-  readonly styleRow: HTMLElement
   readonly paletteButtons: HTMLButtonElement[]
   readonly exportGifButton: HTMLButtonElement
   readonly exportPngButton: HTMLButtonElement
@@ -48,7 +47,6 @@ export function createAppUiController(): AppUiController {
   const headline = requiredElement<HTMLElement>('#style-headline')
   const lede = requiredElement<HTMLElement>('#style-lede')
   const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
-  const styleRow = requiredElement<HTMLElement>('.style-row')
   const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
   const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
   const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
@@ -134,7 +132,6 @@ export function createAppUiController(): AppUiController {
   return {
     input,
     meta,
-    styleRow,
     paletteButtons,
     exportGifButton,
     exportPngButton,

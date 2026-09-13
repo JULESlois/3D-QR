@@ -4,6 +4,7 @@ const [
   html,
   main,
   appInteractions,
+  styleRequest,
   appExportController,
   exportControls,
   exportStatus,
@@ -20,6 +21,7 @@ const [
   readFile('index.html', 'utf8'),
   readFile('src/main.ts', 'utf8'),
   readFile('src/app-interactions.ts', 'utf8'),
+  readFile('src/style-request.ts', 'utf8'),
   readFile('src/app-export-controller.ts', 'utf8'),
   readFile('src/export-controls.ts', 'utf8'),
   readFile('src/export-status.ts', 'utf8'),
@@ -97,7 +99,14 @@ requireText(main, 'createAppExportController({', 'src/main.ts')
 requireText(main, 'exportController.start(() => {', 'src/main.ts')
 requireText(appInteractions, "context.pointerSurface.addEventListener('click'", 'src/app-interactions.ts')
 requireText(appInteractions, 'document.addEventListener(PROJECTION_VIEW_REQUEST_EVENT', 'src/app-interactions.ts')
-requireText(appInteractions, "context.styleRow.addEventListener('click'", 'src/app-interactions.ts')
+requireText(styleRequest, "STYLE_REQUEST_EVENT = 'style-request'", 'src/style-request.ts')
+requireText(appInteractions, 'document.addEventListener(STYLE_REQUEST_EVENT', 'src/app-interactions.ts')
+requireText(uiControls, 'requestStyle(target.id)', 'src/ui-controls.ts')
+requireText(shareState, 'requestStyle(state.style)', 'src/share-state.ts')
+forbidText(html, 'class="scene-options"', 'index.html hidden scene controls')
+forbidText(appUi, 'styleRow', 'src/app-ui.ts hidden scene controls')
+forbidText(appInteractions, 'styleRow', 'src/app-interactions.ts hidden scene controls')
+forbidText(main, 'styleRow', 'src/main.ts hidden scene controls')
 requireText(appInteractions, "context.input.addEventListener('input'", 'src/app-interactions.ts')
 requireText(appInteractions, 'new AbortController()', 'src/app-interactions.ts')
 requireText(appInteractions, 'window.setTimeout(() => context.rebuild(context.input.value), 180)', 'src/app-interactions.ts')

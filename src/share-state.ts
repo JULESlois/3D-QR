@@ -6,6 +6,12 @@ import {
   type ProjectionView,
   type ProjectionViewChangeDetail,
 } from './projection-view'
+import {
+  STYLE_REQUEST_EVENT,
+  isStyleRequestDetail,
+  requestStyle,
+  type StyleRequestDetail,
+} from './style-request'
 import { isStyleId, type StyleId } from './styles'
 
 export interface ShareState {
@@ -93,10 +99,6 @@ function replaceShareHash(): boolean {
   return true
 }
 
-function clickStyle(style: StyleId): void {
-  document.querySelector<HTMLButtonElement>(`[data-style="${style}"]`)?.click()
-}
-
 function clickPalette(palette: PaletteKey): void {
   document.querySelector<HTMLButtonElement>(`[data-palette="${palette}"]`)?.click()
 }
@@ -142,7 +144,7 @@ export function bindShareState(): () => void {
     }
 
     if (state.style && document.body.dataset.style !== state.style) {
-      clickStyle(state.style)
+      requestStyle(state.style)
     }
 
     if (state.palette) {
@@ -215,7 +217,15 @@ export function bindShareState(): () => void {
   document.addEventListener('click', (event) => {
     const target = event.target
     if (!(target instanceof Element)) return
-    if (!target.closest('[data-style], [data-palette]')) return
+    if (!target.closest('[data-palette]')) return
+    queueMicrotask(() => {
+      if (!signal.aborted) replaceShareHash()
+    })
+  }, { signal })
+
+  document.addEventListener(STYLE_REQUEST_EVENT, (event) => {
+    const request = event as CustomEvent<StyleRequestDetail>
+    if (!isStyleRequestDetail(request.detail)) return
     queueMicrotask(() => {
       if (!signal.aborted) replaceShareHash()
     })

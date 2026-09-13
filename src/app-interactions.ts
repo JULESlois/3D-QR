@@ -5,13 +5,17 @@ import {
   type ProjectionView,
   type ProjectionViewRequestDetail,
 } from './projection-view'
-import { isStyleId, type StyleId } from './styles'
+import {
+  STYLE_REQUEST_EVENT,
+  isStyleRequestDetail,
+  type StyleRequestDetail,
+} from './style-request'
+import type { StyleId } from './styles'
 
 export interface AppInteractionContext {
   readonly pointerSurface: HTMLElement
   readonly input: HTMLInputElement
   readonly meta: HTMLElement
-  readonly styleRow: HTMLElement
   readonly paletteButtons: readonly HTMLButtonElement[]
   isBusy(): boolean
   getView(): ProjectionView
@@ -61,14 +65,10 @@ export function bindAppInteractions(context: AppInteractionContext): () => void 
     syncProjectionSemantics(request.detail.view)
   }, { signal })
 
-  context.styleRow.addEventListener('click', (event) => {
-    const target = event.target
-    if (!(target instanceof Element)) return
-    const button = target.closest<HTMLButtonElement>('[data-style]')
-    if (!button || button.disabled || !context.styleRow.contains(button)) return
-    const requested = button.dataset.style
-    if (!requested || !isStyleId(requested)) return
-    context.requestStyle(requested)
+  document.addEventListener(STYLE_REQUEST_EVENT, (event) => {
+    const request = event as CustomEvent<StyleRequestDetail>
+    if (!isStyleRequestDetail(request.detail)) return
+    context.requestStyle(request.detail.styleId)
   }, { signal })
 
   for (const button of context.paletteButtons) {

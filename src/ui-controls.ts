@@ -1,5 +1,6 @@
 import { GIF_EXPORT_STATUS_EVENT, type GifExportStatus } from './export-status'
-import { STYLES, type StyleId } from './styles'
+import { requestStyle } from './style-request'
+import { STYLES } from './styles'
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector)
@@ -153,10 +154,6 @@ function currentSceneIndex(): number {
   return index >= 0 ? index : 0
 }
 
-function sceneButtonFor(styleId: StyleId): HTMLButtonElement {
-  return requiredElement<HTMLButtonElement>(`.scene-options [data-style="${styleId}"]`)
-}
-
 function syncSceneStepper(): void {
   const index = currentSceneIndex()
   const current = STYLES[index]
@@ -213,7 +210,7 @@ function changeSceneBy(delta: number): void {
   pulseArrow(direction)
 
   if (reducedMotion) {
-    sceneButtonFor(target.id).click()
+    requestStyle(target.id)
     syncSceneStepper()
     return
   }
@@ -226,7 +223,7 @@ function changeSceneBy(delta: number): void {
   // The complete visible page leaves first. Scene text, model and panel geometry therefore
   // never rebind or reflow in front of the user.
   sceneTimer = window.setTimeout(() => {
-    sceneButtonFor(target.id).click()
+    requestStyle(target.id)
     syncSceneStepper()
 
     // Reposition the newly bound page to the opposite side without animation.

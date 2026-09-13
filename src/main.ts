@@ -25,7 +25,6 @@ const ui = createAppUiController()
 const {
   input,
   meta,
-  styleRow,
   paletteButtons,
 } = ui
 
@@ -92,7 +91,6 @@ bindAppInteractions({
   pointerSurface: renderer.domElement,
   input,
   meta,
-  styleRow,
   paletteButtons,
   isBusy: exportController.isBusy,
   getView: () => viewTransitions.view,
