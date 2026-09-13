@@ -167,8 +167,12 @@ function syncSceneStepper(): void {
   sceneNextButton.setAttribute('aria-label', `Next scene: ${next.textContent?.trim() || 'next'}`)
 }
 
+function isAppBusy(): boolean {
+  return document.body.dataset.exportBusy === 'true'
+}
+
 function syncSceneDisabledState(): void {
-  const appBusy = sceneButtons.some((button) => button.disabled)
+  const appBusy = isAppBusy()
   scenePrevButton.disabled = sceneChanging || appBusy
   sceneNextButton.disabled = sceneChanging || appBusy
 }
@@ -197,8 +201,7 @@ function settleSceneWindow(): void {
 }
 
 function changeSceneBy(delta: number): void {
-  if (sceneButtons.length < 2 || sceneChanging) return
-  if (sceneButtons.some((button) => button.disabled)) return
+  if (sceneButtons.length < 2 || sceneChanging || isAppBusy()) return
 
   const fromIndex = currentSceneIndex()
   const targetIndex = (fromIndex + delta + sceneButtons.length) % sceneButtons.length
@@ -251,16 +254,14 @@ document.addEventListener('keydown', (event) => {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
   if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
   if (isTextEditingTarget(event.target)) return
-  if (sceneChanging || sceneButtons.some((button) => button.disabled)) return
+  if (sceneChanging || isAppBusy()) return
 
   event.preventDefault()
   changeSceneBy(event.key === 'ArrowRight' ? 1 : -1)
 })
 
 const busyObserver = new MutationObserver(syncSceneDisabledState)
-for (const button of sceneButtons) {
-  busyObserver.observe(button, { attributes: true, attributeFilter: ['disabled'] })
-}
+busyObserver.observe(document.body, { attributes: true, attributeFilter: ['data-export-busy'] })
 
 syncSceneStepper()
 syncSceneDisabledState()
