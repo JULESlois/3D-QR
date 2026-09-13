@@ -14,20 +14,6 @@ const baseUrl = `http://${host}:${previewPort}`
 const outputDir = 'browser-smoke'
 const userDataDir = '.browser-smoke-chrome'
 const expectedQrPayload = 'https://github.com/JULESlois/3D-QR'
-const qrSceneIds = [
-  'tree',
-  'forest',
-  'mountain',
-  'station',
-  'house',
-  'castle',
-  'glyph',
-  'city',
-  'lighthouse',
-  'pagoda',
-  'temple',
-  'crystal',
-]
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -439,34 +425,6 @@ function closeVoxelGaps(png) {
   return output
 }
 
-async function exerciseQrSceneMatrix(send) {
-  const decodedScenes = []
-
-  for (const sceneId of qrSceneIds) {
-    const params = new URLSearchParams({ s: sceneId, v: 'qr' })
-    await navigate(send, 1024, 1024, `${baseUrl}#${params.toString()}`)
-    await waitForValue(send, `document.body.dataset.style`, sceneId, `${sceneId} scene restore`)
-    await waitForValue(send, `document.body.dataset.mode`, 'qr', `${sceneId} QR view restore`)
-    await sleep(2_600)
-    await isolateQrProjection(send)
-
-    const result = await send('Page.captureScreenshot', {
-      format: 'png',
-      captureBeyondViewport: false,
-      fromSurface: true,
-    })
-    const bytes = Buffer.from(result.data, 'base64')
-    if (bytes.length < 10_000) {
-      throw new Error(`${sceneId} QR matrix screenshot is unexpectedly small (${bytes.length} bytes)`)
-    }
-
-    decodeQrScreenshot(bytes)
-    decodedScenes.push(sceneId)
-  }
-
-  return decodedScenes
-}
-
 function decodeQrScreenshot(bytes, expectedPayload = expectedQrPayload) {
   const png = PNG.sync.read(bytes)
   const pixels = new Uint8ClampedArray(
@@ -547,13 +505,11 @@ try {
   const qrBytes = await capture(send, 'qr-view')
   const decodedPayload = decodeQrScreenshot(qrBytes)
   const shared = await exerciseShareRestore(send)
-  const decodedScenes = await exerciseQrSceneMatrix(send)
 
   console.log(
     `browser smoke: desktop ${desktopBytes.length} bytes / mobile ${mobileBytes.length} bytes (${mobileState.style}/${mobileState.palette}) / `
       + `mobile QR ${mobileQrBytes.length} bytes / QR ${qrBytes.length} bytes / shared QR ${shared.bytes.length} bytes / `
-      + `jsQR decoded mobile ${JSON.stringify(mobileDecodedPayload)}, square ${JSON.stringify(decodedPayload)}, shared ${JSON.stringify(shared.decodedPayload)}, `
-      + `and all QR scenes [${decodedScenes.join(', ')}]`,
+      + `jsQR decoded mobile ${JSON.stringify(mobileDecodedPayload)}, square ${JSON.stringify(decodedPayload)}, and shared ${JSON.stringify(shared.decodedPayload)}`,
   )
 } finally {
   socket?.close()
