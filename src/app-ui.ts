@@ -31,7 +31,6 @@ export interface AppUiController {
   readonly input: HTMLInputElement
   readonly meta: HTMLElement
   readonly styleRow: HTMLElement
-  readonly styleButtons: HTMLButtonElement[]
   readonly paletteButtons: HTMLButtonElement[]
   readonly exportGifButton: HTMLButtonElement
   readonly exportPngButton: HTMLButtonElement
@@ -50,7 +49,6 @@ export function createAppUiController(): AppUiController {
   const lede = requiredElement<HTMLElement>('#style-lede')
   const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
   const styleRow = requiredElement<HTMLElement>('.style-row')
-  const styleButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-style]'))
   const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
   const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
   const exportPngButton = requiredElement<HTMLButtonElement>('#export-png')
@@ -59,7 +57,6 @@ export function createAppUiController(): AppUiController {
   const exportControls: Array<HTMLButtonElement | HTMLInputElement> = [
     ...exportActionButtons,
     input,
-    ...styleButtons,
     ...paletteButtons,
   ]
   let busySnapshot: Map<HTMLButtonElement | HTMLInputElement, boolean> | null = null
@@ -94,9 +91,6 @@ export function createAppUiController(): AppUiController {
     eyebrow.textContent = style.eyebrow
     headline.textContent = style.headline
     lede.textContent = style.description
-    styleButtons.forEach((button) => {
-      button.classList.toggle('is-active', button.dataset.style === styleId)
-    })
     document.body.dataset.style = styleId
     updateProjection(styleId, view)
   }
@@ -141,7 +135,6 @@ export function createAppUiController(): AppUiController {
     input,
     meta,
     styleRow,
-    styleButtons,
     paletteButtons,
     exportGifButton,
     exportPngButton,
