@@ -1,4 +1,10 @@
-import { isPaletteKey, type PaletteKey } from './palettes'
+import type { PaletteKey } from './palettes'
+import {
+  PALETTE_REQUEST_EVENT,
+  isPaletteRequestDetail,
+  requestPalette as requestPaletteCommand,
+  type PaletteRequestDetail,
+} from './palette-request'
 import {
   PROJECTION_VIEW_REQUEST_EVENT,
   isProjectionView,
@@ -71,11 +77,17 @@ export function bindAppInteractions(context: AppInteractionContext): () => void 
     context.requestStyle(request.detail.styleId)
   }, { signal })
 
+  document.addEventListener(PALETTE_REQUEST_EVENT, (event) => {
+    const request = event as CustomEvent<PaletteRequestDetail>
+    if (!isPaletteRequestDetail(request.detail)) return
+    context.requestPalette(request.detail.paletteKey)
+  }, { signal })
+
   for (const button of context.paletteButtons) {
     button.addEventListener('click', () => {
       const requested = button.dataset.palette
-      if (!requested || !isPaletteKey(requested)) return
-      context.requestPalette(requested)
+      if (!requested || !isPaletteRequestDetail({ paletteKey: requested })) return
+      requestPaletteCommand(requested)
     }, { signal })
   }
 

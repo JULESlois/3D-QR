@@ -5,6 +5,7 @@ const [
   main,
   appInteractions,
   styleRequest,
+  paletteRequest,
   appExportController,
   exportControls,
   exportStatus,
@@ -22,6 +23,7 @@ const [
   readFile('src/main.ts', 'utf8'),
   readFile('src/app-interactions.ts', 'utf8'),
   readFile('src/style-request.ts', 'utf8'),
+  readFile('src/palette-request.ts', 'utf8'),
   readFile('src/app-export-controller.ts', 'utf8'),
   readFile('src/export-controls.ts', 'utf8'),
   readFile('src/export-status.ts', 'utf8'),
@@ -102,6 +104,13 @@ requireText(appInteractions, 'document.addEventListener(PROJECTION_VIEW_REQUEST_
 requireText(styleRequest, "STYLE_REQUEST_EVENT = 'style-request'", 'src/style-request.ts')
 requireText(styleRequest, "STYLE_CHANGE_EVENT = 'style-change'", 'src/style-request.ts')
 requireText(styleRequest, 'notifyStyleChanged(styleId: StyleId)', 'src/style-request.ts')
+requireText(paletteRequest, "PALETTE_REQUEST_EVENT = 'palette-request'", 'src/palette-request.ts')
+requireText(paletteRequest, "PALETTE_CHANGE_EVENT = 'palette-change'", 'src/palette-request.ts')
+requireText(appInteractions, 'document.addEventListener(PALETTE_REQUEST_EVENT', 'src/app-interactions.ts')
+requireText(shareState, 'requestPalette(state.palette!)', 'src/share-state.ts')
+requireText(shareState, 'document.addEventListener(PALETTE_CHANGE_EVENT', 'src/share-state.ts')
+forbidText(shareState, "target.closest('[data-palette]')", 'src/share-state.ts palette DOM coupling')
+forbidText(shareState, 'clickPalette(', 'src/share-state.ts palette DOM coupling')
 requireText(main, 'createAppNavigationController({', 'src/main.ts')
 requireText(shareState, 'document.addEventListener(STYLE_CHANGE_EVENT', 'src/share-state.ts')
 forbidText(shareState, 'document.addEventListener(STYLE_REQUEST_EVENT', 'src/share-state.ts')

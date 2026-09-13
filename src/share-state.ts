@@ -1,5 +1,11 @@
 import { isPaletteKey, type PaletteKey } from './palettes'
 import {
+  PALETTE_CHANGE_EVENT,
+  isPaletteRequestDetail,
+  requestPalette,
+  type PaletteRequestDetail,
+} from './palette-request'
+import {
   PROJECTION_VIEW_CHANGE_EVENT,
   isProjectionView,
   requestProjectionView,
@@ -99,10 +105,6 @@ function replaceShareHash(): boolean {
   return true
 }
 
-function clickPalette(palette: PaletteKey): void {
-  document.querySelector<HTMLButtonElement>(`[data-palette="${palette}"]`)?.click()
-}
-
 function fallbackCopyText(value: string): boolean {
   const input = document.createElement('textarea')
   input.value = value
@@ -149,7 +151,7 @@ export function bindShareState(): () => void {
 
     if (state.palette) {
       queueMicrotask(() => {
-        if (!signal.aborted) clickPalette(state.palette!)
+        if (!signal.aborted) requestPalette(state.palette!)
       })
     }
 
@@ -214,10 +216,9 @@ export function bindShareState(): () => void {
     }, 240)
   }, { signal })
 
-  document.addEventListener('click', (event) => {
-    const target = event.target
-    if (!(target instanceof Element)) return
-    if (!target.closest('[data-palette]')) return
+  document.addEventListener(PALETTE_CHANGE_EVENT, (event) => {
+    const change = event as CustomEvent<PaletteRequestDetail>
+    if (!isPaletteRequestDetail(change.detail)) return
     queueMicrotask(() => {
       if (!signal.aborted) replaceShareHash()
     })

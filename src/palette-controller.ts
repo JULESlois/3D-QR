@@ -1,3 +1,4 @@
+import { notifyPaletteChanged } from './palette-request'
 import type { PaletteKey } from './palettes'
 import {
   applyPaletteColorBuffer,
@@ -66,6 +67,7 @@ export function createPaletteController(context: PaletteControllerContext): Pale
     const styleId = getStyleId()
     const paletteKey = getPaletteKey()
     updateUi(styleId, paletteKey)
+    notifyPaletteChanged(paletteKey)
 
     const build = getBuild()
     if (!build || !voxelMesh || reducedMotion) {
