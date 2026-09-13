@@ -257,9 +257,47 @@ async function exerciseMobileUi(send) {
     'Palette switch',
   )
 
+  const hiddenSceneCommands = await evaluateValue(
+    send,
+    `document.querySelectorAll('[data-style]').length`,
+  )
+  if (hiddenSceneCommands !== 0) {
+    throw new Error(`Hidden scene command controls regressed: ${hiddenSceneCommands} [data-style] nodes found`)
+  }
+
   await evaluateValue(send, `document.querySelector('.scene-arrow-next')?.click()`)
   await waitForValue(send, `document.body.dataset.style`, 'forest', 'Next-scene navigation')
   await waitForValue(send, `document.querySelector('.scene-current-label')?.textContent?.trim()`, 'FOREST', 'Scene label')
+  await waitForValue(
+    send,
+    `new URLSearchParams(window.location.hash.slice(1)).get('s')`,
+    'forest',
+    'Scene request share state',
+  )
+
+  await evaluateValue(send, `(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    params.set('s', 'city')
+    window.location.hash = params.toString()
+  })()`)
+  await waitForValue(send, `document.body.dataset.style`, 'city', 'Hashchange scene restore')
+  await waitForValue(send, `document.querySelector('.scene-current-label')?.textContent?.trim()`, 'CITY', 'Hashchange scene label')
+  await waitForValue(
+    send,
+    `new URLSearchParams(window.location.hash.slice(1)).get('s')`,
+    'city',
+    'Hashchange scene share state',
+  )
+
+  await evaluateValue(send, `document.querySelector('.scene-arrow-prev')?.click()`)
+  await waitForValue(send, `document.body.dataset.style`, 'glyph', 'Previous-scene semantic request')
+  await waitForValue(send, `document.querySelector('.scene-current-label')?.textContent?.trim()`, 'GLYPH', 'Previous scene label')
+  await waitForValue(
+    send,
+    `new URLSearchParams(window.location.hash.slice(1)).get('s')`,
+    'glyph',
+    'Previous scene share state',
+  )
 
   await evaluateValue(send, `document.querySelector('.panel-collapse-toggle')?.click()`)
   await waitForValue(send, `document.body.dataset.controls`, 'collapsed', 'Control-panel collapse', 5_000)
@@ -282,7 +320,7 @@ async function exerciseMobileUi(send) {
     controls: document.body.dataset.controls,
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
   }))()`)
-  if (!finalState || finalState.style !== 'forest' || finalState.sceneLabel !== 'FOREST' || finalState.palette !== 'summer' || finalState.controls !== 'expanded' || finalState.overflow) {
+  if (!finalState || finalState.style !== 'glyph' || finalState.sceneLabel !== 'GLYPH' || finalState.palette !== 'summer' || finalState.controls !== 'expanded' || finalState.overflow) {
     throw new Error(`Mobile interaction smoke ended in an invalid state: ${JSON.stringify(finalState)}`)
   }
 
