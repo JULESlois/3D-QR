@@ -1,4 +1,4 @@
-import type { PaletteKey } from './palettes'
+import { isPaletteKey, type PaletteKey } from './palettes'
 import {
   PALETTE_REQUEST_EVENT,
   isPaletteRequestDetail,
@@ -86,7 +86,7 @@ export function bindAppInteractions(context: AppInteractionContext): () => void 
   for (const button of context.paletteButtons) {
     button.addEventListener('click', () => {
       const requested = button.dataset.palette
-      if (!requested || !isPaletteRequestDetail({ paletteKey: requested })) return
+      if (!requested || !isPaletteKey(requested)) return
       requestPaletteCommand(requested)
     }, { signal })
   }
