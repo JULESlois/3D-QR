@@ -67,7 +67,20 @@ jobs:
         run: npx vite build
 
       - name: Browser viewport smoke
-        run: node scripts/run-browser-smoke-ci.mjs scripts/browser-smoke.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/run-browser-smoke-ci.mjs scripts/browser-smoke.mjs 2>&1 | tee browser-smoke.log
+          status=${PIPESTATUS[0]}
+          if (( status != 0 )); then
+            {
+              echo '### Browser viewport smoke diagnostics'
+              echo '```text'
+              tail -n 160 browser-smoke.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
 
       - name: All-scenes QR decode smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/all-scenes-qr-browser-smoke.mjs
