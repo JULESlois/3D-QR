@@ -1,4 +1,5 @@
 import { getPalette, isPaletteKey, type PaletteKey } from './palettes'
+import { getStylePaletteKeys, isStylePaletteAvailable } from './palette-policy'
 import { getStyle, type StyleId } from './styles'
 import type { ProjectionView } from './projection-view'
 
@@ -46,6 +47,7 @@ export function createAppUiController(): AppUiController {
   const eyebrow = requiredElement<HTMLElement>('#style-eyebrow')
   const headline = requiredElement<HTMLElement>('#style-headline')
   const lede = requiredElement<HTMLElement>('#style-lede')
+  const paletteControl = requiredElement<HTMLElement>('.palette-control')
   const paletteLabel = requiredElement<HTMLElement>('.palette-control > .palette-label')
   const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-palette]'))
   const exportGifButton = requiredElement<HTMLButtonElement>('#export-gif')
@@ -65,16 +67,26 @@ export function createAppUiController(): AppUiController {
     const style = getStyle(styleId)
     const palette = getPalette(styleId, paletteKey)
     const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
+    const availablePaletteKeys = getStylePaletteKeys(styleId)
+    const allowsPaletteChoice = availablePaletteKeys.length > 1
+
     document.documentElement.style.setProperty('--accent', accent)
     document.body.dataset.palette = paletteKey
+    paletteControl.hidden = !allowsPaletteChoice
+    paletteControl.setAttribute('aria-hidden', String(!allowsPaletteChoice))
     paletteLabel.textContent = `SURFACE / ${palette.label.toUpperCase()}`
 
     paletteButtons.forEach((button) => {
       const requested = button.dataset.palette
       if (!requested || !isPaletteKey(requested)) return
 
+      const available = isStylePaletteAvailable(styleId, requested)
+      button.hidden = !available
+      button.disabled = !available
+      button.classList.toggle('is-active', available && requested === paletteKey)
+      if (!available) return
+
       const option = getPalette(styleId, requested)
-      button.classList.toggle('is-active', requested === paletteKey)
       button.style.background = swatchBackground(option.swatch)
       button.setAttribute('aria-label', `${style.label} palette: ${option.label}`)
       button.title = option.label

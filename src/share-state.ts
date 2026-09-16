@@ -1,4 +1,5 @@
 import { isPaletteKey, type PaletteKey } from './palettes'
+import { isStylePaletteAvailable } from './palette-policy'
 import {
   PALETTE_CHANGE_EVENT,
   isPaletteRequestDetail,
@@ -74,6 +75,7 @@ function currentState(): ShareState | null {
     || !isStyleId(style)
     || !palette
     || !isPaletteKey(palette)
+    || !isStylePaletteAvailable(style, palette)
     || !view
     || !isProjectionView(view)
   ) return null
@@ -149,10 +151,17 @@ export function bindShareState(): () => void {
       requestStyle(state.style)
     }
 
-    if (state.palette) {
-      queueMicrotask(() => {
-        if (!signal.aborted) requestPalette(state.palette!)
-      })
+    const currentStyle = state.style ?? document.body.dataset.style
+    if (state.palette && currentStyle && isStyleId(currentStyle)) {
+      if (isStylePaletteAvailable(currentStyle, state.palette)) {
+        queueMicrotask(() => {
+          if (!signal.aborted) requestPalette(state.palette!)
+        })
+      } else {
+        queueMicrotask(() => {
+          if (!signal.aborted) replaceShareHash()
+        })
+      }
     }
 
     if (state.view) {

@@ -1,4 +1,5 @@
 import { notifyPaletteChanged } from './palette-request'
+import { isStylePaletteAvailable } from './palette-policy'
 import type { PaletteKey } from './palettes'
 import {
   applyPaletteColorBuffer,
@@ -60,11 +61,15 @@ export function createPaletteController(context: PaletteControllerContext): Pale
   }
 
   function request(nextPaletteKey: PaletteKey): void {
-    if (isBusy() || nextPaletteKey === getPaletteKey()) return
+    const styleId = getStyleId()
+    if (
+      isBusy()
+      || nextPaletteKey === getPaletteKey()
+      || !isStylePaletteAvailable(styleId, nextPaletteKey)
+    ) return
 
     const voxelMesh = voxelMeshes.mesh
     setPaletteKey(nextPaletteKey)
-    const styleId = getStyleId()
     const paletteKey = getPaletteKey()
     updateUi(styleId, paletteKey)
     notifyPaletteChanged(paletteKey)
