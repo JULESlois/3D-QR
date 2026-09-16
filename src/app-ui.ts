@@ -66,6 +66,7 @@ export function createAppUiController(): AppUiController {
     const palette = getPalette(styleId, paletteKey)
     const accent = palette.colors[Math.min(2, palette.colors.length - 1)]
     document.documentElement.style.setProperty('--accent', accent)
+    document.body.dataset.palette = paletteKey
     paletteLabel.textContent = `SURFACE / ${palette.label.toUpperCase()}`
 
     paletteButtons.forEach((button) => {

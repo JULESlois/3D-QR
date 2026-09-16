@@ -65,22 +65,22 @@ export function decodeShareHash(hash: string): Partial<ShareState> {
 function currentState(): ShareState | null {
   const input = document.querySelector<HTMLInputElement>('#qr-input')
   const style = document.body.dataset.style
-  const activePalette = document.querySelector<HTMLButtonElement>('[data-palette].is-active')?.dataset.palette
+  const palette = document.body.dataset.palette
   const view = document.body.dataset.mode
 
   if (
     !input
     || !style
     || !isStyleId(style)
-    || !activePalette
-    || !isPaletteKey(activePalette)
+    || !palette
+    || !isPaletteKey(palette)
     || !view
     || !isProjectionView(view)
   ) return null
 
   const payload = input.value.trim()
   if (!payload) return null
-  return { payload, style, palette: activePalette, view }
+  return { payload, style, palette, view }
 }
 
 function clearShareHashForEmptyPayload(): void {
