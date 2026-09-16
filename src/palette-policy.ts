@@ -27,5 +27,6 @@ export function getStylePaletteKeys(styleId: StyleId): readonly PaletteKey[] {
 }
 
 export function isStylePaletteAvailable(styleId: StyleId, paletteKey: PaletteKey): boolean {
-  return getStylePaletteKeys(styleId).includes(paletteKey)
+  const available: readonly PaletteKey[] = STYLE_PALETTE_KEYS[styleId]
+  return available.includes(paletteKey)
 }
