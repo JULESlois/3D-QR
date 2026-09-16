@@ -6,8 +6,10 @@ const ALL_PALETTES = PALETTE_KEYS as readonly PaletteKey[]
 /**
  * Palette availability is authored per scene instead of forcing every sculpture into the
  * same four-way color selector. Single-entry scenes are intentionally fixed-color designs.
+ * Widen the registry values to PaletteKey[] at the boundary so callers do not inherit a
+ * union of scene-specific tuple element types when indexing by a dynamic StyleId.
  */
-export const STYLE_PALETTE_KEYS = {
+export const STYLE_PALETTE_KEYS: Readonly<Record<StyleId, readonly PaletteKey[]>> = {
   tree: ALL_PALETTES,
   forest: ['summer', 'ginkgo', 'spectrum'],
   mountain: ['blossom', 'summer', 'spectrum'],
@@ -20,13 +22,12 @@ export const STYLE_PALETTE_KEYS = {
   pagoda: ['ginkgo'],
   temple: ['blossom'],
   crystal: ALL_PALETTES,
-} as const satisfies Record<StyleId, readonly PaletteKey[]>
+}
 
 export function getStylePaletteKeys(styleId: StyleId): readonly PaletteKey[] {
   return STYLE_PALETTE_KEYS[styleId]
 }
 
 export function isStylePaletteAvailable(styleId: StyleId, paletteKey: PaletteKey): boolean {
-  const available: readonly PaletteKey[] = STYLE_PALETTE_KEYS[styleId]
-  return available.includes(paletteKey)
+  return STYLE_PALETTE_KEYS[styleId].includes(paletteKey)
 }
