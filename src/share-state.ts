@@ -1,5 +1,5 @@
 import { isPaletteKey, type PaletteKey } from './palettes'
-import { isStylePaletteAvailable } from './palette-policy'
+import { getStylePaletteKeys, isStylePaletteAvailable } from './palette-policy'
 import {
   PALETTE_CHANGE_EVENT,
   isPaletteRequestDetail,
@@ -40,7 +40,7 @@ export function encodeShareHash(state: ShareState): string {
   const params = new URLSearchParams()
   params.set(PAYLOAD_KEY, state.payload)
   params.set(STYLE_KEY, state.style)
-  params.set(PALETTE_KEY, state.palette)
+  if (getStylePaletteKeys(state.style).length > 1) params.set(PALETTE_KEY, state.palette)
   params.set(VIEW_KEY, state.view)
   return `#${params.toString()}`
 }

@@ -15,6 +15,17 @@ if (decoded.style !== state.style) throw new Error('Share style did not round-tr
 if (decoded.palette !== state.palette) throw new Error('Share palette did not round-trip')
 if (decoded.view !== state.view) throw new Error('Share projection view did not round-trip')
 
+const fixedState: ShareState = {
+  payload: 'fixed palette scene',
+  style: 'castle',
+  palette: 'summer',
+  view: 'art',
+}
+const fixedHash = encodeShareHash(fixedState)
+const fixedParams = new URLSearchParams(fixedHash.slice(1))
+if (fixedParams.has('p')) throw new Error('Fixed-color scenes should not serialize a meaningless palette')
+if (decodeShareHash(fixedHash).style !== 'castle') throw new Error('Fixed-color scene did not round-trip')
+
 const invalid = decodeShareHash('#q=hello&s=not-a-style&p=invalid&v=sideways')
 if (invalid.payload !== 'hello') throw new Error('Valid share payload was discarded')
 if (invalid.style !== undefined) throw new Error('Invalid style should be ignored')
@@ -33,4 +44,4 @@ if (legacy.payload !== 'legacy' || legacy.style !== 'forest' || legacy.palette !
 }
 if (legacy.view !== undefined) throw new Error('Legacy share hash should not invent a projection view')
 
-console.log(`share-state smoke: ${hash.length} chars / codec round-trip passed with projection view`)
+console.log(`share-state smoke: ${hash.length} chars / codec round-trip passed with scene palette policy`)
