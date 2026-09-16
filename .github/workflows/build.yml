@@ -48,7 +48,20 @@ jobs:
         run: npm run test:gif
 
       - name: TypeScript type-check
-        run: npx tsc --noEmit
+        shell: bash
+        run: |
+          set +e
+          npx tsc --noEmit --pretty false 2>&1 | tee typecheck.log
+          status=${PIPESTATUS[0]}
+          if (( status != 0 )); then
+            {
+              echo '### TypeScript diagnostics'
+              echo '```text'
+              sed -n '1,120p' typecheck.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
 
       - name: Vite build
         run: npx vite build
