@@ -32,8 +32,26 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Type-check and build
-        run: npm run build
+      - name: Projection smoke
+        run: npm run test:projection
+
+      - name: Material tone smoke
+        run: npm run test:material
+
+      - name: Share-state smoke
+        run: npm run test:share
+
+      - name: UI architecture smoke
+        run: npm run test:ui-architecture
+
+      - name: GIF encoder smoke
+        run: npm run test:gif
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: Vite build
+        run: npx vite build
 
       - name: Browser viewport smoke
         run: node scripts/run-browser-smoke-ci.mjs scripts/browser-smoke.mjs
