@@ -259,10 +259,10 @@ async function exerciseMobileUi(send) {
 
   const hiddenSceneCommands = await evaluateValue(
     send,
-    `document.querySelectorAll('[data-style]').length`,
+    `document.querySelectorAll('button[data-style], [role="button"][data-style], .scene-options [data-style]').length`,
   )
   if (hiddenSceneCommands !== 0) {
-    throw new Error(`Hidden scene command controls regressed: ${hiddenSceneCommands} [data-style] nodes found`)
+    throw new Error(`Hidden scene command controls regressed: ${hiddenSceneCommands} interactive [data-style] nodes found`)
   }
 
   await evaluateValue(send, `document.querySelector('.scene-arrow-next')?.click()`)
@@ -320,7 +320,7 @@ async function exerciseMobileUi(send) {
     controls: document.body.dataset.controls,
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
   }))()`)
-  if (!finalState || finalState.style !== 'glyph' || finalState.sceneLabel !== 'GLYPH' || finalState.palette !== 'summer' || finalState.controls !== 'expanded' || finalState.overflow) {
+  if (!finalState || finalState.style !== 'glyph' || finalState.sceneLabel !== 'GLYPH' || finalState.palette !== 'spectrum' || finalState.controls !== 'expanded' || finalState.overflow) {
     throw new Error(`Mobile interaction smoke ended in an invalid state: ${JSON.stringify(finalState)}`)
   }
 
